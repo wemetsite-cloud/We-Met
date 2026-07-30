@@ -1,0 +1,16 @@
+{
+  "name": "we-met-platform",
+  "version": "4.1.0",
+  "private": true,
+  "description": "Publish-ready separate customer, listener and admin portals with Malayalam browser calls, chat and coupon talk-time.",
+  "scripts": {
+    "install:backend": "npm --prefix backend install --registry=https://registry.npmjs.org/",
+    "start": "npm --prefix backend start",
+    "dev": "npm --prefix backend run dev",
+    "db:init": "npm --prefix backend run db:init",
+    "check": "node tools/check-project.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "we-met-backend",
+  "version": "4.1.0",
+  "private": true,
+  "description": "We Met English-interface platform for private Malayalam browser voice calls, live chat and coupon talk-time.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "db:init": "node scripts/init-db.js",
+    "check": "node scripts/check-syntax.js",
+    "start:production": "node scripts/init-db.js && node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.1"
+  }
+}

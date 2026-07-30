@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f0448f">
+  <meta name="description" content="Private Malayalam voice conversations with verified listeners, browser calling and per-second talk-time billing.">
+  <title>We Met — Talk freely. Feel lighter.</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="page-glow page-glow-one" aria-hidden="true"></div>
+  <div class="page-glow page-glow-two" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="We Met home">
+      <img src="assets/logo.svg" alt="">
+      <span><strong>We Met</strong><small>Malayalam conversations</small></span>
+    </a>
+    <div class="top-actions">
+      <button id="notificationPermission" class="button button-quiet button-small" type="button">Enable alerts</button>
+      <button id="openAuth" class="button button-primary button-small" type="button">Sign in</button>
+      <button id="logoutBtn" class="button button-quiet button-small hidden" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main id="mainContent">
+    <section id="landing" class="landing">
+      <div class="hero shell">
+        <div class="hero-copy">
+          <span class="eyebrow"><i></i> Malayalam voice conversations, on your time</span>
+          <h1>A real conversation,<br><em>whenever you need one.</em></h1>
+          <p class="hero-lead">Talk freely. Feel lighter. Add talk-time to your wallet, choose an available female listener and start a private browser voice call in seconds.</p>
+          <div class="hero-buttons">
+            <button class="button button-primary button-large" data-auth="register" type="button">Create free account</button>
+            <button class="button button-soft button-large" data-auth="login" type="button">Sign in</button>
+          </div>
+          <div class="trust-row" aria-label="Platform benefits">
+            <span><b>Private</b>No phone number shown</span>
+            <span><b>Fair</b>Charged per connected second</span>
+            <span><b>Simple</b>No app required</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="We Met call preview">
+          <div class="preview-orbit orbit-one"></div>
+          <div class="preview-orbit orbit-two"></div>
+          <article class="phone-preview">
+            <div class="preview-head">
+              <span class="mini-brand"><img src="assets/logo.svg" alt="">We Met</span>
+              <span class="online-pill"><i></i> Available</span>
+            </div>
+            <div class="preview-person">
+              <div class="listener-art avatar-rose"><span>SM</span></div>
+              <span class="language-chip">Malayalam listener</span>
+              <h3>Someone is ready to listen</h3>
+              <p>Your identity stays private throughout the call.</p>
+            </div>
+            <button class="preview-call" type="button" data-auth="register"><span>⌕</span> Start a conversation</button>
+            <div class="preview-note"><span>00:00</span><small>Timer begins after audio connects</small></div>
+          </article>
+          <div class="floating-note note-one">Private by design</div>
+          <div class="floating-note note-two">Malayalam only</div>
+        </div>
+      </div>
+
+      <div class="feature-grid shell">
+        <article><span>01</span><div><h2>Private connection</h2><p>Your phone number and email are never shown to the listener.</p></div></article>
+        <article><span>02</span><div><h2>Pay by second</h2><p>Your balance reduces only after both sides have a live audio connection.</p></div></article>
+        <article><span>03</span><div><h2>Browser calling</h2><p>Use a modern browser on your phone or computer. No installation needed.</p></div></article>
+      </div>
+
+      <section class="how-it-works shell">
+        <div class="section-copy"><span class="eyebrow">HOW IT WORKS</span><h2>From sign-in to a Malayalam conversation in three steps.</h2></div>
+        <div class="steps">
+          <article><b>1</b><h3>Add talk-time</h3><p>Redeem a code shared by the We Met team or support.</p></article>
+          <article><b>2</b><h3>Choose a listener</h3><p>Pick an available listener or let We Met find one automatically.</p></article>
+          <article><b>3</b><h3>Talk and chat</h3><p>Use clear voice calling and live text chat in the same private session.</p></article>
+        </div>
+      </section>
+    </section>
+
+    <section id="dashboard" class="dashboard hidden shell">
+      <div class="welcome-card">
+        <div>
+          <span class="eyebrow">YOUR SPACE</span>
+          <h1 id="helloName">Hello</h1>
+          <p>Choose a listener and start a Malayalam conversation whenever you feel like talking.</p>
+        </div>
+        <div class="wallet-pill"><small>Talk-time available</small><strong id="balanceTop">0:00</strong><button type="button" data-jump="wallet">Add minutes</button></div>
+      </div>
+
+      <nav class="tabs" id="tabs" aria-label="Customer navigation">
+        <button class="active" data-tab="home" type="button"><span>Home</span></button>
+        <button data-tab="wallet" type="button"><span>Wallet</span></button>
+        <button data-tab="history" type="button"><span>History</span></button>
+        <button data-tab="favorites" type="button"><span>Favourites</span></button>
+        <button data-tab="notifications" type="button"><span>Alerts</span></button>
+        <button data-tab="support" type="button"><span>Support</span></button>
+        <button data-tab="profile" type="button"><span>Profile</span></button>
+      </nav>
+
+      <div class="tab active" id="tab-home">
+        <section class="call-hero">
+          <div>
+            <span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking listener availability…</span></span>
+            <h2>Ready to talk?</h2>
+            <p>Choose a listener yourself, reconnect with your previous listener, or let We Met find the next available person.</p>
+            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button">Call an available listener</button><button class="button button-quiet" type="button" data-jump="wallet">Redeem code</button></div>
+          </div>
+          <div class="balance-ring"><span>Talk-time</span><strong id="balanceRing">0:00</strong><small>Minimum 2 minutes to call</small></div>
+        </section>
+
+        <div id="previousBox" class="previous-box hidden"></div>
+        <div class="section-head"><div><span class="eyebrow">AVAILABLE NOW</span><h2>Choose your Malayalam listener</h2><p>All listeners on We Met are women.</p></div><button id="refreshListeners" class="button button-quiet" type="button">Refresh</button></div>
+        <div id="listenerGrid" class="listener-grid" aria-live="polite"></div>
+      </div>
+
+      <div class="tab" id="tab-wallet">
+        <div class="grid-two">
+          <section class="panel coupon-panel">
+            <span class="eyebrow">REDEEM TALK-TIME</span>
+            <h2>Enter your We Met code</h2>
+            <p>Codes are created by the administrator. Each code adds a fixed number of minutes to your wallet.</p>
+            <form id="couponForm" class="inline-form"><label class="sr-only" for="couponCode">Redeem code</label><input id="couponCode" autocomplete="off" placeholder="Example: WEMET-LOVE" required><button class="button button-primary">Redeem</button></form>
+          </section>
+          <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
+        </div>
+        <div class="section-head"><div><span class="eyebrow">REFERENCE PACKS</span><h2>Talk-time plans</h2><p>These prices are references for codes issued by the team. Online payments are currently hidden.</p></div></div>
+        <div id="plansGrid" class="plans-grid"></div>
+        <div class="section-head compact"><div><h2>Wallet activity</h2></div></div>
+        <div id="walletHistory" class="list"></div>
+      </div>
+
+      <div class="tab" id="tab-history"><div class="section-head"><div><span class="eyebrow">YOUR CONVERSATIONS</span><h2>Call history</h2></div></div><div id="callHistory" class="list"></div></div>
+      <div class="tab" id="tab-favorites"><div class="section-head"><div><span class="eyebrow">SAVED LISTENERS</span><h2>Your favourites</h2></div></div><div id="favoritesList" class="listener-grid"></div></div>
+      <div class="tab" id="tab-notifications"><div class="section-head"><div><span class="eyebrow">UPDATES</span><h2>Notifications</h2></div><button id="readNotifications" class="button button-quiet" type="button">Mark all read</button></div><div id="notificationsList" class="list"></div></div>
+
+      <div class="tab" id="tab-support">
+        <div class="grid-two">
+          <section class="panel"><span class="eyebrow">CONTACT SUPPORT</span><h2>Send a message to the admin</h2><form id="supportForm" class="stack"><label>Subject<input id="supportSubject" maxlength="120" required placeholder="What do you need help with?"></label><label>Message<textarea id="supportMessage" maxlength="3000" required placeholder="Explain the issue clearly"></textarea></label><button class="button button-primary">Send message</button></form><small>Support email: wemetsite@gmail.com</small></section>
+          <section class="panel safety-panel"><span class="eyebrow">STAY SAFE</span><h2>Keep personal information private</h2><p>Never share your phone number, OTP, bank details, passwords or private images during a conversation.</p><button class="button button-soft legal-btn" data-legal="safety" type="button">Read safety policy</button></section>
+        </div>
+        <div class="about-grid">
+          <section class="panel"><h3>About We Met</h3><p>An English-interface platform built for private Malayalam voice conversations, text chat and connected-second billing.</p></section>
+          <section class="panel"><h3>Frequently asked</h3><p><b>Do I need an app?</b> No, a supported browser is enough.</p><p><b>Can the listener see my number?</b> No.</p><p><b>When does billing start?</b> After live audio connects.</p></section>
+          <section class="panel"><h3>Account help</h3><p>Use the support form for password recovery, account changes or an account-deletion request.</p></section>
+        </div>
+        <div class="section-head compact"><div><h2>Your support messages</h2></div></div><div id="supportList" class="list"></div>
+      </div>
+
+      <div class="tab" id="tab-profile">
+        <div class="grid-two">
+          <section class="panel profile-summary"><span class="eyebrow">ACCOUNT</span><div class="profile-mark"><img src="assets/logo.svg" alt=""></div><h2 id="profileName">—</h2><p id="profileEmail">—</p><p id="profileDob">—</p><div class="legal-links"><button class="legal-btn" data-legal="terms" type="button">Terms</button><button class="legal-btn" data-legal="privacy" type="button">Privacy</button><button class="legal-btn" data-legal="refund" type="button">Refund policy</button></div></section>
+          <section class="panel security-panel"><span class="eyebrow">ACCOUNT SECURITY</span><form id="loginChangeForm" class="stack"><h2>Change email</h2><label>New email<input id="newEmail" type="email" autocomplete="email" required></label><label>Current password<input id="emailChangePassword" type="password" autocomplete="current-password" required></label><button class="button button-soft">Update email</button></form><hr><form id="passwordForm" class="stack"><h2>Change password</h2><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form></section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="authModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-card auth-card">
+      <button class="close" data-close="authModal" type="button" aria-label="Close">×</button>
+      <img class="auth-logo" src="assets/logo.svg" alt="">
+      <span class="eyebrow">WELCOME TO WE MET</span>
+      <h2 id="authTitle">Welcome back</h2>
+      <p id="authSubtitle">Sign in to continue.</p>
+      <div class="auth-switch"><button data-mode="login" class="active" type="button">Sign in</button><button data-mode="register" type="button">Create account</button></div>
+      <form id="loginForm" class="stack"><label>Email<input id="loginIdentifier" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password"></label><button class="button button-primary button-large">Sign in</button><button type="button" id="forgotOpen" class="link-button">Forgot password?</button></form>
+      <form id="registerForm" class="stack hidden"><label>Full name<input id="regName" autocomplete="name" required></label><label>Email<input id="regEmail" type="email" autocomplete="email" required></label><label>Date of birth<input id="regDob" type="date" required></label><label>Password<input id="regPassword" type="password" minlength="8" autocomplete="new-password" required><small>Use at least 8 characters.</small></label><label class="check"><input id="regTerms" type="checkbox" required><span>I am at least 16 and accept the Terms and Privacy Policy.</span></label><button class="button button-primary button-large">Create account</button></form>
+      <form id="forgotForm" class="stack hidden"><p>Enter your account email. A password-reset request will be sent to the administrator.</p><label>Email<input id="forgotIdentifier" type="email" autocomplete="email" required></label><button class="button button-primary">Send request</button><button type="button" id="backLogin" class="link-button">Back to sign in</button></form>
+    </div>
+  </div>
+
+  <div id="callModal" class="call-modal hidden" role="dialog" aria-modal="true" aria-label="Active call">
+    <div class="call-shell">
+      <div class="call-top"><span id="callState">Finding a listener…</span><button id="minimizeCall" class="icon-button" type="button" aria-label="Minimize call">—</button></div>
+      <div class="call-person"><div class="call-avatar"><img src="assets/logo.svg" alt=""></div><span class="language-chip">Malayalam call</span><h2 id="callPerson">Listener</h2><p id="callBio">A private conversation</p><strong id="callTimer">0:00</strong><small>Wallet: <span id="callBalance">0:00</span></small></div>
+      <div class="chat-box"><div id="chatMessages" class="chat-messages" aria-live="polite"></div><form id="chatForm" class="chat-form"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Type a message…"><button type="submit" aria-label="Send message">➤</button></form></div>
+      <div class="call-actions"><button id="muteBtn" class="round-action" type="button"><span>🎙</span><small>Mute</small></button><button id="reportCallBtn" class="round-action" type="button"><span>⚑</span><small>Report</small></button><button id="endCallBtn" class="round-action end" type="button"><span>☎</span><small>End</small></button></div>
+    </div>
+  </div>
+  <button id="restoreCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small id="restoreTimer">0:00</small></button>
+
+  <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
+  <audio id="remoteAudio" autoplay></audio>
+  <script src="config.js"></script><script src="socket-loader.js"></script><script src="api.js"></script><script src="webrtc.js"></script><script src="app.js"></script>
+</body>
+</html>
