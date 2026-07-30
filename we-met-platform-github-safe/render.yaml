@@ -6,10 +6,10 @@ services:
     plan: free
     numInstances: 1
     autoDeployTrigger: commit
+    rootDir: we-met-platform-github-safe
     buildCommand: cd backend && npm ci --omit=dev
     startCommand: cd backend && npm run start:production
     healthCheckPath: /api/health
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: NODE_ENV
         value: "production"
