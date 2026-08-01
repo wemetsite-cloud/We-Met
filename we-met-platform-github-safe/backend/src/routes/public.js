@@ -1,4 +1,5 @@
 const express = require('express');
+const QRCode = require('qrcode');
 const db = require('../db');
 const config = require('../config');
 const { asyncHandler } = require('../middleware');
@@ -11,6 +12,42 @@ router.get('/plans', asyncHandler(async (_req, res) => {
      FROM plans WHERE active=true ORDER BY sort_order,price_paise`,
   );
   res.json({ plans: result.rows });
+}));
+
+router.get('/payment-checkout/:planId', asyncHandler(async (req, res) => {
+  const result = await db.query(
+    `SELECT id,name,price_paise,seconds,popular
+     FROM plans WHERE id=$1 AND active=true`,
+    [req.params.planId],
+  );
+  const plan = result.rows[0];
+  if (!plan) return res.status(404).json({ error: 'This talk-time pack is no longer available.' });
+
+  const paymentParams = new URLSearchParams({
+    pa: config.paymentUpiId,
+    pn: config.paymentPayeeName,
+    am: (Number(plan.price_paise) / 100).toFixed(2),
+    cu: 'INR',
+    tn: `We Met ${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
+  }).toString();
+  const upiUrl = `upi://pay?${paymentParams}`;
+  const qrDataUrl = await QRCode.toDataURL(upiUrl, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 420,
+    color: { dark: '#301420', light: '#ffffff' },
+  });
+
+  res.setHeader('Cache-Control', 'private, no-store');
+  return res.json({
+    plan,
+    payeeUpiId: config.paymentUpiId,
+    payeeName: config.paymentPayeeName,
+    upiUrl,
+    googlePayUrl: `tez://upi/pay?${paymentParams}`,
+    googlePayIosUrl: `gpay://upi/pay?${paymentParams}`,
+    qrDataUrl,
+  });
 }));
 
 router.get('/config', (_req, res) => res.json({

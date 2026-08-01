@@ -1,4 +1,4 @@
-const CACHE = 'we-met-customer-v5.0.0';
+const CACHE = 'we-met-customer-v5.1.0';
 const STATIC = [
   './',
   'index.html',

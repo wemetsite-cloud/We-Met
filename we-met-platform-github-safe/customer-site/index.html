@@ -132,6 +132,7 @@
         </div>
         <div class="section-head"><div><span class="eyebrow">PAY WITH UPI</span><h2>Choose a talk-time pack</h2><p>Pay from your UPI app, upload the payment screenshot, and wait for administrator verification. Minutes are credited only after approval.</p></div></div>
         <div id="plansGrid" class="plans-grid"></div>
+        <div id="activePaymentBanner" class="active-payment-banner hidden" aria-live="polite"></div>
         <div class="section-head compact"><div><h2>Your payment submissions</h2><p>Pending proofs are usually reviewed manually by the administrator.</p></div><button id="refreshPayments" class="button button-quiet" type="button">Refresh</button></div>
         <div id="paymentHistory" class="list"></div>
         <div class="section-head compact"><div><h2>Wallet activity</h2></div></div>
@@ -179,20 +180,63 @@
     </div>
   </div>
 
-  <div id="paymentModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="paymentTitle">
+  <div id="paymentModal" class="modal payment-modal hidden" role="dialog" aria-modal="true" aria-labelledby="paymentTitle">
     <div class="modal-card payment-card">
-      <button class="close" data-close="paymentModal" type="button" aria-label="Close">×</button>
-      <span class="eyebrow">MANUAL UPI PAYMENT</span><h2 id="paymentTitle">Add talk-time</h2>
-      <div id="paymentSummary" class="payment-summary"></div>
-      <div class="upi-box"><small>Pay exactly to</small><strong id="paymentUpiId">salahkpsite@slc</strong><div><button id="copyUpi" class="button button-quiet" type="button">Copy UPI ID</button><a id="openUpiApp" class="button button-soft" href="#">Open UPI app</a></div></div>
-      <form id="paymentForm" class="stack">
-        <input id="paymentPlanId" name="planId" type="hidden">
-        <label>UPI transaction / UTR reference (recommended)<input id="paymentUtr" name="utrReference" maxlength="100" autocomplete="off" placeholder="Example: 426781234567"></label>
-        <label>Payment screenshot (PNG, JPEG or WebP; max 5 MB)<input id="paymentProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp" required></label>
-        <label>Note to administrator (optional)<textarea id="paymentNote" name="customerNote" maxlength="500" placeholder="Add any useful payment detail"></textarea></label>
-        <p class="payment-warning">Do not upload bank statements, OTPs, card details or unrelated private information.</p>
-        <button class="button button-primary button-large">Submit payment proof</button>
-      </form>
+      <button class="close" data-close="paymentModal" type="button" aria-label="Close payment checkout">×</button>
+      <div class="payment-heading"><span class="eyebrow">SECURE UPI CHECKOUT</span><h2 id="paymentTitle">Add talk-time</h2><p>Pay the exact amount, submit your receipt, and track the administrator’s review.</p></div>
+      <ol id="paymentProgress" class="payment-progress" aria-label="Payment progress">
+        <li data-payment-progress="pay"><b>1</b><span>Pay</span></li>
+        <li data-payment-progress="upload"><b>2</b><span>Upload proof</span></li>
+        <li data-payment-progress="status"><b>3</b><span>Verification</span></li>
+      </ol>
+
+      <section id="paymentStepPay" class="payment-step" data-payment-step="pay">
+        <div id="paymentLoading" class="checkout-loading"><i></i><strong>Preparing your exact payment…</strong></div>
+        <div id="paymentPayContent" class="hidden">
+          <div id="paymentSummary" class="payment-summary"></div>
+          <div class="payment-methods">
+            <div class="upi-actions-card">
+              <span class="payment-kicker">PAY ON THIS PHONE</span>
+              <h3>Open a UPI payment app</h3>
+              <p>The amount, recipient and payment note are filled automatically.</p>
+              <a id="payGooglePay" class="payment-app-button gpay-button" href="#"><span class="gpay-mark">G</span><b>Pay with Google Pay</b><small>Open GPay directly</small></a>
+              <a id="openUpiApp" class="payment-app-button upi-button" href="#"><span>UPI</span><b>Choose any UPI app</b><small>PhonePe, Paytm, BHIM and more</small></a>
+              <div class="payee-copy"><div><small>Recipient UPI ID</small><strong id="paymentUpiId">salahkpsite@slc</strong></div><button id="copyUpi" class="button button-quiet" type="button">Copy</button></div>
+            </div>
+            <div class="payment-qr-card">
+              <span class="payment-kicker">SCAN FROM ANOTHER PHONE</span>
+              <div class="qr-frame"><img id="paymentQr" alt="UPI payment QR code"></div>
+              <strong id="paymentQrAmount">—</strong><small>Scan with any UPI app</small>
+            </div>
+          </div>
+          <p class="payment-safe-note"><b>Before continuing:</b> confirm the UPI app shows <span id="paymentPayeeName">We Met</span>, recipient <span id="paymentSafeUpi">salahkpsite@slc</span>, and the exact amount above.</p>
+          <button id="paymentPaidNext" class="button button-primary button-large payment-next" type="button">I’ve completed the payment</button>
+        </div>
+      </section>
+
+      <section id="paymentStepUpload" class="payment-step hidden" data-payment-step="upload">
+        <div class="upload-intro"><span class="upload-icon">↑</span><div><h3>Upload the successful-payment screenshot</h3><p>The administrator uses this proof to verify your payment before adding minutes.</p></div></div>
+        <form id="paymentForm" class="stack">
+          <input id="paymentPlanId" name="planId" type="hidden">
+          <label>Payment screenshot <span class="required-label">Required</span><input id="paymentProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp" required><small>PNG, JPEG or WebP · maximum 5 MB</small></label>
+          <div id="paymentProofPreview" class="proof-preview hidden"><img id="paymentProofImage" alt="Selected payment screenshot preview"><div><strong id="paymentProofName">Screenshot selected</strong><small>Check that the amount, recipient and success status are readable.</small></div></div>
+          <label>UPI transaction / UTR reference <span class="optional-label">Recommended</span><input id="paymentUtr" name="utrReference" maxlength="100" autocomplete="off" inputmode="numeric" placeholder="Example: 426781234567"></label>
+          <label>Note to administrator <span class="optional-label">Optional</span><textarea id="paymentNote" name="customerNote" maxlength="500" placeholder="Add any useful payment detail"></textarea></label>
+          <p class="payment-warning">For your safety, do not upload a bank statement or anything containing an OTP, card number, password or unrelated private information.</p>
+          <div class="payment-form-actions"><button id="backToPayment" class="button button-quiet" type="button">Back to payment</button><button class="button button-primary button-large" type="submit">Send for verification</button></div>
+        </form>
+      </section>
+
+      <section id="paymentStepStatus" class="payment-step hidden" data-payment-step="status" aria-live="polite">
+        <div id="paymentStatusIcon" class="payment-status-icon pending"><i></i></div>
+        <span id="paymentLiveLabel" class="payment-live-label"><i></i> LIVE STATUS</span>
+        <h3 id="paymentStatusTitle">Waiting for administrator approval</h3>
+        <p id="paymentStatusText">Your proof was sent successfully. This screen updates automatically after the administrator approves or declines it.</p>
+        <div id="pendingPaymentSummary" class="pending-payment-summary"></div>
+        <div id="paymentAdminMessage" class="admin-payment-message hidden"></div>
+        <p id="paymentWaitNote" class="payment-wait-note">You can safely go back and use the rest of the site. Your wallet and this payment status will update automatically.</p>
+        <div class="payment-status-actions"><button id="checkPaymentNow" class="button button-soft" type="button">Check now</button><button id="paymentBackWallet" class="button button-primary" type="button">Back to wallet</button></div>
+      </section>
     </div>
   </div>
 

@@ -90,6 +90,8 @@ const workflowSources = {
   admin: fs.readFileSync(path.join(root, 'backend/src/routes/admin.js'), 'utf8'),
   customer: fs.readFileSync(path.join(root, 'backend/src/routes/customer.js'), 'utf8'),
   auth: fs.readFileSync(path.join(root, 'backend/src/routes/auth.js'), 'utf8'),
+  public: fs.readFileSync(path.join(root, 'backend/src/routes/public.js'), 'utf8'),
+  customerUi: fs.readFileSync(path.join(root, 'customer-site/app.js'), 'utf8'),
 };
 const invariants = [
   [workflowSources.socket.includes("socket.on('chat:send'") && workflowSources.socket.includes('callId,\n          senderId'), 'Chat messages must include callId and delivery acknowledgement.'],
@@ -97,6 +99,8 @@ const invariants = [
   [schema.includes('uq_wallet_payment_credit') && schema.includes("type='payment'"), 'Payment credits must be idempotent in the wallet ledger.'],
   [workflowSources.customer.includes('validImageBytes') && workflowSources.customer.includes('5 * 1024 * 1024'), 'Payment screenshot validation and size limits are required.'],
   [workflowSources.auth.includes('recovery_key_hash') && workflowSources.auth.includes("request.status !== 'approved'"), 'Password recovery must require the private key and administrator approval.'],
+  [workflowSources.public.includes('QRCode.toDataURL') && workflowSources.public.includes('googlePayUrl') && workflowSources.public.includes('upiUrl'), 'Checkout must provide exact UPI, Google Pay and QR payment options.'],
+  [workflowSources.customerUi.includes('previewPaymentProof') && workflowSources.customerUi.includes('startPaymentPolling'), 'Customer checkout must preview proof and refresh administrator approval status.'],
 ];
 for (const [valid, message] of invariants) {
   if (!valid) {
