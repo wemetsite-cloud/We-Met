@@ -33,6 +33,7 @@ function signToken(user) {
     sub: user.id,
     role: user.role,
     name: user.name,
+    ver: Number(user.auth_version || 0),
     iss: config.appName,
     iat: now,
     exp: now + 7 * 24 * 60 * 60,

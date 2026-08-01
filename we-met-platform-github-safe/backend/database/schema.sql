@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   employee_code text UNIQUE,
   upi_id text,
   password_hash text NOT NULL,
+  auth_version integer NOT NULL DEFAULT 0,
   balance_seconds integer NOT NULL DEFAULT 0 CHECK (balance_seconds >= 0),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','blocked','suspended')),
   suspended_until timestamptz,
@@ -71,7 +72,7 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   seconds_delta integer NOT NULL,
-  type text NOT NULL CHECK (type IN ('coupon','admin_adjustment','call_debit')),
+  type text NOT NULL CHECK (type IN ('coupon','admin_adjustment','call_debit','payment')),
   note text,
   reference_id uuid,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -129,10 +130,36 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TABLE IF NOT EXISTS password_reset_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','closed')),
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','approved','declined','completed')),
+  recovery_key_hash text,
   note text,
+  admin_message text,
   created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '72 hours'),
+  reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
   resolved_at timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS payment_submissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_id uuid REFERENCES plans(id) ON DELETE SET NULL,
+  plan_name text NOT NULL,
+  amount_paise integer NOT NULL CHECK (amount_paise > 0),
+  seconds integer NOT NULL CHECK (seconds > 0),
+  payee_upi_id text NOT NULL,
+  utr_reference text,
+  customer_note text,
+  proof_mime text NOT NULL,
+  proof_size integer NOT NULL CHECK (proof_size > 0 AND proof_size <= 5242880),
+  proof_data bytea NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','declined')),
+  admin_message text,
+  reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Safe upgrades from earlier packages.
@@ -143,11 +170,34 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version integer NOT NULL DEFAULT 0;
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS popular boolean NOT NULL DEFAULT false;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_id uuid REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal';
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS admin_note text;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS recovery_key_hash text;
+ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS admin_message text;
+ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '72 hours');
+ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
+
+ALTER TABLE password_reset_requests DROP CONSTRAINT IF EXISTS password_reset_requests_status_check;
+
+UPDATE password_reset_requests SET status='completed' WHERE status='resolved';
+UPDATE password_reset_requests SET status='declined' WHERE status='closed';
+UPDATE password_reset_requests
+SET status='declined',admin_message='Submit a new recovery request to receive a secure recovery key.',resolved_at=now()
+WHERE status='open' AND recovery_key_hash IS NULL;
+
+DO $$ BEGIN
+  ALTER TABLE password_reset_requests ADD CONSTRAINT password_reset_requests_status_check CHECK (status IN ('open','approved','declined','completed'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE wallet_transactions DROP CONSTRAINT IF EXISTS wallet_transactions_type_check;
+  ALTER TABLE wallet_transactions ADD CONSTRAINT wallet_transactions_type_check CHECK (type IN ('coupon','admin_adjustment','call_debit','payment'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
@@ -164,6 +214,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_name ON plans(name);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_customer ON calls(customer_id) WHERE status IN ('ringing','connecting','active');
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_employee ON calls(employee_id) WHERE status IN ('ringing','connecting','active');
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role,status);
 CREATE INDEX IF NOT EXISTS idx_calls_customer ON calls(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_employee ON calls(employee_id,created_at DESC);
@@ -172,6 +223,10 @@ CREATE INDEX IF NOT EXISTS idx_wallet_customer ON wallet_transactions(customer_i
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_password_resets_status ON password_reset_requests(status,created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_recovery_key ON password_reset_requests(recovery_key_hash) WHERE recovery_key_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payments_customer ON payment_submissions(customer_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payment_submissions(status,created_at DESC);
 
 INSERT INTO plans (name,price_paise,seconds,popular,active,sort_order) VALUES
 ('Starter',4900,300,false,true,10),

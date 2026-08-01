@@ -21,7 +21,7 @@ function integer(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_I
 }
 
 router.get('/dashboard', asyncHandler(async (_req, res) => {
-  const [users, calls, reports, tickets, coupons, minutes] = await Promise.all([
+  const [users, calls, reports, tickets, coupons, minutes, payments] = await Promise.all([
     db.query(`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role`),
     db.query(`
       SELECT status, COUNT(*)::int AS count,
@@ -33,6 +33,7 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     db.query(`SELECT COUNT(*)::int AS count FROM support_tickets WHERE status = 'open'`),
     db.query(`SELECT COUNT(*)::int AS count FROM coupons WHERE active = true`),
     db.query(`SELECT COALESCE(SUM(billed_seconds), 0)::bigint AS seconds FROM calls`),
+    db.query(`SELECT COUNT(*)::int AS count FROM payment_submissions WHERE status='pending'`),
   ]);
 
   res.json({
@@ -42,6 +43,7 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     openTickets: tickets.rows[0].count,
     activeCoupons: coupons.rows[0].count,
     totalTalkSeconds: Number(minutes.rows[0].seconds),
+    pendingPayments: payments.rows[0].count,
   });
 }));
 
@@ -219,7 +221,7 @@ router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
   }
 
   const result = await db.query(`
-    UPDATE users SET password_hash = $2, updated_at = now()
+    UPDATE users SET password_hash = $2, auth_version=auth_version+1, updated_at = now()
     WHERE id = $1
     RETURNING id
   `, [req.params.id, await hashPassword(password)]);
@@ -230,9 +232,11 @@ router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
 
   await db.query(`
     UPDATE password_reset_requests
-    SET status = 'resolved', resolved_at = now()
-    WHERE user_id = $1 AND status = 'open'
+    SET status = 'completed', resolved_at = now()
+    WHERE user_id = $1 AND status IN ('open','approved')
   `, [req.params.id]);
+
+  await req.app.locals.socketRuntime?.restrictUser(req.params.id, 'Password reset by administrator. Sign in again.');
 
   res.json({ ok: true });
 }));
@@ -494,6 +498,11 @@ router.patch('/support/:id', asyncHandler(async (req, res) => {
 }));
 
 router.get('/password-resets', asyncHandler(async (_req, res) => {
+  await db.query(`
+    UPDATE password_reset_requests
+    SET status='declined',admin_message='This recovery request expired.',resolved_at=now()
+    WHERE status IN ('open','approved') AND expires_at<=now()
+  `);
   const result = await db.query(`
     SELECT request.*, user_account.name, user_account.email, user_account.username,
            user_account.role
@@ -503,6 +512,101 @@ router.get('/password-resets', asyncHandler(async (_req, res) => {
              request.created_at DESC
   `);
   res.json({ requests: result.rows });
+}));
+
+router.patch('/password-resets/:id', asyncHandler(async (req, res) => {
+  const action = String(req.body.action || '');
+  if (!['approved', 'declined'].includes(action)) {
+    return res.status(400).json({ error: 'Choose approve or decline.' });
+  }
+  const adminMessage = text(req.body.adminMessage, 1000) || null;
+  const result = await db.query(`
+    UPDATE password_reset_requests
+    SET status=$2,admin_message=$3,reviewed_by=$4,reviewed_at=now(),
+        resolved_at=CASE WHEN $2='declined' THEN now() ELSE NULL END
+    WHERE id=$1 AND status='open' AND expires_at>now()
+    RETURNING *
+  `, [req.params.id, action, adminMessage, req.user.id]);
+  const request = result.rows[0];
+  if (!request) return res.status(409).json({ error: 'This request is no longer open or has expired.' });
+  const title = action === 'approved' ? 'Password recovery approved' : 'Password recovery declined';
+  const body = action === 'approved'
+    ? `Your recovery request was approved. Return to the recovery screen and use your saved key.${adminMessage ? ` ${adminMessage}` : ''}`
+    : `Your recovery request was declined.${adminMessage ? ` ${adminMessage}` : ' Contact support if you still need help.'}`;
+  await db.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.user_id, title, body]);
+  req.app.locals.socketRuntime?.notifyUser(request.user_id, { title, body });
+  res.json({ request });
+}));
+
+router.get('/payments', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
+           payment.amount_paise,payment.seconds,payment.payee_upi_id,
+           payment.utr_reference,payment.customer_note,payment.status,
+           payment.admin_message,payment.reviewed_at,payment.created_at,
+           customer.name AS customer_name,customer.email AS customer_email
+    FROM payment_submissions payment
+    JOIN users customer ON customer.id=payment.customer_id
+    ORDER BY CASE payment.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+             payment.created_at DESC
+    LIMIT 1000
+  `);
+  res.json({ payments: result.rows });
+}));
+
+router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
+  const result = await db.query('SELECT proof_mime,proof_data FROM payment_submissions WHERE id=$1', [req.params.id]);
+  const proof = result.rows[0];
+  if (!proof) return res.status(404).json({ error: 'Payment screenshot not found.' });
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.type(proof.proof_mime).send(proof.proof_data);
+}));
+
+router.patch('/payments/:id', asyncHandler(async (req, res) => {
+  const action = String(req.body.action || '');
+  if (!['approved', 'declined'].includes(action)) {
+    return res.status(400).json({ error: 'Choose approve or decline.' });
+  }
+  const adminMessage = text(req.body.adminMessage, 1000) || null;
+
+  const payment = await db.transaction(async (client) => {
+    const found = await client.query(`
+      SELECT * FROM payment_submissions WHERE id=$1 FOR UPDATE
+    `, [req.params.id]);
+    const record = found.rows[0];
+    if (!record) throw Object.assign(new Error('Payment submission not found.'), { status: 404 });
+    if (record.status !== 'pending') throw Object.assign(new Error('This payment has already been reviewed.'), { status: 409 });
+
+    const updated = await client.query(`
+      UPDATE payment_submissions
+      SET status=$2,admin_message=$3,reviewed_by=$4,reviewed_at=now(),updated_at=now()
+      WHERE id=$1
+      RETURNING id,customer_id,plan_id,plan_name,amount_paise,seconds,payee_upi_id,
+                utr_reference,customer_note,status,admin_message,reviewed_at,created_at,updated_at
+    `, [record.id, action, adminMessage, req.user.id]);
+
+    if (action === 'approved') {
+      await client.query(`
+        UPDATE users
+        SET balance_seconds=balance_seconds+$2,updated_at=now()
+        WHERE id=$1 AND role='customer'
+      `, [record.customer_id, record.seconds]);
+      await client.query(`
+        INSERT INTO wallet_transactions(customer_id,seconds_delta,type,note,reference_id)
+        VALUES($1,$2,'payment',$3,$4)
+      `, [record.customer_id, record.seconds, `${record.plan_name} · verified UPI payment`, record.id]);
+    }
+
+    const title = action === 'approved' ? 'Payment approved' : 'Payment declined';
+    const body = action === 'approved'
+      ? `${Math.round(record.seconds / 60)} minutes were added to your wallet.${adminMessage ? ` ${adminMessage}` : ''}`
+      : `Your ${record.plan_name} payment proof was declined.${adminMessage ? ` ${adminMessage}` : ''}`;
+    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [record.customer_id, title, body]);
+    return { ...updated.rows[0], notification: { title, body } };
+  });
+
+  req.app.locals.socketRuntime?.notifyUser(payment.customer_id, payment.notification);
+  res.json({ payment });
 }));
 
 router.post('/notifications', asyncHandler(async (req, res) => {

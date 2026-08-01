@@ -19,7 +19,12 @@
 
   function bind() {
     $('#loginForm').addEventListener('submit', login);
-    $('#forgotBtn').addEventListener('click', forgot);
+    $('#forgotBtn').addEventListener('click', openRecovery);
+    $('#closeRecovery').addEventListener('click', () => show('#recoveryModal', false));
+    $('#recoveryRequestForm').addEventListener('submit', requestRecovery);
+    $('#employeeCheckRecovery').addEventListener('click', checkRecovery);
+    $('#employeeCopyRecovery').addEventListener('click', () => copyValue($('#employeeRecoveryKey').value));
+    $('#employeeResetForm').addEventListener('submit', completeRecovery);
     $('#logoutBtn').addEventListener('click', logout);
     $$('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button)));
     $('#onlineBtn').addEventListener('click', async () => {
@@ -43,6 +48,7 @@
 
   async function init() {
     bind();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
     try { publicConfig = await P.api('/api/public/config'); } catch {}
     ringSecondsLeft = publicConfig?.ringSeconds || 30;
     if (P.Store.token) await loadMe();
@@ -76,15 +82,102 @@
     }
   }
 
-  async function forgot() {
-    const identifier = prompt('Enter your listener account email:');
-    if (!identifier) return;
+  function recoveryStorage(value) {
+    if (value === undefined) {
+      try { return JSON.parse(localStorage.getItem('we_met_employee_password_recovery') || 'null'); } catch { return null; }
+    }
     try {
-      await P.api('/api/auth/forgot-password', {
+      if (value) localStorage.setItem('we_met_employee_password_recovery', JSON.stringify(value));
+      else localStorage.removeItem('we_met_employee_password_recovery');
+    } catch {}
+    return value;
+  }
+
+  function openRecovery() {
+    const saved = recoveryStorage();
+    if (saved?.recoveryKey) {
+      $('#employeeRecoveryId').value = saved.requestId;
+      $('#employeeRecoveryKey').value = saved.recoveryKey;
+      show('#employeeRecoveryPanel');
+    } else {
+      $('#employeeRecoveryId').value = '';
+      $('#employeeRecoveryKey').value = '';
+      $('#employeeRecoveryStatus').textContent = 'Already have a recovery key? Paste it below to check the request.';
+      show('#employeeResetForm', false);
+      show('#employeeRecoveryPanel');
+    }
+    show('#recoveryModal');
+  }
+
+  async function requestRecovery(event) {
+    event.preventDefault();
+    try {
+      const response = await P.api('/api/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ identifier }),
+        body: JSON.stringify({ identifier: $('#recoveryEmail').value }),
       });
-      P.toast('A password-reset request was sent to the administrator.', 'success');
+      if (response.requestId && response.recoveryKey) {
+        recoveryStorage({ requestId: response.requestId, recoveryKey: response.recoveryKey });
+        $('#employeeRecoveryId').value = response.requestId;
+        $('#employeeRecoveryKey').value = response.recoveryKey;
+        $('#employeeRecoveryStatus').textContent = 'Request sent. Save this key and check again after administrator review.';
+        show('#employeeRecoveryPanel');
+        show('#employeeResetForm', false);
+      }
+      P.toast(response.message || 'Recovery request sent.', 'success');
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  async function copyValue(value) {
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) await navigator.clipboard.writeText(value);
+      else {
+        const area = document.createElement('textarea');
+        area.value = value;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+      }
+      P.toast('Recovery key copied.', 'success');
+    } catch {
+      P.toast('Copy failed. Select and copy the key manually.', 'error');
+    }
+  }
+
+  async function checkRecovery() {
+    try {
+      const response = await P.api('/api/auth/password-reset/status', {
+        method: 'POST',
+        body: JSON.stringify({ requestId: $('#employeeRecoveryId').value, recoveryKey: $('#employeeRecoveryKey').value.trim() }),
+      });
+      const request = response.request;
+      const labels = { open: 'Waiting for administrator review.', approved: 'Approved. Enter a new password below.', declined: 'Declined. Contact the administrator or submit a new request.', completed: 'This recovery request was already used.' };
+      $('#employeeRecoveryStatus').textContent = `${labels[request.status] || request.status}${request.adminMessage ? ` Admin message: ${request.adminMessage}` : ''}`;
+      show('#employeeResetForm', request.status === 'approved');
+      recoveryStorage({ requestId: request.id, recoveryKey: $('#employeeRecoveryKey').value.trim() });
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  async function completeRecovery(event) {
+    event.preventDefault();
+    const password = $('#employeeRecoveryPassword').value;
+    if (password !== $('#employeeRecoveryConfirm').value) return P.toast('The two passwords do not match.', 'error');
+    try {
+      const response = await P.api('/api/auth/password-reset/complete', {
+        method: 'POST',
+        body: JSON.stringify({ requestId: $('#employeeRecoveryId').value, recoveryKey: $('#employeeRecoveryKey').value.trim(), newPassword: password }),
+      });
+      recoveryStorage(null);
+      show('#recoveryModal', false);
+      P.toast(response.message, 'success');
     } catch (error) {
       P.toast(error.message, 'error');
     }
@@ -310,8 +403,13 @@
     const input = $('#chatInput');
     const message = input.value.trim();
     if (!message || !currentCall) return;
-    socket.emit('chat:send', { callId: currentCall.id, message });
+    const callId = currentCall.id;
     input.value = '';
+    socket.timeout(8000).emit('chat:send', { callId, message }, (error, response) => {
+      if (!error && response?.ok) return;
+      if (currentCall?.id === callId && !input.value) input.value = message;
+      P.toast(response?.error || 'The message was not delivered. Please try again.', 'error');
+    });
   }
 
   function addChat(message) {

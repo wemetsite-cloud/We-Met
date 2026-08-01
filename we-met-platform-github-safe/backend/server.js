@@ -44,7 +44,7 @@ app.use((req, res, next) => {
   }
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; connect-src 'self' https: wss: ws:; img-src 'self' data:; style-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; connect-src 'self' https: wss: ws:; img-src 'self' data: blob:; style-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   );
   next();
 });

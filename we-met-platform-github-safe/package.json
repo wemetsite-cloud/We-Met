@@ -1,8 +1,8 @@
 {
   "name": "we-met-platform",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "Publish-ready separate customer, listener and admin portals with Malayalam browser calls, chat and coupon talk-time.",
+  "description": "Publish-ready customer, listener and admin PWAs with Malayalam browser calls, reliable chat, secure recovery and manual UPI proof approval.",
   "scripts": {
     "install:backend": "npm --prefix backend install --registry=https://registry.npmjs.org/",
     "start": "npm --prefix backend start",

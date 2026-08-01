@@ -55,12 +55,15 @@ function createSocketServer(io) {
       const payload = verifyToken(socket.handshake.auth?.token);
       const result = await db.query(`
         SELECT id, role, name, email, bio, balance_seconds, status,
-               suspended_until, suspension_reason
+               suspended_until, suspension_reason, auth_version
         FROM users
         WHERE id = $1
       `, [payload.sub]);
       const user = await activateExpiredSuspension(result.rows[0]);
 
+      if (!user || Number(payload.ver || 0) !== Number(user.auth_version || 0)) {
+        return next(new Error('Your login is invalid or has expired.'));
+      }
       if (accountUnavailable(user)) {
         return next(new Error('This account is currently unavailable.'));
       }
@@ -527,24 +530,37 @@ function createSocketServer(io) {
       });
     }
 
-    socket.on('chat:send', safeHandler(async ({ callId, message } = {}) => {
-      const runtime = calls.get(callId);
-      const content = String(message || '').trim().slice(0, 1000);
-      if (!runtime || !['connecting', 'active'].includes(runtime.status) || !content) return;
-      if (![runtime.customerId, runtime.employeeId].includes(user.id)) return;
+    socket.on('chat:send', ({ callId, message } = {}, acknowledge) => {
+      const reply = typeof acknowledge === 'function' ? acknowledge : () => {};
+      Promise.resolve().then(async () => {
+        const runtime = calls.get(callId);
+        const content = String(message || '').trim().slice(0, 1000);
+        if (!content) return reply({ ok: false, error: 'Type a message first.' });
+        if (!runtime || !['connecting', 'active'].includes(runtime.status)) {
+          return reply({ ok: false, error: 'Text chat is available only during the current call.' });
+        }
+        if (![runtime.customerId, runtime.employeeId].includes(user.id)) {
+          return reply({ ok: false, error: 'You cannot send a message to this call.' });
+        }
 
-      const result = await db.query(`
-        INSERT INTO call_messages (call_id, sender_id, message)
-        VALUES ($1, $2, $3)
-        RETURNING id, message, created_at
-      `, [callId, user.id, content]);
+        const result = await db.query(`
+          INSERT INTO call_messages (call_id, sender_id, message)
+          VALUES ($1, $2, $3)
+          RETURNING id, message, created_at
+        `, [callId, user.id, content]);
 
-      io.to(`call:${callId}`).emit('chat:message', {
-        ...result.rows[0],
-        senderId: user.id,
-        senderName: user.name,
+        io.to(`call:${callId}`).emit('chat:message', {
+          ...result.rows[0],
+          callId,
+          senderId: user.id,
+          senderName: user.name,
+        });
+        return reply({ ok: true, id: result.rows[0].id });
+      }).catch((error) => {
+        console.error('Socket chat failed:', error);
+        reply({ ok: false, error: 'The message could not be sent. Please try again.' });
       });
-    }));
+    });
 
     socket.on('disconnect', safeHandler(async () => {
       if (removeUserSocket(user.id, socket.id) > 0) return;

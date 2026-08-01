@@ -1,4 +1,4 @@
-# We Met V4.1 — publish-ready package
+# We Met V5.0 — publish-ready package
 
 We Met is a responsive platform for private Malayalam browser voice conversations. The interface is English. Customer, listener and admin portals remain separate frontends with their own HTML, JavaScript, CSS and assets.
 
@@ -20,12 +20,12 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 
 ## Applications
 
-- `customer-site/` — customer landing page, account, listener selection, coupon wallet, voice call, chat and PWA
-- `employee-site/` — listener login, availability, incoming calls, voice call, chat and history
-- `admin-site/` — users, listeners, calls, plans, coupons, support, reports, suspensions and analytics
+- `customer-site/` — customer landing page, wallet, manual UPI proof submission, voice call, reliable chat, recovery and installable PWA
+- `employee-site/` — listener login, availability, incoming calls, voice call, reliable chat, recovery and installable PWA
+- `admin-site/` — users, listeners, calls, plans, payment verification, recovery approvals, coupons, safety, support and installable PWA
 - `backend/` — Express, PostgreSQL/Supabase, Socket.IO and WebRTC signalling
 
-## Publish-ready improvements
+## V5 improvements
 
 - local `.env` and `node_modules` removed from the distributed package
 - secret-safe GitHub copy generator
@@ -38,6 +38,11 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 - root/subdomain-aware portal routing
 - Docker secret exclusions
 - exposed temporary passwords removed from package documentation and defaults
+- fixed in-call chat correlation and added delivery acknowledgement
+- customer pack selection, UPI deep link and screenshot upload to `salahkpsite@slc`
+- transaction-locked approval/decline so one payment cannot credit minutes twice
+- recovery key, request tracking, admin approval and customer/listener password completion
+- install manifests and offline app shells for all three portals
 
 ## Live paths before buying a domain
 
@@ -50,6 +55,6 @@ Health:   https://YOUR-SERVICE.onrender.com/api/health
 
 ## Important
 
-Coupon codes and manual admin wallet credits are active. Real online payment checkout is intentionally disabled.
+Manual UPI proof verification, coupon codes and manual admin wallet credits are active. The administrator must verify every submitted transaction independently in the receiving UPI account before approval. This is not an automatic payment gateway.
 
 Use a paid always-on server and a TURN relay before serving real customers. Keep this version on one server instance until shared multi-instance call state is implemented.

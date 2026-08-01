@@ -12,6 +12,7 @@
   let currentCall = null;
   let listeners = [];
   let historyCalls = [];
+  let paymentPlans = [];
   let favoriteIds = new Set();
   let activeTab = 'home';
 
@@ -30,6 +31,8 @@
       : mode === 'forgot'
         ? 'The administrator will review your request.'
         : 'Sign in to continue.';
+    if (mode === 'forgot') restoreRecovery();
+    else show('#recoveryPanel', false);
     setModalState();
     setTimeout(() => $('#authModal input:not(.hidden)')?.focus(), 50);
   }
@@ -74,6 +77,12 @@
     $('#callNow').addEventListener('click', () => requestCall());
     $('#refreshListeners').addEventListener('click', () => socket?.emit('listeners:get'));
     $('#couponForm').addEventListener('submit', redeem);
+    $('#paymentForm').addEventListener('submit', submitPayment);
+    $('#refreshPayments').addEventListener('click', loadPayments);
+    $('#copyUpi').addEventListener('click', () => copyValue(publicConfig?.paymentUpiId || 'salahkpsite@slc', 'UPI ID copied.'));
+    $('#copyRecoveryKey').addEventListener('click', () => copyValue($('#recoveryKey').value, 'Recovery key copied.'));
+    $('#checkRecovery').addEventListener('click', checkRecovery);
+    $('#resetCompleteForm').addEventListener('submit', completeRecovery);
     $('#supportForm').addEventListener('submit', sendSupport);
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#loginChangeForm').addEventListener('submit', changeLogin);
@@ -108,6 +117,7 @@
     targetButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
     if (tab === 'history' || tab === 'wallet') loadHistory();
+    if (tab === 'wallet') loadPayments();
     if (tab === 'favorites') loadFavorites();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'support') loadSupport();
@@ -168,13 +178,19 @@
   async function forgot(event) {
     event.preventDefault();
     try {
-      await P.api('/api/auth/forgot-password', {
+      const response = await P.api('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ identifier: $('#forgotIdentifier').value }),
       });
-      P.toast('Your reset request was sent to the administrator.', 'success');
-      event.target.reset();
-      setAuth('login');
+      if (response.requestId && response.recoveryKey) {
+        saveRecovery({ requestId: response.requestId, recoveryKey: response.recoveryKey });
+        $('#recoveryRequestId').value = response.requestId;
+        $('#recoveryKey').value = response.recoveryKey;
+        $('#recoveryStatus').textContent = 'Request sent. Save this recovery key and check again after the administrator reviews it.';
+        show('#recoveryPanel');
+        show('#resetCompleteForm', false);
+      }
+      P.toast(response.message || 'Recovery request sent.', 'success');
     } catch (error) {
       P.toast(error.message, 'error');
     }
@@ -207,6 +223,7 @@
     loadSupport();
     loadFavorites();
     loadNotifications();
+    loadPayments();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -331,7 +348,13 @@
       if (needsTopup) selectTab('wallet');
     });
     socket.on('chat:message', addChat);
-    socket.on('notification:new', (notification) => P.notify(notification.title, notification.body));
+    socket.on('notification:new', (notification) => {
+      P.notify(notification.title, notification.body);
+      if (/payment/i.test(notification.title || '')) {
+        loadMe();
+        loadPayments();
+      }
+    });
     socket.on('account:restricted', (data) => {
       P.toast(data.reason || 'Your account has been restricted.', 'error');
       logout();
@@ -432,8 +455,13 @@
     const input = $('#chatInput');
     const message = input.value.trim();
     if (!message || !currentCall) return;
-    socket.emit('chat:send', { callId: currentCall.id, message });
+    const callId = currentCall.id;
     input.value = '';
+    socket.timeout(8000).emit('chat:send', { callId, message }, (error, response) => {
+      if (!error && response?.ok) return;
+      if (currentCall?.id === callId && !input.value) input.value = message;
+      P.toast(response?.error || 'The message was not delivered. Please try again.', 'error');
+    });
   }
 
   function addChat(message) {
@@ -534,11 +562,148 @@
   }
 
   function renderPlans(plans = []) {
+    paymentPlans = plans;
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
         ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
-        <span>${P.esc(plan.name)}</span><h3>${Math.round(plan.seconds / 60)} min</h3><strong>${P.money(plan.price_paise)}</strong><p>Redeem a matching code issued by We Met support or the administrator.</p>
+        <span>${P.esc(plan.name)}</span><h3>${Math.round(plan.seconds / 60)} min</h3><strong>${P.money(plan.price_paise)}</strong><p>Pay by UPI and upload the successful-payment screenshot for manual verification.</p><button class="button button-primary" type="button" data-buy-plan="${plan.id}">Choose pack</button>
       </article>`).join('');
+    $$('[data-buy-plan]').forEach((button) => button.addEventListener('click', () => openPayment(button.dataset.buyPlan)));
+  }
+
+  async function copyValue(value, message = 'Copied.') {
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const area = document.createElement('textarea');
+        area.value = value;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+      }
+      P.toast(message, 'success');
+    } catch {
+      P.toast('Copy failed. Select the value and copy it manually.', 'error');
+    }
+  }
+
+  function openPayment(planId) {
+    if (!me) {
+      P.toast('Sign in before submitting a payment.', 'info');
+      return setAuth('login');
+    }
+    const plan = paymentPlans.find((item) => item.id === planId);
+    if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
+    const upiId = publicConfig?.paymentUpiId || 'salahkpsite@slc';
+    const payee = publicConfig?.paymentPayeeName || 'We Met';
+    $('#paymentPlanId').value = plan.id;
+    $('#paymentTitle').textContent = `${plan.name} · ${Math.round(plan.seconds / 60)} minutes`;
+    $('#paymentSummary').innerHTML = `<div><small>Pack</small><strong>${P.esc(plan.name)}</strong></div><div><small>Minutes</small><strong>${Math.round(plan.seconds / 60)}</strong></div><div><small>Pay exactly</small><strong>${P.money(plan.price_paise)}</strong></div>`;
+    $('#paymentUpiId').textContent = upiId;
+    const params = new URLSearchParams({ pa: upiId, pn: payee, am: (Number(plan.price_paise) / 100).toFixed(2), cu: 'INR', tn: `We Met ${plan.name}` });
+    $('#openUpiApp').href = `upi://pay?${params}`;
+    show('#paymentModal');
+    setModalState();
+  }
+
+  async function submitPayment(event) {
+    event.preventDefault();
+    const button = event.submitter;
+    const file = $('#paymentProof').files[0];
+    if (!file) return P.toast('Choose the successful-payment screenshot.', 'error');
+    if (file.size > 5 * 1024 * 1024) return P.toast('The screenshot must be 5 MB or smaller.', 'error');
+    button?.setAttribute('disabled', '');
+    try {
+      const form = new FormData(event.target);
+      const response = await P.api('/api/customer/payments', { method: 'POST', body: form, timeout: 60000 });
+      event.target.reset();
+      show('#paymentModal', false);
+      setModalState();
+      P.toast(response.message || 'Payment proof submitted.', 'success');
+      selectTab('wallet');
+      loadPayments();
+    } catch (error) {
+      P.toast(error.message, 'error');
+    } finally {
+      button?.removeAttribute('disabled');
+    }
+  }
+
+  async function loadPayments() {
+    if (!me) return;
+    try {
+      const response = await P.api('/api/customer/payments');
+      $('#paymentHistory').innerHTML = response.payments.length
+        ? response.payments.map((payment) => `
+          <article class="list-item payment-item"><div><strong>${P.esc(payment.plan_name)} · ${P.money(payment.amount_paise)}</strong><p>${Math.round(payment.seconds / 60)} minutes · submitted ${P.date(payment.created_at)}</p>${payment.utr_reference ? `<small>UTR: ${P.esc(payment.utr_reference)}</small>` : ''}${payment.admin_message ? `<p><b>Admin message:</b> ${P.esc(payment.admin_message)}</p>` : ''}</div><span class="badge ${payment.status}">${P.esc(payment.status)}</span></article>`).join('')
+        : emptyState('No payment submissions', 'Choose a talk-time pack, pay by UPI, and upload the payment screenshot here.');
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  function saveRecovery(value) {
+    try { localStorage.setItem('we_met_password_recovery', JSON.stringify(value)); } catch {}
+  }
+
+  function restoreRecovery() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('we_met_password_recovery') || 'null'); } catch {}
+    if (!saved?.recoveryKey) {
+      $('#recoveryRequestId').value = '';
+      $('#recoveryKey').value = '';
+      $('#recoveryStatus').textContent = 'Already have a recovery key? Paste it below to check the request.';
+      show('#resetCompleteForm', false);
+      return show('#recoveryPanel');
+    }
+    $('#recoveryRequestId').value = saved.requestId;
+    $('#recoveryKey').value = saved.recoveryKey;
+    show('#recoveryPanel');
+  }
+
+  async function checkRecovery() {
+    try {
+      const response = await P.api('/api/auth/password-reset/status', {
+        method: 'POST',
+        body: JSON.stringify({ requestId: $('#recoveryRequestId').value, recoveryKey: $('#recoveryKey').value.trim() }),
+      });
+      const request = response.request;
+      const labels = {
+        open: 'Waiting for administrator review.',
+        approved: 'Approved. Enter a new password below.',
+        declined: 'Declined. Submit a new request or contact support.',
+        completed: 'This recovery request was already used.',
+      };
+      $('#recoveryStatus').textContent = `${labels[request.status] || request.status}${request.adminMessage ? ` Admin message: ${request.adminMessage}` : ''}`;
+      show('#resetCompleteForm', request.status === 'approved');
+      saveRecovery({ requestId: request.id, recoveryKey: $('#recoveryKey').value.trim() });
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  async function completeRecovery(event) {
+    event.preventDefault();
+    const password = $('#recoveryNewPassword').value;
+    if (password !== $('#recoveryConfirmPassword').value) return P.toast('The two passwords do not match.', 'error');
+    try {
+      const response = await P.api('/api/auth/password-reset/complete', {
+        method: 'POST',
+        body: JSON.stringify({ requestId: $('#recoveryRequestId').value, recoveryKey: $('#recoveryKey').value.trim(), newPassword: password }),
+      });
+      localStorage.removeItem('we_met_password_recovery');
+      event.target.reset();
+      show('#recoveryPanel', false);
+      P.toast(response.message, 'success');
+      setAuth('login');
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
   }
 
   async function redeem(event) {

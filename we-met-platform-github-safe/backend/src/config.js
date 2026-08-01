@@ -50,6 +50,8 @@ const config = {
   publicUrl,
   serveFrontends: bool(process.env.SERVE_FRONTENDS, true),
   supportEmail: process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com',
+  paymentUpiId: process.env.PAYMENT_UPI_ID || 'salahkpsite@slc',
+  paymentPayeeName: process.env.PAYMENT_PAYEE_NAME || 'We Met',
 
   jwtSecret: process.env.JWT_SECRET || '',
   databaseUrl: process.env.DATABASE_URL || '',

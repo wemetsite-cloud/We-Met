@@ -32,6 +32,18 @@
     }
   }
 
+  async function file(path) {
+    const headers = {};
+    if (Store.token) headers.Authorization = `Bearer ${Store.token}`;
+    const response = await fetch(`${base}${path}`, { headers });
+    if (!response.ok) {
+      let message = 'The file could not be loaded.';
+      try { message = (await response.json()).error || message; } catch {}
+      throw new Error(message);
+    }
+    return response.blob();
+  }
+
   function escapeHtml(value = '') {
     return String(value).replace(/[&<>"']/g, (character) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -87,6 +99,7 @@
     base,
     Store,
     api,
+    file,
     esc: escapeHtml,
     duration,
     date,

@@ -6,10 +6,10 @@ services:
     plan: free
     numInstances: 1
     autoDeployTrigger: commit
-    rootDir: we-met-platform-github-safe
     buildCommand: cd backend && npm ci --omit=dev
     startCommand: cd backend && npm run start:production
     healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 60
     envVars:
       - key: NODE_ENV
         value: "production"
@@ -17,6 +17,10 @@ services:
         value: "We Met"
       - key: SUPPORT_EMAIL
         value: "wemetsite@gmail.com"
+      - key: PAYMENT_UPI_ID
+        value: "salahkpsite@slc"
+      - key: PAYMENT_PAYEE_NAME
+        value: "We Met"
       - key: SERVE_FRONTENDS
         value: "true"
       - key: DATABASE_URL
@@ -54,4 +58,4 @@ services:
       - key: STUN_URL
         value: "stun:stun.l.google.com:19302"
       - key: PAYMENT_GATEWAY_MODE
-        value: "disabled"
+        value: "manual-proof"

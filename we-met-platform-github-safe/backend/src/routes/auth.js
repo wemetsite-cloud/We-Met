@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { authenticate, asyncHandler, unavailable, activateExpiredSuspension } = require('../middleware');
@@ -7,6 +8,9 @@ const router = express.Router();
 const loginAttempts = new Map();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LIMIT = 8;
+const resetAttempts = new Map();
+const RESET_WINDOW_MS = 60 * 60 * 1000;
+const RESET_LIMIT = 5;
 
 function publicUser(user) {
   return {
@@ -60,6 +64,23 @@ function recordFailedAttempt(key) {
   const current = loginAttempts.get(key) || { count: 0, startedAt: Date.now() };
   current.count += 1;
   loginAttempts.set(key, current);
+}
+
+function recoveryHash(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function canRequestReset(req, identifier) {
+  const key = `${req.ip}:${identifier}`;
+  const now = Date.now();
+  const current = resetAttempts.get(key);
+  if (!current || now - current.startedAt > RESET_WINDOW_MS) {
+    resetAttempts.set(key, { count: 1, startedAt: now });
+    return true;
+  }
+  if (current.count >= RESET_LIMIT) return false;
+  current.count += 1;
+  return true;
 }
 
 router.post('/register', asyncHandler(async (req, res) => {
@@ -168,22 +189,117 @@ router.post('/change-login', authenticate, asyncHandler(async (req, res) => {
 
 router.post('/forgot-password', asyncHandler(async (req, res) => {
   const identifier = String(req.body.identifier || '').trim().toLowerCase();
+  if (!identifier) return res.status(400).json({ error: 'Enter your account email or username.' });
+  if (!canRequestReset(req, identifier)) {
+    return res.status(429).json({ error: 'Too many recovery requests. Try again later.' });
+  }
+
   const result = await db.query(
     `SELECT id FROM users
-     WHERE lower(coalesce(email,''))=$1 OR lower(coalesce(username,''))=$1
+     WHERE (lower(coalesce(email,''))=$1 OR lower(coalesce(username,''))=$1)
+       AND role <> 'admin'
      LIMIT 1`,
     [identifier],
   );
-  if (result.rows[0]) {
-    await db.query(
-      `INSERT INTO password_reset_requests(user_id)
-       SELECT $1 WHERE NOT EXISTS(
-         SELECT 1 FROM password_reset_requests WHERE user_id=$1 AND status='open'
-       )`,
-      [result.rows[0].id],
-    );
+  const user = result.rows[0];
+  if (!user) {
+    return res.json({
+      ok: true,
+      message: 'If the account exists, a recovery request has been sent to the administrator.',
+    });
   }
-  res.json({ ok: true, message: 'If the account exists, a reset request has been sent to the administrator.' });
+
+  const recoveryKey = crypto.randomBytes(24).toString('base64url');
+  const request = await db.transaction(async (client) => {
+    await client.query(`
+      UPDATE password_reset_requests
+      SET status='declined', admin_message='Replaced by a newer recovery request',
+          reviewed_at=now(), resolved_at=now()
+      WHERE user_id=$1 AND status IN ('open','approved')
+    `, [user.id]);
+    const created = await client.query(`
+      INSERT INTO password_reset_requests(user_id,recovery_key_hash,expires_at)
+      VALUES($1,$2,now()+interval '72 hours')
+      RETURNING id,expires_at
+    `, [user.id, recoveryHash(recoveryKey)]);
+    return created.rows[0];
+  });
+
+  res.status(201).json({
+    ok: true,
+    requestId: request.id,
+    recoveryKey,
+    expiresAt: request.expires_at,
+    message: 'Recovery request sent. Keep this browser open or save the recovery key until the administrator reviews it.',
+  });
+}));
+
+router.post('/password-reset/status', asyncHandler(async (req, res) => {
+  const keyHash = recoveryHash(req.body.recoveryKey);
+  const result = await db.query(`
+    SELECT id,status,admin_message,expires_at,reviewed_at
+    FROM password_reset_requests
+    WHERE recovery_key_hash=$1
+  `, [keyHash]);
+  const request = result.rows[0];
+  if (!request) return res.status(404).json({ error: 'Recovery request not found. Check your recovery details.' });
+
+  if (['open', 'approved'].includes(request.status) && new Date(request.expires_at) <= new Date()) {
+    await db.query(`
+      UPDATE password_reset_requests
+      SET status='declined',admin_message='This recovery request expired.',resolved_at=now()
+      WHERE id=$1
+    `, [request.id]);
+    request.status = 'declined';
+    request.admin_message = 'This recovery request expired.';
+  }
+
+  res.json({
+    request: {
+      id: request.id,
+      status: request.status,
+      adminMessage: request.admin_message,
+      expiresAt: request.expires_at,
+      reviewedAt: request.reviewed_at,
+    },
+  });
+}));
+
+router.post('/password-reset/complete', asyncHandler(async (req, res) => {
+  const keyHash = recoveryHash(req.body.recoveryKey);
+  const newPassword = String(req.body.newPassword || '');
+  if (newPassword.length < 8) return res.status(400).json({ error: 'Use a new password with at least 8 characters.' });
+  const passwordHash = await hashPassword(newPassword);
+
+  const recoveredUserId = await db.transaction(async (client) => {
+    const result = await client.query(`
+      SELECT id,user_id,status,expires_at
+      FROM password_reset_requests
+      WHERE recovery_key_hash=$1
+      FOR UPDATE
+    `, [keyHash]);
+    const request = result.rows[0];
+    if (!request) throw Object.assign(new Error('Recovery request not found.'), { status: 404 });
+    if (new Date(request.expires_at) <= new Date()) throw Object.assign(new Error('This recovery request has expired.'), { status: 410 });
+    if (request.status !== 'approved') {
+      throw Object.assign(new Error(request.status === 'open' ? 'The administrator has not approved this request yet.' : 'This recovery request cannot be used.'), { status: 409 });
+    }
+
+    await client.query(`
+      UPDATE users
+      SET password_hash=$2,auth_version=auth_version+1,updated_at=now()
+      WHERE id=$1
+    `, [request.user_id, passwordHash]);
+    await client.query(`
+      UPDATE password_reset_requests
+      SET status='completed',resolved_at=now()
+      WHERE id=$1
+    `, [request.id]);
+    return request.user_id;
+  });
+
+  await req.app.locals.socketRuntime?.restrictUser(recoveredUserId, 'Password changed. Sign in again.');
+  res.json({ ok: true, message: 'Password changed. You can now sign in with your new password.' });
 }));
 
 module.exports = router;

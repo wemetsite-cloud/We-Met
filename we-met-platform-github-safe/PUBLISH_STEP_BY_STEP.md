@@ -260,13 +260,35 @@ Admin:    https://YOUR-SERVICE.onrender.com/admin/
 Health:   https://YOUR-SERVICE.onrender.com/api/health
 ```
 
+## 13. Test the V5 payment flow
+
+1. Sign in to the customer portal and open **Wallet**.
+2. Choose a minute pack and confirm the UPI ID is `salahkpsite@slc`.
+3. For a real payment, pay the exact pack amount and upload only the successful-payment screenshot.
+4. Sign in to **Admin → Payments** and open the proof.
+5. Check the receiving UPI account independently; never trust the screenshot alone.
+6. Approve to add the pack minutes once, or decline with an optional message.
+7. Refresh the customer Wallet and confirm the payment status and wallet-ledger credit.
+
+## 14. Test password recovery
+
+1. From the customer or listener sign-in page, submit **Forgot password**.
+2. Save the recovery key shown by the portal.
+3. In **Admin → Password resets**, verify the owner and approve the request.
+4. Return to the recovery screen, check status and set a new password.
+5. Confirm the old password no longer works and the new password signs in.
+
+## 15. Install each PWA
+
+Open the customer, listener and admin portal over HTTPS. In Chrome/Edge use the install icon in the address bar or **Menu → Install app**. On iPhone/iPad use Safari **Share → Add to Home Screen**. Each portal uses its own name, icon and standalone app shell.
+
 Do not share the admin or listener URLs and passwords publicly.
 
 ---
 
 # PART D — public test
 
-## 13. Test on two devices
+## 16. Test on two devices
 
 Listener device:
 
@@ -301,13 +323,13 @@ Also test:
 
 # PART E — important hosting limitations
 
-## 14. Free Render is only for testing
+## 17. Free Render is only for testing
 
 The free service can spin down after inactivity. A sleeping service cannot reliably keep listeners online and can delay new calls while it wakes up. Move to an always-on paid web-service instance before using the platform with real customers.
 
 Keep the service at **one instance**. The current online-listener and active-call runtime is stored in one Node process. Do not enable horizontal scaling until a shared Socket.IO/Redis call-state system is added.
 
-## 15. Add TURN before real launch
+## 18. Add TURN before real launch
 
 STUN alone does not work across every Wi-Fi, mobile carrier or firewall. Obtain a managed TURN service or Coturn server, then add these in Render → Environment:
 
@@ -332,7 +354,7 @@ Test:
 
 # PART F — custom domain later
 
-## 16. Buy a domain only after the onrender.com test works
+## 19. Buy a domain only after the onrender.com test works
 
 Suggested structure:
 
@@ -345,7 +367,7 @@ api.yourdomain.com        → API
 
 This package detects these subdomain names automatically and serves the correct portal at `/`.
 
-## 17. Add domains in Render
+## 20. Add domains in Render
 
 In your Render web service:
 
@@ -355,7 +377,7 @@ Settings → Custom Domains → Add Custom Domain
 
 Add each domain, configure the DNS records shown by Render at your domain provider, and click Verify. Render handles HTTPS certificates after verification.
 
-## 18. Add production origin values after domains work
+## 21. Add production origin values after domains work
 
 In Render → Environment, add:
 

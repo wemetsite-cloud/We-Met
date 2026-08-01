@@ -1,7 +1,7 @@
 (() => {
     'use strict';
     const P = window.Portal;
-    let me = null, users = [], calls = [], reports = [], tickets = [], resets = [];
+    let me = null, users = [], calls = [], reports = [], tickets = [], resets = [], payments = [];
     const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
     const show = (s, v = true) => $(s)?.classList.toggle('hidden', !v);
     async function copyText(value) {
@@ -24,10 +24,11 @@
             P.toast('Could not copy automatically. Select the code and copy it manually.', 'error');
         }
     }
-    const pageMeta = { overview: ['Overview', 'We Met platform live summary'], customers: ['Customers', 'Balances, history and account controls'], employees: ['Listeners', 'Female listener accounts and access'], plans: ['Plans', 'Talk-time reference pricing'], coupons: ['Coupons', 'Create wallet redeem codes'], calls: ['Calls', 'Every call and duration'], reports: ['Reports', 'Safety review and account actions'], support: ['Support', 'Customer messages'], resets: ['Password resets', 'Manual password recovery'], broadcast: ['Notifications', 'Send in-app/browser messages'], security: ['Security', 'Administrator password and launch safety'] };
+    const pageMeta = { overview: ['Overview', 'We Met platform live summary'], customers: ['Customers', 'Balances, history and account controls'], employees: ['Listeners', 'Female listener accounts and access'], plans: ['Plans', 'Talk-time pricing'], payments: ['Payments', 'Verify UPI screenshots and release minutes'], coupons: ['Coupons', 'Create wallet redeem codes'], calls: ['Calls', 'Every call and duration'], reports: ['Reports', 'Safety review and account actions'], support: ['Support', 'Customer messages'], resets: ['Password resets', 'Approve secure account recovery'], broadcast: ['Notifications', 'Send in-app/browser messages'], security: ['Security', 'Administrator password and launch safety'] };
     function bind() { $('#loginForm').onsubmit = login; $('#logout').onclick = () => { P.Store.clear(); location.reload(); }; $('#nav').onclick = e => { const b = e.target.closest('[data-page]'); if (!b)
-        return; openPage(b.dataset.page); document.querySelector('.layout').classList.remove('menu-open'); }; $('#menuBtn').onclick = () => document.querySelector('.layout').classList.toggle('menu-open'); $('#employeeForm').onsubmit = createEmployee; $('#planForm').onsubmit = createPlan; $('#couponForm').onsubmit = createCoupon; $('#broadcastForm').onsubmit = sendBroadcast; $('#adminPasswordForm').onsubmit = changePassword; $('#adminUsernameForm').onsubmit = changeAdminUsername; $('#refreshLive').onclick = loadLive; $('#reloadCustomers').onclick = loadUsers; $('#reloadEmployees').onclick = loadUsers; $('#reloadCoupons').onclick = loadCoupons; $('#reloadCalls').onclick = loadCalls; $('#reloadReports').onclick = loadReports; $('#reloadSupport').onclick = loadSupport; $('#reloadResets').onclick = loadResets; $('#customerSearch').oninput = renderCustomers; $('#callSearch').oninput = renderCalls; $('#closeModal').onclick = () => show('#actionModal', false); }
-    async function init() { bind(); if (P.Store.token)
+        return; openPage(b.dataset.page); document.querySelector('.layout').classList.remove('menu-open'); }; $('#menuBtn').onclick = () => document.querySelector('.layout').classList.toggle('menu-open'); $('#employeeForm').onsubmit = createEmployee; $('#planForm').onsubmit = createPlan; $('#couponForm').onsubmit = createCoupon; $('#broadcastForm').onsubmit = sendBroadcast; $('#adminPasswordForm').onsubmit = changePassword; $('#adminUsernameForm').onsubmit = changeAdminUsername; $('#refreshLive').onclick = loadLive; $('#reloadCustomers').onclick = loadUsers; $('#reloadEmployees').onclick = loadUsers; $('#reloadPayments').onclick = loadPayments; $('#reloadCoupons').onclick = loadCoupons; $('#reloadCalls').onclick = loadCalls; $('#reloadReports').onclick = loadReports; $('#reloadSupport').onclick = loadSupport; $('#reloadResets').onclick = loadResets; $('#customerSearch').oninput = renderCustomers; $('#callSearch').oninput = renderCalls; $('#closeModal').onclick = () => show('#actionModal', false); }
+    async function init() { bind(); if ('serviceWorker' in navigator)
+        navigator.serviceWorker.register('service-worker.js').catch(() => {}); if (P.Store.token)
         await loadMe(); }
     async function login(e) { e.preventDefault(); try {
         const d = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: $('#username').value, password: $('#password').value }) });
@@ -50,13 +51,14 @@
     catch {
         P.Store.clear();
     } }
-    function enter() { show('#loginView', false); show('#appView'); const adminName = document.querySelector('.admin-chip b'); if (adminName) adminName.textContent = me.name || 'Administrator'; openPage('overview'); loadDashboard(); loadUsers(); loadPlans(); loadCoupons(); loadCalls(); loadReports(); loadSupport(); loadResets(); }
+    function enter() { show('#loginView', false); show('#appView'); const adminName = document.querySelector('.admin-chip b'); if (adminName) adminName.textContent = me.name || 'Administrator'; openPage('overview'); loadDashboard(); loadUsers(); loadPlans(); loadPayments(); loadCoupons(); loadCalls(); loadReports(); loadSupport(); loadResets(); }
     function openPage(name) { $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.page === name)); $$('.page').forEach(p => p.classList.toggle('active', p.id === `page-${name}`)); $('#pageTitle').textContent = pageMeta[name][0]; $('#pageDesc').textContent = pageMeta[name][1]; window.scrollTo({ top: 0, behavior: 'smooth' }); if (name === 'overview') {
         loadDashboard();
         loadLive();
     } if (name === 'customers' || name === 'employees')
         loadUsers(); if (name === 'plans')
-        loadPlans(); if (name === 'coupons')
+        loadPlans(); if (name === 'payments')
+        loadPayments(); if (name === 'coupons')
         loadCoupons(); if (name === 'calls')
         loadCalls(); if (name === 'reports')
         loadReports(); if (name === 'support')
@@ -67,7 +69,7 @@
         const count = r => d.users.find(x => x.role === r)?.count || 0;
         $('#mCustomers').textContent = count('customer');
         $('#mTalk').textContent = P.duration(d.totalTalkSeconds);
-        $('#mAttention').textContent = (d.openReports || 0) + (d.openTickets || 0);
+        $('#mAttention').textContent = (d.openReports || 0) + (d.openTickets || 0) + (d.pendingPayments || 0);
         $('#callSummary').innerHTML = (d.calls || []).map(x => `<div><small>${P.esc(x.status)}</small><strong>${x.count}</strong><span>${P.duration(x.seconds)}</span></div>`).join('') || '<p class="empty-copy">No calls yet.</p>';
     }
     catch (e) {
@@ -217,8 +219,49 @@
     function replySupport(id) { const t = tickets.find(x => x.id === id); modal(`Reply — ${t.subject}`, `<form id="replyForm" class="stack"><textarea id="replyText" placeholder="Reply to customer">${P.esc(t.admin_reply || '')}</textarea><select id="replyStatus"><option value="replied">Replied</option><option value="closed">Closed</option></select><button class="primary">Send</button></form>`); $('#replyForm').onsubmit = async (e) => { e.preventDefault(); await P.api(`/api/admin/support/${id}`, { method: 'PATCH', body: JSON.stringify({ adminReply: $('#replyText').value, status: $('#replyStatus').value }) }); show('#actionModal', false); P.toast('Reply sent.', 'success'); loadSupport(); }; }
     async function loadResets() { try {
         resets = (await P.api('/api/admin/password-resets')).requests;
-        $('#resetList').innerHTML = resets.map(r => `<article class="ticket"><div><span class="pill ${r.status}">${r.status}</span><strong>${P.esc(r.name)} — ${P.esc(r.email || r.username)}</strong><p>${r.role} • requested ${P.date(r.created_at)}</p></div>${r.status === 'open' ? `<button class="primary" data-reset="${r.user_id}">Set new password</button>` : ''}</article>`).join('') || '<p>No reset requests.</p>';
-        $$('#resetList [data-reset]').forEach(b => b.onclick = () => resetPassword(b.dataset.reset));
+        $('#resetList').innerHTML = resets.map(r => `<article class="ticket"><div><span class="pill ${r.status}">${r.status}</span><strong>${P.esc(r.name)} — ${P.esc(r.email || r.username)}</strong><p>${P.esc(r.role)} • requested ${P.date(r.created_at)} • expires ${P.date(r.expires_at)}</p>${r.admin_message ? `<p><b>Admin message:</b> ${P.esc(r.admin_message)}</p>` : ''}</div>${r.status === 'open' ? `<div class="actions"><button class="primary" data-reset-approve="${r.id}">Approve</button><button class="danger" data-reset-decline="${r.id}">Decline</button></div>` : ''}</article>`).join('') || '<p>No reset requests.</p>';
+        $$('[data-reset-approve]').forEach(b => b.onclick = () => reviewReset(b.dataset.resetApprove, 'approved'));
+        $$('[data-reset-decline]').forEach(b => b.onclick = () => reviewReset(b.dataset.resetDecline, 'declined'));
+    }
+    catch (e) {
+        P.toast(e.message, 'error');
+    } }
+    async function reviewReset(id, action) { const message = prompt(`Optional message for the user (${action}):`) || ''; try {
+        await P.api(`/api/admin/password-resets/${id}`, { method: 'PATCH', body: JSON.stringify({ action, adminMessage: message }) });
+        P.toast(`Recovery request ${action}.`, 'success');
+        loadResets();
+    }
+    catch (e) {
+        P.toast(e.message, 'error');
+    } }
+    async function loadPayments() { try {
+        payments = (await P.api('/api/admin/payments')).payments;
+        $('#paymentsList').innerHTML = payments.map(p => `<article class="ticket payment-review"><div><span class="pill ${p.status}">${p.status}</span><strong>${P.esc(p.customer_name)} — ${P.esc(p.plan_name)}</strong><p>${P.money(p.amount_paise)} • ${Math.round(p.seconds / 60)} minutes • ${P.date(p.created_at)}</p><p>${P.esc(p.customer_email || '')}${p.utr_reference ? ` • UTR ${P.esc(p.utr_reference)}` : ''}</p>${p.customer_note ? `<p><b>Customer note:</b> ${P.esc(p.customer_note)}</p>` : ''}${p.admin_message ? `<p><b>Admin message:</b> ${P.esc(p.admin_message)}</p>` : ''}</div><div class="actions"><button class="ghost" data-payment-proof="${p.id}">View proof</button>${p.status === 'pending' ? `<button class="primary" data-payment-approve="${p.id}">Approve + add minutes</button><button class="danger" data-payment-decline="${p.id}">Decline</button>` : ''}</div></article>`).join('') || '<p>No payment submissions.</p>';
+        $$('[data-payment-proof]').forEach(b => b.onclick = () => viewPaymentProof(b.dataset.paymentProof));
+        $$('[data-payment-approve]').forEach(b => b.onclick = () => reviewPayment(b.dataset.paymentApprove, 'approved'));
+        $$('[data-payment-decline]').forEach(b => b.onclick = () => reviewPayment(b.dataset.paymentDecline, 'declined'));
+    }
+    catch (e) {
+        P.toast(e.message, 'error');
+    } }
+    async function viewPaymentProof(id) { try {
+        const payment = payments.find(p => p.id === id);
+        const blob = await P.file(`/api/admin/payments/${id}/proof`);
+        const url = URL.createObjectURL(blob);
+        modal(`Payment proof — ${payment?.customer_name || ''}`, `<img id="paymentProofImage" class="proof-image" alt="Uploaded payment screenshot"><p>Confirm this transaction independently in the receiving UPI account before approval.</p>`);
+        $('#paymentProofImage').src = url;
+        $('#paymentProofImage').onload = () => URL.revokeObjectURL(url);
+    }
+    catch (e) {
+        P.toast(e.message, 'error');
+    } }
+    async function reviewPayment(id, action) { const payment = payments.find(p => p.id === id); if (action === 'approved' && !confirm(`Approve ${P.money(payment.amount_paise)} and add ${Math.round(payment.seconds / 60)} minutes to ${payment.customer_name}? Verify the payment in your UPI account first.`))
+        return; const message = prompt(`Optional message for the customer (${action}):`) || ''; try {
+        await P.api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action, adminMessage: message }) });
+        P.toast(action === 'approved' ? 'Payment approved and minutes added.' : 'Payment declined.', 'success');
+        loadPayments();
+        loadDashboard();
+        loadUsers();
     }
     catch (e) {
         P.toast(e.message, 'error');

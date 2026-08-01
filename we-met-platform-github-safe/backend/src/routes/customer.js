@@ -1,9 +1,40 @@
 const express = require('express');
+const multer = require('multer');
 const db = require('../db');
+const config = require('../config');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
 
 const router = express.Router();
 router.use(authenticate, requireRole('customer'));
+
+const proofUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp']);
+    if (!allowed.has(file.mimetype)) {
+      return callback(Object.assign(new Error('Upload a PNG, JPEG or WebP payment screenshot.'), { status: 400 }));
+    }
+    return callback(null, true);
+  },
+});
+
+function uploadPaymentProof(req, res, next) {
+  proofUpload.single('proof')(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'The screenshot must be 5 MB or smaller.' });
+    return res.status(error.status || 400).json({ error: error.message || 'The screenshot could not be uploaded.' });
+  });
+}
+
+function validImageBytes(file) {
+  const bytes = file?.buffer;
+  if (!bytes || bytes.length < 12) return false;
+  if (file.mimetype === 'image/png') return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (file.mimetype === 'image/jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (file.mimetype === 'image/webp') return bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP';
+  return false;
+}
 
 router.get('/history', asyncHandler(async (req, res) => {
   const [calls, wallet] = await Promise.all([
@@ -53,6 +84,96 @@ router.post('/redeem', asyncHandler(async (req, res) => {
   });
 
   res.json(output);
+}));
+
+router.get('/payments', asyncHandler(async (req, res) => {
+  const result = await db.query(`
+    SELECT id,plan_id,plan_name,amount_paise,seconds,payee_upi_id,utr_reference,
+           customer_note,status,admin_message,reviewed_at,created_at,updated_at
+    FROM payment_submissions
+    WHERE customer_id=$1
+    ORDER BY created_at DESC
+    LIMIT 100
+  `, [req.user.id]);
+  res.json({ payments: result.rows });
+}));
+
+router.post('/payments', uploadPaymentProof, asyncHandler(async (req, res) => {
+  const planId = String(req.body.planId || '');
+  const utrReference = String(req.body.utrReference || '').trim().slice(0, 100) || null;
+  const customerNote = String(req.body.customerNote || '').trim().slice(0, 500) || null;
+  if (!req.file || !validImageBytes(req.file)) {
+    return res.status(400).json({ error: 'The selected file is not a valid PNG, JPEG or WebP screenshot.' });
+  }
+
+  const planResult = await db.query(`
+    SELECT id,name,price_paise,seconds
+    FROM plans
+    WHERE id=$1 AND active=true
+  `, [planId]);
+  const plan = planResult.rows[0];
+  if (!plan) return res.status(404).json({ error: 'This talk-time pack is no longer available.' });
+
+  const limits = await db.query(`
+    SELECT COUNT(*) FILTER (WHERE status='pending')::int AS pending,
+           COUNT(*) FILTER (WHERE created_at>now()-interval '24 hours')::int AS recent
+    FROM payment_submissions
+    WHERE customer_id=$1
+  `, [req.user.id]);
+  if (limits.rows[0].pending >= 3) {
+    return res.status(429).json({ error: 'You already have three payment proofs waiting for review.' });
+  }
+  if (limits.rows[0].recent >= 10) {
+    return res.status(429).json({ error: 'Too many payment submissions today. Try again later or contact support.' });
+  }
+
+  if (utrReference) {
+    const duplicate = await db.query(`
+      SELECT 1 FROM payment_submissions
+      WHERE upper(trim(utr_reference))=upper(trim($1)) AND status IN ('pending','approved')
+      LIMIT 1
+    `, [utrReference]);
+    if (duplicate.rows[0]) return res.status(409).json({ error: 'That UPI transaction reference was already submitted.' });
+  }
+
+  const result = await db.query(`
+    INSERT INTO payment_submissions(
+      customer_id,plan_id,plan_name,amount_paise,seconds,payee_upi_id,
+      utr_reference,customer_note,proof_mime,proof_size,proof_data
+    )
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    RETURNING id,plan_id,plan_name,amount_paise,seconds,payee_upi_id,
+              utr_reference,customer_note,status,created_at
+  `, [
+    req.user.id,
+    plan.id,
+    plan.name,
+    plan.price_paise,
+    plan.seconds,
+    config.paymentUpiId,
+    utrReference,
+    customerNote,
+    req.file.mimetype,
+    req.file.size,
+    req.file.buffer,
+  ]);
+
+  res.status(201).json({
+    payment: result.rows[0],
+    message: 'Payment proof submitted. Minutes will be added only after administrator approval.',
+  });
+}));
+
+router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
+  const result = await db.query(`
+    SELECT proof_mime,proof_data
+    FROM payment_submissions
+    WHERE id=$1 AND customer_id=$2
+  `, [req.params.id, req.user.id]);
+  const proof = result.rows[0];
+  if (!proof) return res.status(404).json({ error: 'Payment screenshot not found.' });
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.type(proof.proof_mime).send(proof.proof_data);
 }));
 
 router.get('/favorites', asyncHandler(async (req, res) => {

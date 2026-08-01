@@ -7,6 +7,8 @@
   <meta name="description" content="We Met administration dashboard.">
   <title>We Met Admin</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -23,6 +25,7 @@
         <button data-page="customers"><b>◎</b><span>Customers</span></button>
         <button data-page="employees"><b>♙</b><span>Listeners</span></button>
         <button data-page="plans"><b>◇</b><span>Plans</span></button>
+        <button data-page="payments"><b>₹</b><span>Payments</span></button>
         <button data-page="coupons"><b>⌁</b><span>Coupons</span></button>
         <button data-page="calls"><b>☎</b><span>Calls</span></button>
         <button data-page="reports"><b>⚑</b><span>Reports</span></button>
@@ -31,14 +34,14 @@
         <button data-page="broadcast"><b>✦</b><span>Notifications</span></button>
         <button data-page="security"><b>⚙</b><span>Security</span></button>
       </nav>
-      <div class="side-footer"><small>We Met v4</small><button id="logout" class="side-logout">Log out</button></div>
+      <div class="side-footer"><small>We Met v5</small><button id="logout" class="side-logout">Log out</button></div>
     </aside>
 
     <div class="content">
       <header><button id="menuBtn" class="menu" type="button" aria-label="Open menu">☰</button><div><h1 id="pageTitle">Overview</h1><p id="pageDesc">We Met platform live summary</p></div><div class="admin-chip"><span>SS</span><div><b>Sabith Salah Kp</b><small>Administrator</small></div></div></header>
       <main>
         <section id="page-overview" class="page active">
-          <div class="metric-grid"><article><div class="metric-icon purple">◎</div><small>Customers</small><strong id="mCustomers">0</strong><span>Registered accounts</span></article><article><div class="metric-icon green">●</div><small>Online listeners</small><strong id="mOnline">0</strong><span>Available, ringing or busy</span></article><article><div class="metric-icon blue">◷</div><small>Total talk-time</small><strong id="mTalk">0:00</strong><span>Connected call duration</span></article><article><div class="metric-icon orange">!</div><small>Needs attention</small><strong id="mAttention">0</strong><span>Open reports and tickets</span></article></div>
+          <div class="metric-grid"><article><div class="metric-icon purple">◎</div><small>Customers</small><strong id="mCustomers">0</strong><span>Registered accounts</span></article><article><div class="metric-icon green">●</div><small>Online listeners</small><strong id="mOnline">0</strong><span>Available, ringing or busy</span></article><article><div class="metric-icon blue">◷</div><small>Total talk-time</small><strong id="mTalk">0:00</strong><span>Connected call duration</span></article><article><div class="metric-icon orange">!</div><small>Needs attention</small><strong id="mAttention">0</strong><span>Reports, tickets and payment proofs</span></article></div>
           <div class="grid-two"><section class="panel"><div class="panel-head"><div><span class="eyebrow">REAL TIME</span><h2>Live calls</h2></div><button id="refreshLive" class="ghost">Refresh</button></div><div id="liveCalls" class="live-list"></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">PRESENCE</span><h2>Listener availability</h2></div></div><div id="liveListeners" class="live-list"></div></section></div>
           <section class="panel"><div class="panel-head"><div><span class="eyebrow">ALL TIME</span><h2>Call status summary</h2></div></div><div id="callSummary" class="summary-bars"></div></section>
         </section>
@@ -49,13 +52,15 @@
 
         <section id="page-plans" class="page"><div class="grid-form"><form id="planForm" class="panel stack"><span class="eyebrow">PLAN SETUP</span><h2>Create talk-time plan</h2><label>Plan name<input id="planName" required></label><label>Price in INR<input id="planPrice" type="number" min="1" required></label><label>Minutes<input id="planMinutes" type="number" min="1" required></label><label class="check"><input id="planPopular" type="checkbox"><span>Show popular badge</span></label><button class="primary">Create plan</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">REFERENCE PRICING</span><h2>Current plans</h2></div></div><div id="plansList" class="card-list"></div></section></div></section>
 
+        <section id="page-payments" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">MANUAL UPI VERIFICATION</span><h2>Payment screenshots</h2><p>Approve only after the amount and transaction are independently visible in the receiving UPI account.</p></div><button id="reloadPayments" class="ghost">Refresh</button></div><div id="paymentsList" class="ticket-list"></div></section></section>
+
         <section id="page-coupons" class="page"><div class="grid-form"><form id="couponForm" class="panel stack"><span class="eyebrow">WALLET CODE</span><h2>Create redeem code</h2><label>Code<input id="couponCode" placeholder="Leave blank to auto-generate"></label><label>Label or note<input id="couponLabel"></label><label>Minutes<input id="couponMinutes" type="number" min="1" required></label><label>Maximum uses<input id="couponUses" type="number" min="1" placeholder="Blank means unlimited"></label><label>Expiry date<input id="couponExpiry" type="datetime-local"></label><button class="primary">Create coupon</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">REDEEM CODES</span><h2>Coupon inventory</h2></div><button id="reloadCoupons" class="ghost">Refresh</button></div><div id="couponsList" class="card-list"></div></section></div></section>
 
         <section id="page-calls" class="page"><div class="toolbar"><div><span class="eyebrow">CALL AUDIT</span><h2>Every call and duration</h2></div><div class="toolbar-actions"><input id="callSearch" placeholder="Search customer or listener"><button id="reloadCalls" class="ghost">Refresh</button></div></div><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Listener</th><th>Status</th><th>Duration</th><th>Started</th><th>End reason</th></tr></thead><tbody id="callsTable"></tbody></table></div></section>
 
         <section id="page-reports" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">SAFETY</span><h2>Reports requiring review</h2></div><button id="reloadReports" class="ghost">Refresh</button></div><div id="reportsList" class="ticket-list"></div></section></section>
         <section id="page-support" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">INBOX</span><h2>Customer support messages</h2></div><button id="reloadSupport" class="ghost">Refresh</button></div><div id="supportList" class="ticket-list"></div></section></section>
-        <section id="page-resets" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">ACCOUNT RECOVERY</span><h2>Password reset requests</h2></div><button id="reloadResets" class="ghost">Refresh</button></div><div id="resetList" class="ticket-list"></div></section></section>
+        <section id="page-resets" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">ACCOUNT RECOVERY</span><h2>Password reset requests</h2><p>Verify the account owner through the contact information already on record before approval.</p></div><button id="reloadResets" class="ghost">Refresh</button></div><div id="resetList" class="ticket-list"></div></section></section>
 
         <section id="page-broadcast" class="page"><form id="broadcastForm" class="panel stack narrow"><span class="eyebrow">IN-APP + BROWSER NOTIFICATION</span><h2>Send an admin message</h2><label>Recipient<select id="broadcastUser"><option value="">All customers and listeners</option></select></label><label>Title<input id="broadcastTitle" value="We Met"></label><label>Message<textarea id="broadcastBody" required placeholder="Write a clear platform update"></textarea></label><button class="primary">Send notification</button></form></section>
 

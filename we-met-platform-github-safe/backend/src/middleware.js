@@ -38,11 +38,14 @@ async function authenticate(req, res, next) {
     const payload = verifyToken(token);
     const result = await db.query(
       `SELECT id,role,name,username,email,phone,date_of_birth,bio,employee_code,upi_id,
-              balance_seconds,status,suspended_until,suspension_reason,created_at
+              balance_seconds,status,suspended_until,suspension_reason,auth_version,created_at
        FROM users WHERE id=$1`,
       [payload.sub],
     );
     const user = await activateExpiredSuspension(result.rows[0]);
+    if (!user || Number(payload.ver || 0) !== Number(user.auth_version || 0)) {
+      return res.status(401).json({ error: 'Your login has expired. Please sign in again.' });
+    }
     if (unavailable(user)) return res.status(401).json({ error: 'This account is currently unavailable.' });
     req.user = user;
     next();

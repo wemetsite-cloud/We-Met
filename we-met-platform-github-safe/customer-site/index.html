@@ -77,7 +77,7 @@
       <section class="how-it-works shell">
         <div class="section-copy"><span class="eyebrow">HOW IT WORKS</span><h2>From sign-in to a Malayalam conversation in three steps.</h2></div>
         <div class="steps">
-          <article><b>1</b><h3>Add talk-time</h3><p>Redeem a code shared by the We Met team or support.</p></article>
+          <article><b>1</b><h3>Add talk-time</h3><p>Choose a UPI pack and submit payment proof, or redeem a code from the We Met team.</p></article>
           <article><b>2</b><h3>Choose a listener</h3><p>Pick an available listener or let We Met find one automatically.</p></article>
           <article><b>3</b><h3>Talk and chat</h3><p>Use clear voice calling and live text chat in the same private session.</p></article>
         </div>
@@ -110,7 +110,7 @@
             <span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking listener availability…</span></span>
             <h2>Ready to talk?</h2>
             <p>Choose a listener yourself, reconnect with your previous listener, or let We Met find the next available person.</p>
-            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button">Call an available listener</button><button class="button button-quiet" type="button" data-jump="wallet">Redeem code</button></div>
+            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button">Call an available listener</button><button class="button button-quiet" type="button" data-jump="wallet">Add minutes</button></div>
           </div>
           <div class="balance-ring"><span>Talk-time</span><strong id="balanceRing">0:00</strong><small>Minimum 2 minutes to call</small></div>
         </section>
@@ -130,8 +130,10 @@
           </section>
           <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
         </div>
-        <div class="section-head"><div><span class="eyebrow">REFERENCE PACKS</span><h2>Talk-time plans</h2><p>These prices are references for codes issued by the team. Online payments are currently hidden.</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">PAY WITH UPI</span><h2>Choose a talk-time pack</h2><p>Pay from your UPI app, upload the payment screenshot, and wait for administrator verification. Minutes are credited only after approval.</p></div></div>
         <div id="plansGrid" class="plans-grid"></div>
+        <div class="section-head compact"><div><h2>Your payment submissions</h2><p>Pending proofs are usually reviewed manually by the administrator.</p></div><button id="refreshPayments" class="button button-quiet" type="button">Refresh</button></div>
+        <div id="paymentHistory" class="list"></div>
         <div class="section-head compact"><div><h2>Wallet activity</h2></div></div>
         <div id="walletHistory" class="list"></div>
       </div>
@@ -172,7 +174,25 @@
       <div class="auth-switch"><button data-mode="login" class="active" type="button">Sign in</button><button data-mode="register" type="button">Create account</button></div>
       <form id="loginForm" class="stack"><label>Email<input id="loginIdentifier" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password"></label><button class="button button-primary button-large">Sign in</button><button type="button" id="forgotOpen" class="link-button">Forgot password?</button></form>
       <form id="registerForm" class="stack hidden"><label>Full name<input id="regName" autocomplete="name" required></label><label>Email<input id="regEmail" type="email" autocomplete="email" required></label><label>Date of birth<input id="regDob" type="date" required></label><label>Password<input id="regPassword" type="password" minlength="8" autocomplete="new-password" required><small>Use at least 8 characters.</small></label><label class="check"><input id="regTerms" type="checkbox" required><span>I am at least 16 and accept the Terms and Privacy Policy.</span></label><button class="button button-primary button-large">Create account</button></form>
-      <form id="forgotForm" class="stack hidden"><p>Enter your account email. A password-reset request will be sent to the administrator.</p><label>Email<input id="forgotIdentifier" type="email" autocomplete="email" required></label><button class="button button-primary">Send request</button><button type="button" id="backLogin" class="link-button">Back to sign in</button></form>
+      <form id="forgotForm" class="stack hidden"><p>Enter your account email. Save the recovery key shown after submission, then wait for administrator approval.</p><label>Email<input id="forgotIdentifier" type="email" autocomplete="email" required></label><button class="button button-primary">Send recovery request</button><button type="button" id="backLogin" class="link-button">Back to sign in</button></form>
+      <section id="recoveryPanel" class="recovery-panel hidden"><span class="eyebrow">RECOVERY STATUS</span><p id="recoveryStatus">Waiting for administrator review.</p><label>Recovery key<input id="recoveryKey" autocomplete="off" spellcheck="false"></label><input id="recoveryRequestId" type="hidden"><div class="recovery-actions"><button id="copyRecoveryKey" class="button button-quiet" type="button">Copy key</button><button id="checkRecovery" class="button button-soft" type="button">Check status</button></div><form id="resetCompleteForm" class="stack hidden"><label>New password<input id="recoveryNewPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm new password<input id="recoveryConfirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Set new password</button></form></section>
+    </div>
+  </div>
+
+  <div id="paymentModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="paymentTitle">
+    <div class="modal-card payment-card">
+      <button class="close" data-close="paymentModal" type="button" aria-label="Close">×</button>
+      <span class="eyebrow">MANUAL UPI PAYMENT</span><h2 id="paymentTitle">Add talk-time</h2>
+      <div id="paymentSummary" class="payment-summary"></div>
+      <div class="upi-box"><small>Pay exactly to</small><strong id="paymentUpiId">salahkpsite@slc</strong><div><button id="copyUpi" class="button button-quiet" type="button">Copy UPI ID</button><a id="openUpiApp" class="button button-soft" href="#">Open UPI app</a></div></div>
+      <form id="paymentForm" class="stack">
+        <input id="paymentPlanId" name="planId" type="hidden">
+        <label>UPI transaction / UTR reference (recommended)<input id="paymentUtr" name="utrReference" maxlength="100" autocomplete="off" placeholder="Example: 426781234567"></label>
+        <label>Payment screenshot (PNG, JPEG or WebP; max 5 MB)<input id="paymentProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp" required></label>
+        <label>Note to administrator (optional)<textarea id="paymentNote" name="customerNote" maxlength="500" placeholder="Add any useful payment detail"></textarea></label>
+        <p class="payment-warning">Do not upload bank statements, OTPs, card details or unrelated private information.</p>
+        <button class="button button-primary button-large">Submit payment proof</button>
+      </form>
     </div>
   </div>
 

@@ -56,5 +56,6 @@ Interface language: English
 Minimum starting balance: 2 minutes
 Ring timeout: 30 seconds
 Low-balance warning: 1 minute
-Payment mode: coupons/manual credit only
+Payment UPI ID: salahkpsite@slc
+Payment mode: manual UPI proof approval, coupons and manual credit
 ```

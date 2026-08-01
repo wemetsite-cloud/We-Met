@@ -1,8 +1,8 @@
 {
   "name": "we-met-backend",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "We Met English-interface platform for private Malayalam browser voice calls, live chat and coupon talk-time.",
+  "description": "We Met backend for Malayalam browser calls, reliable live chat, secure recovery and verified manual UPI talk-time credits.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "express": "^5.1.0",
+    "multer": "^2.2.0",
     "pg": "^8.16.3",
     "socket.io": "^4.8.1"
   }

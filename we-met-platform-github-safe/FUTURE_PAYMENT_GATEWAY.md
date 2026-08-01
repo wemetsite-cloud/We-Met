@@ -1,14 +1,14 @@
-# Future Razorpay upgrade
+# Future automatic payment-gateway upgrade
 
-V4.1 intentionally uses only coupons and manual minute adjustments. The customer UI contains no payment button and no real-money order can be created.
+V5 uses manual UPI payment-proof submission. Customers choose a pack, pay the configured UPI ID and upload a screenshot. The administrator independently verifies the transaction and then approves or declines it. Approval is transaction-locked and credits minutes once.
 
 Reserved private fields are present in `backend/.env.example`:
 
 ```env
-PAYMENT_GATEWAY_MODE=disabled
+PAYMENT_GATEWAY_MODE=manual-proof
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=
 ```
 
-They are placeholders only; setting them does not activate payments. A future release must add server-created orders, server-side signature verification, idempotent wallet credit, webhook verification, failed/cancelled payment handling, invoices and legal/tax review. Never credit minutes from browser-supplied prices.
+The Razorpay values are placeholders only; setting them does not activate an automatic gateway. A future release must add server-created orders, server-side signature verification, idempotent wallet credit, webhook verification, failed/cancelled payment handling, invoices and legal/tax review. Never trust browser-supplied prices or approve a screenshot without checking the receiving account.

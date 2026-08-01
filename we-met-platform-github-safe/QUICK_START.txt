@@ -1,4 +1,4 @@
-WE MET V4.1 — QUICK START
+WE MET V5.0 — QUICK START
 
 1. Reset the Supabase database password that was previously shared.
 2. Extract this ZIP to a new folder.

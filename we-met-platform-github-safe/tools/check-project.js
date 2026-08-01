@@ -53,12 +53,55 @@ for (const htmlFile of htmlFiles) {
 const required = [
   'customer-site/style.css', 'employee-site/style.css', 'admin-site/style.css',
   'customer-site/assets/logo.svg', 'employee-site/assets/logo.svg', 'admin-site/assets/logo.svg',
+  'customer-site/manifest.webmanifest', 'employee-site/manifest.webmanifest', 'admin-site/manifest.webmanifest',
+  'customer-site/service-worker.js', 'employee-site/service-worker.js', 'admin-site/service-worker.js',
   'backend/.env.example', 'backend/database/schema.sql', 'SETUP_WINDOWS.bat', 'START_WINDOWS.bat',
 ];
 for (const relative of required) {
   if (!fs.existsSync(path.join(root, relative))) {
     failed = true;
     console.error(`Missing required file: ${relative}`);
+  }
+}
+
+for (const portal of ['customer-site', 'employee-site', 'admin-site']) {
+  const manifestPath = path.join(root, portal, 'manifest.webmanifest');
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (manifest.display !== 'standalone' || !manifest.start_url || !Array.isArray(manifest.icons) || manifest.icons.length < 2) {
+      throw new Error('missing standalone/start_url/icons');
+    }
+  } catch (error) {
+    failed = true;
+    console.error(`Invalid PWA manifest: ${portal}/manifest.webmanifest (${error.message})`);
+  }
+}
+
+const schema = fs.readFileSync(path.join(root, 'backend/database/schema.sql'), 'utf8');
+for (const table of ['call_messages', 'password_reset_requests', 'payment_submissions', 'wallet_transactions']) {
+  if (!schema.includes(`CREATE TABLE IF NOT EXISTS ${table}`)) {
+    failed = true;
+    console.error(`Database schema is missing required table: ${table}`);
+  }
+}
+
+const workflowSources = {
+  socket: fs.readFileSync(path.join(root, 'backend/src/socket.js'), 'utf8'),
+  admin: fs.readFileSync(path.join(root, 'backend/src/routes/admin.js'), 'utf8'),
+  customer: fs.readFileSync(path.join(root, 'backend/src/routes/customer.js'), 'utf8'),
+  auth: fs.readFileSync(path.join(root, 'backend/src/routes/auth.js'), 'utf8'),
+};
+const invariants = [
+  [workflowSources.socket.includes("socket.on('chat:send'") && workflowSources.socket.includes('callId,\n          senderId'), 'Chat messages must include callId and delivery acknowledgement.'],
+  [workflowSources.admin.includes('SELECT * FROM payment_submissions WHERE id=$1 FOR UPDATE') && workflowSources.admin.includes("record.status !== 'pending'"), 'Payment approval must lock and accept only pending records.'],
+  [schema.includes('uq_wallet_payment_credit') && schema.includes("type='payment'"), 'Payment credits must be idempotent in the wallet ledger.'],
+  [workflowSources.customer.includes('validImageBytes') && workflowSources.customer.includes('5 * 1024 * 1024'), 'Payment screenshot validation and size limits are required.'],
+  [workflowSources.auth.includes('recovery_key_hash') && workflowSources.auth.includes("request.status !== 'approved'"), 'Password recovery must require the private key and administrator approval.'],
+];
+for (const [valid, message] of invariants) {
+  if (!valid) {
+    failed = true;
+    console.error(message);
   }
 }
 
