@@ -121,15 +121,7 @@
       </div>
 
       <div class="tab" id="tab-wallet">
-        <div class="grid-two">
-          <section class="panel coupon-panel">
-            <span class="eyebrow">REDEEM TALK-TIME</span>
-            <h2>Enter your We Met code</h2>
-            <p>Codes are created by the administrator. Each code adds a fixed number of minutes to your wallet.</p>
-            <form id="couponForm" class="inline-form"><label class="sr-only" for="couponCode">Redeem code</label><input id="couponCode" autocomplete="off" placeholder="Example: WEMET-LOVE" required><button class="button button-primary">Redeem</button></form>
-          </section>
-          <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
-        </div>
+        
         <div class="section-head"><div><span class="eyebrow">PAY WITH UPI</span><h2>Choose a talk-time pack</h2><p>Pay from your UPI app, upload the payment screenshot, and wait for administrator verification. Minutes are credited only after approval.</p></div></div>
         <div id="plansGrid" class="plans-grid"></div>
         <div id="activePaymentBanner" class="active-payment-banner hidden" aria-live="polite"></div>
@@ -137,6 +129,19 @@
         <div id="paymentHistory" class="list"></div>
         <div class="section-head compact"><div><h2>Wallet activity</h2></div></div>
         <div id="walletHistory" class="list"></div>
+
+        <div class="grid-two">
+
+          <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
+          <section class="panel coupon-panel">
+            <span class="eyebrow">REDEEM TALK-TIME</span>
+            <h2>Enter your We Met code</h2>
+            <p>Radeem your valuable coupons here.</p>
+            <form id="couponForm" class="inline-form"><label class="sr-only" for="couponCode">Redeem code</label><input id="couponCode" autocomplete="off" placeholder="Example: WEMET-LOVE" required><button class="button button-primary">Redeem</button></form>
+          </section>
+          
+        </div>
+        
       </div>
 
       <div class="tab" id="tab-history"><div class="section-head"><div><span class="eyebrow">YOUR CONVERSATIONS</span><h2>Call history</h2></div></div><div id="callHistory" class="list"></div></div>
