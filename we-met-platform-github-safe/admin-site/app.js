@@ -4,6 +4,15 @@
     let me = null, users = [], calls = [], reports = [], tickets = [], resets = [], payments = [];
     const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
     const show = (s, v = true) => $(s)?.classList.toggle('hidden', !v);
+    async function registerFreshServiceWorker() {
+        if (!('serviceWorker' in navigator))
+            return;
+        try {
+            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.2.0', { updateViaCache: 'none' });
+            await registration.update();
+        }
+        catch { }
+    }
     async function copyText(value) {
         try {
             if (navigator.clipboard?.writeText && window.isSecureContext) {
@@ -27,8 +36,7 @@
     const pageMeta = { overview: ['Overview', 'We Met platform live summary'], customers: ['Customers', 'Balances, history and account controls'], employees: ['Listeners', 'Female listener accounts and access'], plans: ['Plans', 'Talk-time pricing'], payments: ['Payments', 'Verify UPI screenshots and release minutes'], coupons: ['Coupons', 'Create wallet redeem codes'], calls: ['Calls', 'Every call and duration'], reports: ['Reports', 'Safety review and account actions'], support: ['Support', 'Customer messages'], resets: ['Password resets', 'Approve secure account recovery'], broadcast: ['Notifications', 'Send in-app/browser messages'], security: ['Security', 'Administrator password and launch safety'] };
     function bind() { $('#loginForm').onsubmit = login; $('#logout').onclick = () => { P.Store.clear(); location.reload(); }; $('#nav').onclick = e => { const b = e.target.closest('[data-page]'); if (!b)
         return; openPage(b.dataset.page); document.querySelector('.layout').classList.remove('menu-open'); }; $('#menuBtn').onclick = () => document.querySelector('.layout').classList.toggle('menu-open'); $('#employeeForm').onsubmit = createEmployee; $('#planForm').onsubmit = createPlan; $('#couponForm').onsubmit = createCoupon; $('#broadcastForm').onsubmit = sendBroadcast; $('#adminPasswordForm').onsubmit = changePassword; $('#adminUsernameForm').onsubmit = changeAdminUsername; $('#refreshLive').onclick = loadLive; $('#reloadCustomers').onclick = loadUsers; $('#reloadEmployees').onclick = loadUsers; $('#reloadPayments').onclick = loadPayments; $('#reloadCoupons').onclick = loadCoupons; $('#reloadCalls').onclick = loadCalls; $('#reloadReports').onclick = loadReports; $('#reloadSupport').onclick = loadSupport; $('#reloadResets').onclick = loadResets; $('#customerSearch').oninput = renderCustomers; $('#callSearch').oninput = renderCalls; $('#closeModal').onclick = () => show('#actionModal', false); }
-    async function init() { bind(); if ('serviceWorker' in navigator)
-        navigator.serviceWorker.register('service-worker.js').catch(() => {}); if (P.Store.token)
+    async function init() { bind(); registerFreshServiceWorker(); if (P.Store.token)
         await loadMe(); }
     async function login(e) { e.preventDefault(); try {
         const d = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: $('#username').value, password: $('#password').value }) });

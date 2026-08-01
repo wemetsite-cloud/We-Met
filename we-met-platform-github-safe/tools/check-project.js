@@ -52,6 +52,7 @@ for (const htmlFile of htmlFiles) {
 
 const required = [
   'customer-site/style.css', 'employee-site/style.css', 'admin-site/style.css',
+  'customer-site/_headers', 'employee-site/_headers', 'admin-site/_headers',
   'customer-site/assets/logo.svg', 'employee-site/assets/logo.svg', 'admin-site/assets/logo.svg',
   'customer-site/manifest.webmanifest', 'employee-site/manifest.webmanifest', 'admin-site/manifest.webmanifest',
   'customer-site/service-worker.js', 'employee-site/service-worker.js', 'admin-site/service-worker.js',
@@ -74,6 +75,18 @@ for (const portal of ['customer-site', 'employee-site', 'admin-site']) {
   } catch (error) {
     failed = true;
     console.error(`Invalid PWA manifest: ${portal}/manifest.webmanifest (${error.message})`);
+  }
+
+  const serviceWorker = fs.readFileSync(path.join(root, portal, 'service-worker.js'), 'utf8');
+  const portalHtml = fs.readFileSync(path.join(root, portal, 'index.html'), 'utf8');
+  const portalApp = fs.readFileSync(path.join(root, portal, 'app.js'), 'utf8');
+  if (!serviceWorker.includes("const VERSION = '5.2.0'") || !serviceWorker.includes("cache: 'no-store'")) {
+    failed = true;
+    console.error(`Stale-cache protection is missing from ${portal}/service-worker.js`);
+  }
+  if (!portalHtml.includes('?v=5.2.0') || !portalApp.includes("updateViaCache: 'none'")) {
+    failed = true;
+    console.error(`V5.2 cache-busting registration is missing from ${portal}`);
   }
 }
 

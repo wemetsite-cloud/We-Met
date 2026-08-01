@@ -17,6 +17,14 @@
   let ringSecondsLeft = 30;
   let publicConfig = null;
 
+  async function registerFreshServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.2.0', { updateViaCache: 'none' });
+      await registration.update();
+    } catch {}
+  }
+
   function bind() {
     $('#loginForm').addEventListener('submit', login);
     $('#forgotBtn').addEventListener('click', openRecovery);
@@ -48,7 +56,7 @@
 
   async function init() {
     bind();
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    registerFreshServiceWorker();
     try { publicConfig = await P.api('/api/public/config'); } catch {}
     ringSecondsLeft = publicConfig?.ringSeconds || 30;
     if (P.Store.token) await loadMe();

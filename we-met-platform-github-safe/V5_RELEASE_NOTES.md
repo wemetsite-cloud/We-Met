@@ -1,4 +1,14 @@
-# We Met V5.1 release notes
+# We Met V5.2 release notes
+
+## V5.2 cache reliability
+
+- Customer, listener and administrator portals now use the same V5.2 cache generation.
+- JavaScript, CSS, HTML and configuration requests use network-first loading with offline fallback.
+- Asset URLs include a V5.2 cache-busting query so CDN and browser caches request the updated files.
+- Old portal-specific caches are deleted during service-worker activation.
+- Already-open pages reload once when V5.2 activates, preventing an old app bundle from remaining on the device.
+- Service-worker registrations bypass the browser HTTP cache and explicitly check for updates.
+- Each portal includes Cloudflare Pages `_headers` rules that prevent stale HTML, configuration and service-worker files.
 
 ## V5.1 payment experience
 

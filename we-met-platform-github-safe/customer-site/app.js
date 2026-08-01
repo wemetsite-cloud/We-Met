@@ -26,6 +26,14 @@
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const setModalState = () => document.body.classList.toggle('modal-open', Boolean($('.modal:not(.hidden), .call-modal:not(.hidden)')));
 
+  async function registerFreshServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.2.0', { updateViaCache: 'none' });
+      await registration.update();
+    } catch {}
+  }
+
   function setAuth(mode) {
     show('#authModal');
     show('#loginForm', mode === 'login');
@@ -58,7 +66,7 @@
     }
 
     if (P.Store.token) await loadMe();
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    registerFreshServiceWorker();
   }
 
   function bind() {

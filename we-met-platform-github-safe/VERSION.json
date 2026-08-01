@@ -1,6 +1,6 @@
 {
   "name": "We Met",
-  "version": "5.1.0",
-  "release": "Guided GPay, universal UPI and QR checkout with screenshot preview and live administrator approval status",
+  "version": "5.2.0",
+  "release": "Forced cache refresh for every portal plus guided GPay, UPI and QR checkout with live administrator approval",
   "builtAt": "2026-08-01"
 }

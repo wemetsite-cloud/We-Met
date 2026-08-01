@@ -1,4 +1,4 @@
-# We Met V5.1 — publish-ready package
+# We Met V5.2 — publish-ready package
 
 We Met is a responsive platform for private Malayalam browser voice conversations. The interface is English. Customer, listener and admin portals remain separate frontends with their own HTML, JavaScript, CSS and assets.
 
@@ -27,6 +27,7 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 
 ## V5 improvements
 
+- V5.2 cache refresh: customer, listener and admin use network-first service workers, versioned assets and automatic one-time reload after deployment
 - Guided purchase checkout with a dedicated Google Pay link, universal UPI app chooser and exact-amount QR code
 - Screenshot preview before submission and a live verification screen that continues updating after the customer returns to the wallet
 - Automatic wallet refresh when the administrator approves a payment, with decline messages shown directly to the customer
