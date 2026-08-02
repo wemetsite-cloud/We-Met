@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS users (
   username text UNIQUE,
   email text UNIQUE,
   phone text,
-  date_of_birth date,
   bio text,
   employee_code text UNIQUE,
   upi_id text,
@@ -163,7 +162,6 @@ CREATE TABLE IF NOT EXISTS payment_submissions (
 );
 
 -- Safe upgrades from earlier packages.
-ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth date;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id text;

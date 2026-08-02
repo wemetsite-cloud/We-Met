@@ -58,7 +58,7 @@ router.get('/users', asyncHandler(async (req, res) => {
   }
 
   const result = await db.query(`
-    SELECT id, role, name, username, email, phone, date_of_birth, bio,
+    SELECT id, role, name, username, email, phone, bio,
            employee_code, upi_id, balance_seconds, status, suspended_until,
            suspension_reason, created_at
     FROM users
@@ -244,7 +244,7 @@ router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
 router.get('/users/:id/details', asyncHandler(async (req, res) => {
   const [user, calls, wallet, reports, support] = await Promise.all([
     db.query(`
-      SELECT id, role, name, username, email, phone, date_of_birth, bio,
+      SELECT id, role, name, username, email, phone, bio,
              employee_code, upi_id, balance_seconds, status, suspended_until,
              suspension_reason, created_at
       FROM users WHERE id = $1

@@ -1,4 +1,4 @@
-const VERSION = '5.2.0';
+const VERSION = '5.3.0';
 const CACHE_PREFIX = 'we-met-admin-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = ['./','index.html','style.css','app.js','api.js','config.js','manifest.webmanifest','assets/logo.svg','assets/favicon.png','assets/icon-192.png','assets/icon-512.png'];

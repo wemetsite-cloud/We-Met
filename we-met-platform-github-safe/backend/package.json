@@ -1,6 +1,6 @@
 {
   "name": "we-met-backend",
-  "version": "5.2.0",
+  "version": "5.3.0",
   "private": true,
   "description": "We Met backend for Malayalam browser calls, reliable live chat, secure recovery and verified manual UPI talk-time credits.",
   "main": "server.js",

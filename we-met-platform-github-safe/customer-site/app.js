@@ -29,7 +29,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.2.0', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.3.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
   }
@@ -42,7 +42,7 @@
     $$('.auth-switch button').forEach((button) => button.classList.toggle('active', button.dataset.mode === mode));
     $('#authTitle').textContent = mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Recover your account' : 'Welcome back';
     $('#authSubtitle').textContent = mode === 'register'
-      ? 'For people aged 16 and above.'
+      ? 'For people aged 18 and above.'
       : mode === 'forgot'
         ? 'The administrator will review your request.'
         : 'Sign in to continue.';
@@ -187,7 +187,6 @@
         body: JSON.stringify({
           name: $('#regName').value,
           email: $('#regEmail').value,
-          dateOfBirth: $('#regDob').value,
           password: $('#regPassword').value,
           termsAccepted: $('#regTerms').checked,
         }),
@@ -245,7 +244,6 @@
     $('#helloName').textContent = `Hello, ${me.name}`;
     $('#profileName').textContent = me.name;
     $('#profileEmail').textContent = me.email || '—';
-    $('#profileDob').textContent = me.dateOfBirth ? `Date of birth: ${new Date(me.dateOfBirth).toLocaleDateString('en-IN')}` : '';
     updateBalance(me.balanceSeconds);
     connectSocket();
     loadHistory();

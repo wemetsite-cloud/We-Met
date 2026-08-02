@@ -6,6 +6,7 @@ const { activateExpiredSuspension } = require('./middleware');
 function createSocketServer(io) {
   const employees = new Map();
   const userSockets = new Map();
+  const connectedUsers = new Map();
   const calls = new Map();
   const userCall = new Map();
   let assignmentSequence = 0;
@@ -25,6 +26,14 @@ function createSocketServer(io) {
 
   function emitToUser(userId, event, payload) {
     io.to(`user:${userId}`).emit(event, payload);
+  }
+
+  function concurrentPresence() {
+    const byRole = { customer: 0, employee: 0, admin: 0 };
+    for (const user of connectedUsers.values()) {
+      if (Object.hasOwn(byRole, user.role)) byRole[user.role] += 1;
+    }
+    return { total: connectedUsers.size, byRole };
   }
 
   function publicListeners() {
@@ -405,6 +414,7 @@ function createSocketServer(io) {
   io.on('connection', (socket) => {
     const user = socket.data.user;
     addUserSocket(user.id, socket.id);
+    connectedUsers.set(user.id, { role: user.role, name: user.name });
     socket.join(`user:${user.id}`);
     socket.emit('session:ready', { user });
 
@@ -564,6 +574,7 @@ function createSocketServer(io) {
 
     socket.on('disconnect', safeHandler(async () => {
       if (removeUserSocket(user.id, socket.id) > 0) return;
+      connectedUsers.delete(user.id);
 
       if (user.role === 'employee') {
         employees.delete(user.id);
@@ -588,16 +599,21 @@ function createSocketServer(io) {
 
   return {
     restrictUser,
-    liveSnapshot: () => ({
-      onlineEmployees: publicListeners(),
-      activeCalls: [...calls.values()].map((call) => ({
-        id: call.id,
-        customerId: call.customerId,
-        employeeId: call.employeeId,
-        status: call.status,
-        billedSeconds: call.billedSeconds,
-      })),
-    }),
+    liveSnapshot: () => {
+      const presence = concurrentPresence();
+      return {
+        concurrentUsers: presence.total,
+        onlineByRole: presence.byRole,
+        onlineEmployees: publicListeners(),
+        activeCalls: [...calls.values()].map((call) => ({
+          id: call.id,
+          customerId: call.customerId,
+          employeeId: call.employeeId,
+          status: call.status,
+          billedSeconds: call.billedSeconds,
+        })),
+      };
+    },
     notifyUser: (userId, payload) => emitToUser(userId, 'notification:new', payload),
   };
 }

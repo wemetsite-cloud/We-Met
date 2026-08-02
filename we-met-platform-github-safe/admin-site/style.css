@@ -9,3 +9,12 @@
 @media(max-width:430px){.metric-grid{grid-template-columns:1fr}.toolbar-actions{flex-direction:column}.toolbar-actions .ghost{width:100%}.login-card{padding:27px 20px}.login-card h1{font-size:32px}.live-row,.mini-card,.ticket{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .pill.pending{background:#fff2df;color:#97600f}.pill.approved,.pill.completed{background:#e8fff7;color:#08775e}.pill.declined{background:#fff0f3;color:var(--red)}.payment-review{align-items:flex-start}.payment-review>div:first-child{min-width:0}.proof-image{display:block;max-width:100%;max-height:68vh;margin:14px auto;border:1px solid var(--line);border-radius:14px;object-fit:contain;background:#f5f6f8}.panel-head p{margin:5px 0 0;color:var(--muted);font-size:11px}
+
+/* V5.3 live presence and touch-friendly customer directory */
+.metric-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+.metric-icon.cyan{background:#e8fbff;color:#087b94}
+.table-wrap{max-width:100%;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+.customer-directory-scroll{max-height:min(72dvh,760px);overflow:auto;scroll-behavior:smooth;overscroll-behavior-x:contain;overscroll-behavior-y:contain}
+.customer-directory-scroll th{position:sticky;top:0;z-index:2;background:#f8f9fb}
+@media(max-width:1120px){.metric-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.metric-grid{grid-template-columns:1fr}.customer-directory-scroll{max-height:calc(100dvh - 235px)}}

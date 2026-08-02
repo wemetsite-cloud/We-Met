@@ -2,13 +2,14 @@
     'use strict';
     const P = window.Portal;
     let me = null, users = [], calls = [], reports = [], tickets = [], resets = [], payments = [];
+    let liveRefreshTimer = null;
     const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
     const show = (s, v = true) => $(s)?.classList.toggle('hidden', !v);
     async function registerFreshServiceWorker() {
         if (!('serviceWorker' in navigator))
             return;
         try {
-            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.2.0', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.3.0', { updateViaCache: 'none' });
             await registration.update();
         }
         catch { }
@@ -59,7 +60,7 @@
     catch {
         P.Store.clear();
     } }
-    function enter() { show('#loginView', false); show('#appView'); const adminName = document.querySelector('.admin-chip b'); if (adminName) adminName.textContent = me.name || 'Administrator'; openPage('overview'); loadDashboard(); loadUsers(); loadPlans(); loadPayments(); loadCoupons(); loadCalls(); loadReports(); loadSupport(); loadResets(); }
+    function enter() { show('#loginView', false); show('#appView'); const adminName = document.querySelector('.admin-chip b'); if (adminName) adminName.textContent = me.name || 'Administrator'; openPage('overview'); loadDashboard(); loadUsers(); loadPlans(); loadPayments(); loadCoupons(); loadCalls(); loadReports(); loadSupport(); loadResets(); clearInterval(liveRefreshTimer); liveRefreshTimer = setInterval(() => { if (document.visibilityState === 'visible' && $('#page-overview').classList.contains('active')) loadLive(true); }, 10000); }
     function openPage(name) { $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.page === name)); $$('.page').forEach(p => p.classList.toggle('active', p.id === `page-${name}`)); $('#pageTitle').textContent = pageMeta[name][0]; $('#pageDesc').textContent = pageMeta[name][1]; window.scrollTo({ top: 0, behavior: 'smooth' }); if (name === 'overview') {
         loadDashboard();
         loadLive();
@@ -83,14 +84,19 @@
     catch (e) {
         P.toast(e.message, 'error');
     } }
-    async function loadLive() { try {
+    async function loadLive(silent = false) { try {
         const d = await P.api('/api/admin/live');
-        $('#mOnline').textContent = d.onlineEmployees.length;
-        $('#liveListeners').innerHTML = d.onlineEmployees.length ? d.onlineEmployees.map(x => `<div class="live-row"><div><strong>${P.esc(x.name)}</strong><p>${P.esc(x.bio || '')}</p></div><span class="pill ${x.status}">${P.esc(x.status)}</span></div>`).join('') : '<p class="empty-copy">No listeners online.</p>';
-        $('#liveCalls').innerHTML = d.activeCalls.length ? d.activeCalls.map(x => `<div class="live-row"><div><strong>${x.id.slice(0, 8)}</strong><p>${x.status} • ${P.duration(x.billedSeconds)}</p></div><span class="pill busy">LIVE</span></div>`).join('') : '<p class="empty-copy">No live calls.</p>';
+        const onlineEmployees = d.onlineEmployees || [];
+        const activeCalls = d.activeCalls || [];
+        const byRole = d.onlineByRole || {};
+        $('#mConcurrent').textContent = Number(d.concurrentUsers || 0);
+        $('#mConcurrentBreakdown').textContent = `${Number(byRole.customer || 0)} customers • ${Number(byRole.employee || 0)} listeners`;
+        $('#mOnline').textContent = onlineEmployees.length;
+        $('#liveListeners').innerHTML = onlineEmployees.length ? onlineEmployees.map(x => `<div class="live-row"><div><strong>${P.esc(x.name)}</strong><p>${P.esc(x.bio || '')}</p></div><span class="pill ${x.status}">${P.esc(x.status)}</span></div>`).join('') : '<p class="empty-copy">No listeners online.</p>';
+        $('#liveCalls').innerHTML = activeCalls.length ? activeCalls.map(x => `<div class="live-row"><div><strong>${x.id.slice(0, 8)}</strong><p>${x.status} • ${P.duration(x.billedSeconds)}</p></div><span class="pill busy">LIVE</span></div>`).join('') : '<p class="empty-copy">No live calls.</p>';
     }
     catch (e) {
-        P.toast(e.message, 'error');
+        if (!silent) P.toast(e.message, 'error');
     } }
     async function loadUsers() { try {
         users = (await P.api('/api/admin/users')).users;
@@ -102,7 +108,7 @@
     catch (e) {
         P.toast(e.message, 'error');
     } }
-    function renderCustomers() { const q = ($('#customerSearch')?.value || '').toLowerCase(), list = users.filter(x => x.role === 'customer' && (`${x.name} ${x.email}`).toLowerCase().includes(q)); $('#customersTable').innerHTML = list.map(u => `<tr><td><b>${P.esc(u.name)}</b><br><small>${u.date_of_birth ? new Date(u.date_of_birth).toLocaleDateString('en-IN') : ''}</small></td><td>${P.esc(u.email || '—')}</td><td>${P.duration(u.balance_seconds)}</td><td><span class="pill ${u.status}">${u.status}</span>${u.suspended_until ? `<br><small>until ${P.date(u.suspended_until)}</small>` : ''}</td><td>${P.date(u.created_at)}</td><td><div class="actions"><button class="ghost" data-details="${u.id}">Details</button><button class="ghost" data-minutes="${u.id}">Minutes</button><button class="warning" data-suspend="${u.id}">Suspend</button><button class="${u.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${u.id}" data-status="${u.status}">${u.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${u.id}">Reset pass</button></div></td></tr>`).join(''); wireUserActions(); }
+    function renderCustomers() { const q = ($('#customerSearch')?.value || '').toLowerCase(), list = users.filter(x => x.role === 'customer' && (`${x.name} ${x.email}`).toLowerCase().includes(q)); $('#customersTable').innerHTML = list.map(u => `<tr><td><b>${P.esc(u.name)}</b></td><td>${P.esc(u.email || '—')}</td><td>${P.duration(u.balance_seconds)}</td><td><span class="pill ${u.status}">${u.status}</span>${u.suspended_until ? `<br><small>until ${P.date(u.suspended_until)}</small>` : ''}</td><td>${P.date(u.created_at)}</td><td><div class="actions"><button class="ghost" data-details="${u.id}">Details</button><button class="ghost" data-minutes="${u.id}">Minutes</button><button class="warning" data-suspend="${u.id}">Suspend</button><button class="${u.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${u.id}" data-status="${u.status}">${u.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${u.id}">Reset pass</button></div></td></tr>`).join(''); wireUserActions(); }
     function renderEmployees() { const list = users.filter(x => x.role === 'employee'); $('#employeeCards').innerHTML = list.map(u => `<div class="mini-card"><div><strong>${P.esc(u.name)}</strong><p>${P.esc(u.email || '')} • ${P.esc(u.employee_code || '')}</p><p>${P.esc(u.bio || '')}</p></div><div class="actions"><span class="pill ${u.status}">${u.status}</span><button class="ghost" data-details="${u.id}">Details</button><button class="warning" data-suspend="${u.id}">Suspend</button><button class="${u.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${u.id}" data-status="${u.status}">${u.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${u.id}">Reset pass</button></div></div>`).join('') || '<p>No listeners.</p>'; wireUserActions(); }
     function wireUserActions() { $$('[data-details]').forEach(b => b.onclick = () => showDetails(b.dataset.details)); $$('[data-minutes]').forEach(b => b.onclick = () => minutesModal(b.dataset.minutes)); $$('[data-suspend]').forEach(b => b.onclick = () => suspendModal(b.dataset.suspend)); $$('[data-block]').forEach(b => b.onclick = () => setUserStatus(b.dataset.block, b.dataset.status === 'blocked' ? 'active' : 'blocked')); $$('[data-reset]').forEach(b => b.onclick = () => resetPassword(b.dataset.reset)); }
     function modal(title, body) { $('#modalTitle').textContent = title; $('#modalBody').innerHTML = body; show('#actionModal'); }

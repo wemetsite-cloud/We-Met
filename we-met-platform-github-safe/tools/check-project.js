@@ -80,13 +80,13 @@ for (const portal of ['customer-site', 'employee-site', 'admin-site']) {
   const serviceWorker = fs.readFileSync(path.join(root, portal, 'service-worker.js'), 'utf8');
   const portalHtml = fs.readFileSync(path.join(root, portal, 'index.html'), 'utf8');
   const portalApp = fs.readFileSync(path.join(root, portal, 'app.js'), 'utf8');
-  if (!serviceWorker.includes("const VERSION = '5.2.0'") || !serviceWorker.includes("cache: 'no-store'")) {
+  if (!serviceWorker.includes("const VERSION = '5.3.0'") || !serviceWorker.includes("cache: 'no-store'")) {
     failed = true;
     console.error(`Stale-cache protection is missing from ${portal}/service-worker.js`);
   }
-  if (!portalHtml.includes('?v=5.2.0') || !portalApp.includes("updateViaCache: 'none'")) {
+  if (!portalHtml.includes('?v=5.3.0') || !portalApp.includes("updateViaCache: 'none'")) {
     failed = true;
-    console.error(`V5.2 cache-busting registration is missing from ${portal}`);
+    console.error(`V5.3 cache-busting registration is missing from ${portal}`);
   }
 }
 
@@ -105,6 +105,11 @@ const workflowSources = {
   auth: fs.readFileSync(path.join(root, 'backend/src/routes/auth.js'), 'utf8'),
   public: fs.readFileSync(path.join(root, 'backend/src/routes/public.js'), 'utf8'),
   customerUi: fs.readFileSync(path.join(root, 'customer-site/app.js'), 'utf8'),
+  customerHtml: fs.readFileSync(path.join(root, 'customer-site/index.html'), 'utf8'),
+  customerCss: fs.readFileSync(path.join(root, 'customer-site/style.css'), 'utf8'),
+  adminUi: fs.readFileSync(path.join(root, 'admin-site/app.js'), 'utf8'),
+  adminHtml: fs.readFileSync(path.join(root, 'admin-site/index.html'), 'utf8'),
+  adminCss: fs.readFileSync(path.join(root, 'admin-site/style.css'), 'utf8'),
 };
 const invariants = [
   [workflowSources.socket.includes("socket.on('chat:send'") && workflowSources.socket.includes('callId,\n          senderId'), 'Chat messages must include callId and delivery acknowledgement.'],
@@ -114,6 +119,10 @@ const invariants = [
   [workflowSources.auth.includes('recovery_key_hash') && workflowSources.auth.includes("request.status !== 'approved'"), 'Password recovery must require the private key and administrator approval.'],
   [workflowSources.public.includes('QRCode.toDataURL') && workflowSources.public.includes('googlePayUrl') && workflowSources.public.includes('upiUrl'), 'Checkout must provide exact UPI, Google Pay and QR payment options.'],
   [workflowSources.customerUi.includes('previewPaymentProof') && workflowSources.customerUi.includes('startPaymentPolling'), 'Customer checkout must preview proof and refresh administrator approval status.'],
+  [!workflowSources.auth.includes('dateOfBirth') && workflowSources.auth.includes('at least 18') && !workflowSources.customerHtml.includes('regDob') && workflowSources.customerHtml.includes('I am at least 18'), 'Registration must use the 18+ confirmation without a date-of-birth field.'],
+  [workflowSources.customerCss.includes('grid-template-columns:repeat(2,minmax(0,1fr))') && workflowSources.customerCss.includes('grid-template-columns:repeat(3,minmax(0,1fr))') && workflowSources.customerCss.includes('grid-template-columns:repeat(4,minmax(0,1fr))'), 'Talk-time packs must use responsive two, three and four-column layouts.'],
+  [workflowSources.socket.includes('concurrentUsers') && workflowSources.socket.includes('onlineByRole') && workflowSources.adminUi.includes("$('#mConcurrent')") && workflowSources.adminHtml.includes('People online now'), 'Admin concurrent-presence reporting is required.'],
+  [workflowSources.adminHtml.includes('customer-directory-scroll') && workflowSources.adminCss.includes('-webkit-overflow-scrolling:touch') && workflowSources.adminCss.includes('touch-action:pan-x pan-y'), 'Customer directory must remain touch-scrollable on mobile.'],
 ];
 for (const [valid, message] of invariants) {
   if (!valid) {

@@ -1,4 +1,11 @@
-# We Met V5.2 release notes
+# We Met V5.3 release notes
+
+## V5.3 account, layout and admin improvements
+
+- Customer registration no longer asks for a date of birth. A required checkbox confirms the customer is at least 18 and accepts the Terms and Privacy Policy.
+- Talk-time pack cards show two per row on phones, three per row on tablets and four per row on larger screens.
+- The admin overview shows unique concurrently connected customers and listeners, refreshed every 10 seconds while the overview is visible.
+- The mobile customer directory supports smooth touch scrolling in both directions with a sticky table header.
 
 ## V5.2 cache reliability
 

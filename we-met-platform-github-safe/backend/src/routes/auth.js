@@ -20,7 +20,6 @@ function publicUser(user) {
     username: user.username,
     email: user.email,
     phone: user.phone,
-    dateOfBirth: user.date_of_birth,
     bio: user.bio,
     employeeCode: user.employee_code,
     upiId: user.upi_id,
@@ -33,16 +32,6 @@ function publicUser(user) {
 
 function validEmail(value) {
   return /^\S+@\S+\.\S+$/.test(value);
-}
-
-function isAtLeast16(dateString) {
-  const dob = new Date(`${dateString}T00:00:00Z`);
-  if (Number.isNaN(dob.getTime()) || dob > new Date()) return false;
-  const today = new Date();
-  let age = today.getUTCFullYear() - dob.getUTCFullYear();
-  const month = today.getUTCMonth() - dob.getUTCMonth();
-  if (month < 0 || (month === 0 && today.getUTCDate() < dob.getUTCDate())) age -= 1;
-  return age >= 16;
 }
 
 function attemptKey(req, identifier) {
@@ -87,21 +76,23 @@ router.post('/register', asyncHandler(async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 80);
   const email = String(req.body.email || '').trim().toLowerCase();
   const password = String(req.body.password || '');
-  const dateOfBirth = String(req.body.dateOfBirth || '');
   const termsAccepted = Boolean(req.body.termsAccepted);
 
   if (name.length < 2) return res.status(400).json({ error: 'Enter your full name.' });
   if (!validEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
   if (password.length < 8) return res.status(400).json({ error: 'Use a password with at least 8 characters.' });
-  if (!isAtLeast16(dateOfBirth)) return res.status(400).json({ error: 'You must be at least 16 years old to use We Met.' });
-  if (!termsAccepted) return res.status(400).json({ error: 'Accept the Terms and Privacy Policy to continue.' });
+  if (!termsAccepted) {
+    return res.status(400).json({
+      error: 'Confirm that you are at least 18 and accept the Terms and Privacy Policy to continue.',
+    });
+  }
 
   try {
     const passwordHash = await hashPassword(password);
     const result = await db.query(
-      `INSERT INTO users(role,name,email,date_of_birth,password_hash,terms_accepted_at)
-       VALUES('customer',$1,$2,$3,$4,now()) RETURNING *`,
-      [name, email, dateOfBirth, passwordHash],
+      `INSERT INTO users(role,name,email,password_hash,terms_accepted_at)
+       VALUES('customer',$1,$2,$3,now()) RETURNING *`,
+      [name, email, passwordHash],
     );
     const user = result.rows[0];
     res.status(201).json({ token: signToken(user), user: publicUser(user) });
