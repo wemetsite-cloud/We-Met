@@ -11,6 +11,7 @@
   let audioCall = null;
   let currentCall = null;
   let listeners = [];
+  let deferredInstallPrompt = null;
   let historyCalls = [];
   let paymentPlans = [];
   let paymentSubmissions = [];
@@ -26,10 +27,16 @@
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const setModalState = () => document.body.classList.toggle('modal-open', Boolean($('.modal:not(.hidden), .call-modal:not(.hidden)')));
 
+  window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); deferredInstallPrompt = event; document.querySelectorAll('[data-install-app]').forEach((b)=>b.classList.remove('hidden')); });
+  window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; document.querySelectorAll('[data-install-app]').forEach((b)=>b.classList.add('hidden')); P.toast('We Met installed successfully.', 'success'); });
+  async function installApp() {
+    if (!deferredInstallPrompt) { P.toast('Use your browser menu and choose Install We Met or Add to Home screen.', 'info'); return; }
+    deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null;
+  }
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.3.0', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.4.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
   }
@@ -70,6 +77,7 @@
   }
 
   function bind() {
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-install-app]')) installApp(); });
     $('#openAuth').addEventListener('click', () => setAuth('login'));
     $$('[data-auth]').forEach((button) => button.addEventListener('click', () => setAuth(button.dataset.auth)));
     $$('[data-close]').forEach((button) => button.addEventListener('click', () => {
@@ -420,8 +428,11 @@
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   }
 
-  function statusText(status) {
-    return ({ available: 'Available', busy: 'On a call', break: 'On break', ringing: 'Ringing' })[status] || 'Offline';
+  function statusText(status) { return ({ available: 'Available', busy: 'On a call', break: 'On break', ringing: 'Ringing', offline:'Offline' })[status] || 'Offline'; }
+  function avatarFor(listener) {
+    if (listener.avatar) return listener.avatar;
+    let n = 0; for (const c of String(listener.id || '')) n += c.charCodeAt(0);
+    return `assets/avatar-${String((n % 20) + 1).padStart(2,'0')}.svg`;
   }
 
   function renderListeners() {
@@ -433,12 +444,12 @@
     $('#listenerGrid').innerHTML = listeners.length
       ? listeners.map((listener) => `
         <article class="listener-card">
-          <div class="abstract-avatar tone-${listenerTone(listener.id)}">${P.esc(initials(listener.name))}</div>
+          <div class="abstract-avatar tone-${listenerTone(listener.id)}"><img src="${P.esc(avatarFor(listener))}" alt="" loading="lazy"></div>
           <button class="favorite-btn" data-favorite="${listener.id}" title="${favoriteIds.has(listener.id) ? 'Remove favourite' : 'Add favourite'}" aria-label="Favourite listener">${favoriteIds.has(listener.id) ? '♥' : '♡'}</button>
           <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge ${listener.status}">${statusText(listener.status)}</span></div>
           <div class="language-line">● Malayalam conversations</div>
           <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
-          <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' ? 'disabled' : ''}>${listener.status === 'available' ? 'Call this listener' : statusText(listener.status)}</button>
+          <button class="button ${listener.status === 'available' && !listener.demo ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' || listener.demo ? 'disabled' : ''}>${listener.demo ? 'Demo listener' : (listener.status === 'available' ? 'Call this listener' : statusText(listener.status))}</button>
         </article>`).join('')
       : emptyState('No listeners online', 'Ask a listener to go online, then refresh this page.');
 

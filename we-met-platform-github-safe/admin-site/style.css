@@ -18,3 +18,5 @@
 .customer-directory-scroll th{position:sticky;top:0;z-index:2;background:#f8f9fb}
 @media(max-width:1120px){.metric-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.metric-grid{grid-template-columns:1fr}.customer-directory-scroll{max-height:calc(100dvh - 235px)}}
+
+.hidden{display:none!important}

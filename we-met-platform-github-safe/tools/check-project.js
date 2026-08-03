@@ -80,13 +80,13 @@ for (const portal of ['customer-site', 'employee-site', 'admin-site']) {
   const serviceWorker = fs.readFileSync(path.join(root, portal, 'service-worker.js'), 'utf8');
   const portalHtml = fs.readFileSync(path.join(root, portal, 'index.html'), 'utf8');
   const portalApp = fs.readFileSync(path.join(root, portal, 'app.js'), 'utf8');
-  if (!serviceWorker.includes("const VERSION = '5.3.0'") || !serviceWorker.includes("cache: 'no-store'")) {
+  if (!serviceWorker.includes("const VERSION = '5.4.0'") || !serviceWorker.includes("cache: 'no-store'")) {
     failed = true;
     console.error(`Stale-cache protection is missing from ${portal}/service-worker.js`);
   }
-  if (!portalHtml.includes('?v=5.3.0') || !portalApp.includes("updateViaCache: 'none'")) {
+  if (!portalHtml.includes('?v=5.4.0') || !portalApp.includes("updateViaCache: 'none'")) {
     failed = true;
-    console.error(`V5.3 cache-busting registration is missing from ${portal}`);
+    console.error(`V5.4 cache-busting registration is missing from ${portal}`);
   }
 }
 

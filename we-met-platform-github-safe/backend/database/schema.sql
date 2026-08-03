@@ -55,6 +55,19 @@ CREATE TABLE IF NOT EXISTS coupon_redemptions (
   UNIQUE (coupon_id, customer_id)
 );
 
+
+CREATE TABLE IF NOT EXISTS demo_listeners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  bio text,
+  avatar text,
+  activity text NOT NULL DEFAULT 'available' CHECK (activity IN ('available','break','busy','offline')),
+  randomize boolean NOT NULL DEFAULT false,
+  enabled boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS calls (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES users(id),

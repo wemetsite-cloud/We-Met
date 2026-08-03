@@ -1,7 +1,7 @@
 (() => {
     'use strict';
     const P = window.Portal;
-    let me = null, users = [], calls = [], reports = [], tickets = [], resets = [], payments = [];
+    let me = null, users = [], calls = [], reports = [], tickets = [], resets = [], payments = [], demoListeners = [];
     let liveRefreshTimer = null;
     const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
     const show = (s, v = true) => $(s)?.classList.toggle('hidden', !v);
@@ -9,7 +9,7 @@
         if (!('serviceWorker' in navigator))
             return;
         try {
-            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.3.0', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.4.0', { updateViaCache: 'none' });
             await registration.update();
         }
         catch { }
@@ -34,9 +34,9 @@
             P.toast('Could not copy automatically. Select the code and copy it manually.', 'error');
         }
     }
-    const pageMeta = { overview: ['Overview', 'We Met platform live summary'], customers: ['Customers', 'Balances, history and account controls'], employees: ['Listeners', 'Female listener accounts and access'], plans: ['Plans', 'Talk-time pricing'], payments: ['Payments', 'Verify UPI screenshots and release minutes'], coupons: ['Coupons', 'Create wallet redeem codes'], calls: ['Calls', 'Every call and duration'], reports: ['Reports', 'Safety review and account actions'], support: ['Support', 'Customer messages'], resets: ['Password resets', 'Approve secure account recovery'], broadcast: ['Notifications', 'Send in-app/browser messages'], security: ['Security', 'Administrator password and launch safety'] };
+    const pageMeta = { overview: ['Overview', 'We Met platform live summary'], customers: ['Customers', 'Balances, history and account controls'], employees: ['Listeners', 'Female listener accounts and access'], plans: ['Plans', 'Talk-time pricing'], payments: ['Payments', 'Verify UPI screenshots and release minutes'], coupons: ['Coupons', 'Create wallet redeem codes'], calls: ['Calls', 'Every call and duration'], reports: ['Reports', 'Safety review and account actions'], support: ['Support', 'Customer messages'], resets: ['Password resets', 'Approve secure account recovery'], broadcast: ['Notifications', 'Send in-app/browser messages'], 'demo-listeners': ['Demo Listeners', 'Manage safe demo/test listener profiles and activity'], security: ['Security', 'Administrator password and launch safety'] };
     function bind() { $('#loginForm').onsubmit = login; $('#logout').onclick = () => { P.Store.clear(); location.reload(); }; $('#nav').onclick = e => { const b = e.target.closest('[data-page]'); if (!b)
-        return; openPage(b.dataset.page); document.querySelector('.layout').classList.remove('menu-open'); }; $('#menuBtn').onclick = () => document.querySelector('.layout').classList.toggle('menu-open'); $('#employeeForm').onsubmit = createEmployee; $('#planForm').onsubmit = createPlan; $('#couponForm').onsubmit = createCoupon; $('#broadcastForm').onsubmit = sendBroadcast; $('#adminPasswordForm').onsubmit = changePassword; $('#adminUsernameForm').onsubmit = changeAdminUsername; $('#refreshLive').onclick = loadLive; $('#reloadCustomers').onclick = loadUsers; $('#reloadEmployees').onclick = loadUsers; $('#reloadPayments').onclick = loadPayments; $('#reloadCoupons').onclick = loadCoupons; $('#reloadCalls').onclick = loadCalls; $('#reloadReports').onclick = loadReports; $('#reloadSupport').onclick = loadSupport; $('#reloadResets').onclick = loadResets; $('#customerSearch').oninput = renderCustomers; $('#callSearch').oninput = renderCalls; $('#closeModal').onclick = () => show('#actionModal', false); }
+        return; openPage(b.dataset.page); document.querySelector('.layout').classList.remove('menu-open'); }; $('#menuBtn').onclick = () => document.querySelector('.layout').classList.toggle('menu-open'); $('#employeeForm').onsubmit = createEmployee; $('#demoListenerForm').onsubmit = createDemoListener; $('#planForm').onsubmit = createPlan; $('#couponForm').onsubmit = createCoupon; $('#broadcastForm').onsubmit = sendBroadcast; $('#adminPasswordForm').onsubmit = changePassword; $('#adminUsernameForm').onsubmit = changeAdminUsername; $('#refreshLive').onclick = loadLive; $('#reloadCustomers').onclick = loadUsers; $('#reloadEmployees').onclick = loadUsers; $('#reloadDemoListeners').onclick = loadDemoListeners; $('#reloadPayments').onclick = loadPayments; $('#reloadCoupons').onclick = loadCoupons; $('#reloadCalls').onclick = loadCalls; $('#reloadReports').onclick = loadReports; $('#reloadSupport').onclick = loadSupport; $('#reloadResets').onclick = loadResets; $('#customerSearch').oninput = renderCustomers; $('#callSearch').oninput = renderCalls; $('#closeModal').onclick = () => show('#actionModal', false); }
     async function init() { bind(); registerFreshServiceWorker(); if (P.Store.token)
         await loadMe(); }
     async function login(e) { e.preventDefault(); try {
@@ -60,11 +60,11 @@
     catch {
         P.Store.clear();
     } }
-    function enter() { show('#loginView', false); show('#appView'); const adminName = document.querySelector('.admin-chip b'); if (adminName) adminName.textContent = me.name || 'Administrator'; openPage('overview'); loadDashboard(); loadUsers(); loadPlans(); loadPayments(); loadCoupons(); loadCalls(); loadReports(); loadSupport(); loadResets(); clearInterval(liveRefreshTimer); liveRefreshTimer = setInterval(() => { if (document.visibilityState === 'visible' && $('#page-overview').classList.contains('active')) loadLive(true); }, 10000); }
+    function enter() { show('#loginView', false); show('#appView'); const adminName = document.querySelector('.admin-chip b'); if (adminName) adminName.textContent = me.name || 'Administrator'; openPage('overview'); loadDashboard(); loadUsers(); loadDemoListeners(); loadPlans(); loadPayments(); loadCoupons(); loadCalls(); loadReports(); loadSupport(); loadResets(); clearInterval(liveRefreshTimer); liveRefreshTimer = setInterval(() => { if (document.visibilityState === 'visible' && $('#page-overview').classList.contains('active')) loadLive(true); }, 10000); }
     function openPage(name) { $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.page === name)); $$('.page').forEach(p => p.classList.toggle('active', p.id === `page-${name}`)); $('#pageTitle').textContent = pageMeta[name][0]; $('#pageDesc').textContent = pageMeta[name][1]; window.scrollTo({ top: 0, behavior: 'smooth' }); if (name === 'overview') {
         loadDashboard();
         loadLive();
-    } if (name === 'customers' || name === 'employees')
+    } if (name === 'customers' || name === 'employees' || name === 'demo-listeners')
         loadUsers(); if (name === 'plans')
         loadPlans(); if (name === 'payments')
         loadPayments(); if (name === 'coupons')
@@ -157,6 +157,10 @@
     catch (x) {
         P.toast(x.message, 'error');
     } }
+    async function loadDemoListeners() { try { const d=await P.api('/api/admin/demo-listeners'); demoListeners=d.listeners||[]; $('#demoListenerCards').innerHTML=demoListeners.map(x=>`<div class="mini-card"><div><strong>${P.esc(x.name)}</strong><p>${P.esc(x.activity)} · ${x.randomize?'randomized':'fixed'}</p></div><div class="actions"><button class="ghost" data-demo-edit="${x.id}">Edit</button><button class="danger" data-demo-delete="${x.id}">Delete</button></div></div>`).join('') || '<p>No demo listeners yet.</p>'; $$('[data-demo-edit]').forEach(b=>b.onclick=()=>editDemo(b.dataset.demoEdit)); $$('[data-demo-delete]').forEach(b=>b.onclick=()=>deleteDemo(b.dataset.demoDelete)); } catch(e){P.toast(e.message,'error');} }
+    async function createDemoListener(e){e.preventDefault();try{await P.api('/api/admin/demo-listeners',{method:'POST',body:JSON.stringify({name:$('#demoName').value,bio:$('#demoBio').value,avatar:$('#demoAvatar').value,activity:$('#demoActivity').value,randomize:$('#demoRandomize').checked})});e.target.reset();P.toast('Demo listener added.','success');loadDemoListeners();}catch(x){P.toast(x.message,'error');}}
+    function editDemo(id){const x=demoListeners.find(a=>a.id===id);if(!x)return;modal('Edit demo listener',`<form id="editDemoForm" class="stack"><label>Name<input id="edName" value="${P.esc(x.name)}" required></label><label>Bio<textarea id="edBio">${P.esc(x.bio||'')}</textarea></label><label>Avatar<select id="edAvatar">${Array.from({length:20},(_,i)=>{const v=`assets/avatar-${String(i+1).padStart(2,'0')}.svg`;return `<option value="${v}" ${x.avatar===v?'selected':''}>Avatar ${String(i+1).padStart(2,'0')}</option>`}).join('')}</select></label><label>Activity<select id="edActivity"><option value="available">Online</option><option value="break">On break</option><option value="busy">On another call</option><option value="offline">Offline</option></select></label><label class="check"><input id="edRandom" type="checkbox" ${x.randomize?'checked':''}><span>Randomize activity</span></label><label class="check"><input id="edEnabled" type="checkbox" ${x.enabled?'checked':''}><span>Visible</span></label><button class="primary">Save changes</button></form>`);$('#edActivity').value=x.activity;$('#editDemoForm').onsubmit=async(e)=>{e.preventDefault();try{await P.api(`/api/admin/demo-listeners/${id}`,{method:'PATCH',body:JSON.stringify({name:$('#edName').value,bio:$('#edBio').value,avatar:$('#edAvatar').value,activity:$('#edActivity').value,randomize:$('#edRandom').checked,enabled:$('#edEnabled').checked})});show('#actionModal',false);loadDemoListeners();P.toast('Demo listener updated.','success');}catch(err){P.toast(err.message,'error')}}}
+    async function deleteDemo(id){if(!confirm('Delete this demo listener?'))return;try{await P.api(`/api/admin/demo-listeners/${id}`,{method:'DELETE'});loadDemoListeners();P.toast('Demo listener deleted.','success')}catch(e){P.toast(e.message,'error')}}
     async function loadPlans() { try {
         const d = await P.api('/api/admin/plans');
         $('#plansList').innerHTML = d.plans.map(p => `<div class="mini-card"><div><strong>${P.esc(p.name)} ${p.popular ? '★' : ''}</strong><p>${P.money(p.price_paise)} • ${P.duration(p.seconds)}</p></div><div class="actions"><button class="ghost" data-plan-edit="${p.id}">Edit</button><button class="${p.active ? 'danger' : 'ghost'}" data-plan-toggle="${p.id}" data-active="${p.active}">${p.active ? 'Disable' : 'Enable'}</button></div></div>`).join('');

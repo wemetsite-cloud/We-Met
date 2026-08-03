@@ -52,3 +52,8 @@ img{display:block;max-width:100%}
 @media(max-width:1040px){.plans-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.plans-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-right:0}.plan-card{padding:16px 13px;border-radius:18px}.plan-card h3{font-size:23px}.plan-card>.button{padding:10px 7px;font-size:10px}}
 @media(max-width:480px){.plan-card{padding:15px 11px}.plan-card p{font-size:10px}.plan-card.popular{padding-top:39px}.popular-tag{right:8px;top:8px!important}}
+
+.install-banner{margin:28px auto 0;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px;border:1px solid rgba(240,68,143,.18);border-radius:28px;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(255,238,247,.92));box-shadow:0 18px 50px rgba(80,25,55,.08)}
+.install-banner h2{margin:4px 0 6px}.install-banner p{margin:0}.install-inline{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 14px;font-weight:700}.hidden{display:none!important}
+.abstract-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+@media(max-width:700px){.install-banner{flex-direction:column;align-items:flex-start}.install-banner .button{width:100%}.install-inline{justify-content:space-between;flex-wrap:wrap}}

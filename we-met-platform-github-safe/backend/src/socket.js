@@ -36,15 +36,19 @@ function createSocketServer(io) {
     return { total: connectedUsers.size, byRole };
   }
 
+  let demoCache = [];
+  async function refreshDemoListeners() {
+    try {
+      const result = await db.query(`SELECT id,name,bio,avatar,activity,randomize,enabled FROM demo_listeners WHERE enabled=true ORDER BY created_at DESC`);
+      demoCache = result.rows.map((x) => ({ id: `demo-${x.id}`, demoId:x.id, name:x.name, bio:x.bio||'', avatar:x.avatar||'', status:x.activity, demo:true }));
+    } catch (error) { console.error('Demo listener refresh failed:', error); }
+    broadcastListeners();
+  }
   function publicListeners() {
     const priority = { available: 0, ringing: 1, busy: 2, break: 3 };
     return [...employees.entries()]
-      .map(([id, employee]) => ({
-        id,
-        name: employee.name,
-        bio: employee.bio || '',
-        status: employee.state,
-      }))
+      .map(([id, employee]) => ({ id, name: employee.name, bio: employee.bio || '', avatar: employee.avatar || '', status: employee.state, demo:false }))
+      .concat(demoCache)
       .sort((a, b) => (priority[a.status] ?? 9) - (priority[b.status] ?? 9) || a.name.localeCompare(b.name));
   }
 
@@ -58,6 +62,23 @@ function createSocketServer(io) {
     if (!user.suspended_until) return true;
     return new Date(user.suspended_until) > new Date();
   }
+
+  refreshDemoListeners();
+  setInterval(async () => {
+    if (!demoCache.length) return;
+    let changed = false;
+    const result = await db.query(`SELECT id,name,bio,avatar,activity,randomize,enabled FROM demo_listeners WHERE enabled=true`);
+    const rows = result.rows;
+    for (const row of rows) {
+      if (!row.randomize) continue;
+      if (Math.random() < 0.22) {
+        const states = ['available','break','busy','offline'];
+        await db.query('UPDATE demo_listeners SET activity=$2,updated_at=now() WHERE id=$1',[row.id,states[Math.floor(Math.random()*states.length)]]);
+        changed = true;
+      }
+    }
+    if (changed) refreshDemoListeners();
+  }, 30000);
 
   io.use(async (socket, next) => {
     try {
@@ -599,6 +620,7 @@ function createSocketServer(io) {
 
   return {
     restrictUser,
+    refreshDemoListeners,
     liveSnapshot: () => {
       const presence = concurrentPresence();
       return {

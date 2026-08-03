@@ -638,4 +638,41 @@ router.post('/notifications', asyncHandler(async (req, res) => {
   res.json({ sent: userIds.length });
 }));
 
+router.get('/demo-listeners', asyncHandler(async (_req, res) => {
+  const result = await db.query(`SELECT id,name,bio,avatar,activity,randomize,enabled,created_at,updated_at FROM demo_listeners ORDER BY created_at DESC`);
+  res.json({ listeners: result.rows });
+}));
+
+router.post('/demo-listeners', asyncHandler(async (req, res) => {
+  const name = text(req.body.name, 100);
+  const bio = text(req.body.bio, 500) || null;
+  const avatar = text(req.body.avatar, 300) || null;
+  const activity = ['available','break','busy','offline'].includes(req.body.activity) ? req.body.activity : 'available';
+  const randomize = Boolean(req.body.randomize);
+  if (name.length < 2) return res.status(400).json({ error: 'Enter a display name.' });
+  const result = await db.query(`INSERT INTO demo_listeners(name,bio,avatar,activity,randomize) VALUES($1,$2,$3,$4,$5) RETURNING *`, [name,bio,avatar,activity,randomize]);
+  res.status(201).json({ listener: result.rows[0] });
+}));
+
+router.patch('/demo-listeners/:id', asyncHandler(async (req, res) => {
+  const name = text(req.body.name, 100);
+  const bio = text(req.body.bio, 500) || null;
+  const avatar = text(req.body.avatar, 300) || null;
+  const activity = ['available','break','busy','offline'].includes(req.body.activity) ? req.body.activity : 'offline';
+  const randomize = Boolean(req.body.randomize);
+  const enabled = req.body.enabled !== false;
+  if (name.length < 2) return res.status(400).json({ error: 'Enter a display name.' });
+  const result = await db.query(`UPDATE demo_listeners SET name=$2,bio=$3,avatar=$4,activity=$5,randomize=$6,enabled=$7,updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id,name,bio,avatar,activity,randomize,enabled]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Demo listener not found.' });
+  req.app.locals.socketRuntime?.refreshDemoListeners?.();
+  res.json({ listener: result.rows[0] });
+}));
+
+router.delete('/demo-listeners/:id', asyncHandler(async (req, res) => {
+  const result = await db.query('DELETE FROM demo_listeners WHERE id=$1 RETURNING id', [req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Demo listener not found.' });
+  req.app.locals.socketRuntime?.refreshDemoListeners?.();
+  res.json({ ok: true });
+}));
+
 module.exports = router;
