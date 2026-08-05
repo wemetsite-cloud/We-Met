@@ -1,5 +1,5 @@
 {
-  "version": "5.4.0",
-  "updated": "2026-08-03",
-  "notes": "Demo listener management, randomized demo activity, 20 listener avatars, PWA install UX."
+  "version": "5.5.0",
+  "updated": "2026-08-05",
+  "notes": "Polished listener directory, optional phone at signup, installed-app install controls, five-minute placeholder availability rotation, and improved UPI proof checkout."
 }

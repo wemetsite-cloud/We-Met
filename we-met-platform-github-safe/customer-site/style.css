@@ -57,3 +57,78 @@ img{display:block;max-width:100%}
 .install-banner h2{margin:4px 0 6px}.install-banner p{margin:0}.install-inline{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 14px;font-weight:700}.hidden{display:none!important}
 .abstract-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
 @media(max-width:700px){.install-banner{flex-direction:column;align-items:flex-start}.install-banner .button{width:100%}.install-inline{justify-content:space-between;flex-wrap:wrap}}
+
+
+/* V5.5 payment + listener polish */
+.plan-card{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(219,51,126,.12);
+  background:linear-gradient(155deg,#fff 0%,#fff8fb 100%);
+  box-shadow:0 14px 35px rgba(71,23,48,.07);
+}
+.plan-card:before{
+  content:"";position:absolute;inset:auto -35px -55px auto;width:130px;height:130px;border-radius:50%;
+  background:radial-gradient(circle,rgba(240,68,143,.12),transparent 70%);pointer-events:none;
+}
+.plan-kicker{font-size:9px!important;letter-spacing:.12em;color:var(--pink-deep)!important;font-weight:900!important;margin-bottom:7px;display:block}
+.plan-card h3{font-size:34px;letter-spacing:-.04em;margin:2px 0}
+.plan-card h3 small{font-size:12px;letter-spacing:0;color:var(--muted)}
+.plan-card>strong{font-size:18px}
+.plan-card p{font-size:11px;line-height:1.55;color:var(--muted);margin:9px 0 15px}
+.plan-card .button{box-shadow:0 10px 22px rgba(219,51,126,.16)}
+.plan-card .button span{font-size:15px}
+
+.payment-card{
+  width:min(900px,calc(100% - 30px));
+  border:1px solid rgba(219,51,126,.14);
+  box-shadow:0 35px 100px rgba(47,16,33,.24);
+  background:linear-gradient(145deg,#fff 0%,#fffafd 100%);
+}
+.payment-heading{padding-bottom:4px}
+.payment-heading h2{letter-spacing:-.045em;font-size:34px}
+.payment-summary{
+  border:1px solid rgba(219,51,126,.12);
+  background:linear-gradient(135deg,#fff4f9,#fff);
+  box-shadow:0 12px 30px rgba(78,25,52,.06);
+}
+.payment-summary .exact-amount{background:#351522;color:#fff;border-color:#351522}
+.payment-summary .exact-amount small{color:#e9cbd8}
+.payment-summary .exact-amount strong{color:#fff}
+.payment-methods{gap:14px}
+.upi-actions-card,.payment-qr-card{
+  border:1px solid rgba(219,51,126,.11);
+  border-radius:22px;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 12px 32px rgba(78,25,52,.055);
+}
+.payment-app-button{
+  border-radius:16px!important;
+  transition:.18s ease;
+}
+.payment-app-button:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(65,20,43,.10)}
+.payee-copy{background:#fff8fb!important;border-color:rgba(219,51,126,.1)!important}
+.payment-safe-note{
+  border:1px solid rgba(219,51,126,.1);
+  background:#fff7fb!important;
+  border-radius:16px!important;
+}
+.upload-intro{
+  padding:18px!important;
+  border:1px solid rgba(219,51,126,.12)!important;
+  border-radius:20px!important;
+  background:linear-gradient(135deg,#fff4f9,#fff)!important;
+}
+.upload-intro .payment-kicker{margin-bottom:3px}
+.proof-preview{
+  border:1px solid rgba(219,51,126,.14)!important;
+  background:#fff8fb!important;
+  border-radius:18px!important;
+}
+.payment-form-actions .button-primary{min-width:210px}
+.payment-status-icon{box-shadow:0 15px 40px rgba(219,51,126,.12)}
+.listener-card{
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+.listener-card:hover{transform:translateY(-3px);box-shadow:0 20px 45px rgba(72,22,48,.10);border-color:rgba(219,51,126,.18)}
+.listener-card .button{width:100%}

@@ -75,6 +75,7 @@ function canRequestReset(req, identifier) {
 router.post('/register', asyncHandler(async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 80);
   const email = String(req.body.email || '').trim().toLowerCase();
+  const phone = String(req.body.phone || '').trim().slice(0, 30) || null;
   const password = String(req.body.password || '');
   const termsAccepted = Boolean(req.body.termsAccepted);
 
@@ -90,9 +91,9 @@ router.post('/register', asyncHandler(async (req, res) => {
   try {
     const passwordHash = await hashPassword(password);
     const result = await db.query(
-      `INSERT INTO users(role,name,email,password_hash,terms_accepted_at)
-       VALUES('customer',$1,$2,$3,now()) RETURNING *`,
-      [name, email, passwordHash],
+      `INSERT INTO users(role,name,email,phone,password_hash,terms_accepted_at)
+       VALUES('customer',$1,$2,$3,$4,now()) RETURNING *`,
+      [name, email, phone, passwordHash],
     );
     const user = result.rows[0];
     res.status(201).json({ token: signToken(user), user: publicUser(user) });

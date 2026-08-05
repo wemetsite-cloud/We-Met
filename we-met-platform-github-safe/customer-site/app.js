@@ -27,16 +27,40 @@
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const setModalState = () => document.body.classList.toggle('modal-open', Boolean($('.modal:not(.hidden), .call-modal:not(.hidden)')));
 
-  window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); deferredInstallPrompt = event; document.querySelectorAll('[data-install-app]').forEach((b)=>b.classList.remove('hidden')); });
-  window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; document.querySelectorAll('[data-install-app]').forEach((b)=>b.classList.add('hidden')); P.toast('We Met installed successfully.', 'success'); });
+  const isInstalledApp = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  function syncInstallControls() {
+    const installed = isInstalledApp();
+    document.querySelectorAll('[data-install-app]').forEach((button) => {
+      button.classList.toggle('hidden', installed || !deferredInstallPrompt);
+    });
+    document.querySelectorAll('.install-banner,.install-inline').forEach((section) => {
+      section.classList.toggle('hidden', installed || !deferredInstallPrompt);
+    });
+  }
+  window.addEventListener('beforeinstallprompt', (event) => {
+    if (isInstalledApp()) return;
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    syncInstallControls();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    syncInstallControls();
+    P.toast('We Met is installed. Enjoy the app-like experience.', 'success');
+  });
+  window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', syncInstallControls);
   async function installApp() {
+    if (isInstalledApp()) return syncInstallControls();
     if (!deferredInstallPrompt) { P.toast('Use your browser menu and choose Install We Met or Add to Home screen.', 'info'); return; }
-    deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    syncInstallControls();
   }
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.4.0', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.5.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
   }
@@ -61,6 +85,7 @@
 
   async function init() {
     bind();
+    syncInstallControls();
     try {
       const [configResponse, plansResponse] = await Promise.all([
         P.api('/api/public/config'),
@@ -195,6 +220,7 @@
         body: JSON.stringify({
           name: $('#regName').value,
           email: $('#regEmail').value,
+          phone: $('#regPhone').value,
           password: $('#regPassword').value,
           termsAccepted: $('#regTerms').checked,
         }),
@@ -449,7 +475,7 @@
           <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge ${listener.status}">${statusText(listener.status)}</span></div>
           <div class="language-line">● Malayalam conversations</div>
           <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
-          <button class="button ${listener.status === 'available' && !listener.demo ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' || listener.demo ? 'disabled' : ''}>${listener.demo ? 'Demo listener' : (listener.status === 'available' ? 'Call this listener' : statusText(listener.status))}</button>
+          <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' ? 'disabled' : ''}>${listener.status === 'available' ? 'Call this listener' : statusText(listener.status)}</button>
         </article>`).join('')
       : emptyState('No listeners online', 'Ask a listener to go online, then refresh this page.');
 
@@ -625,8 +651,12 @@
     paymentPlans = plans;
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
-        ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
-        <span>${P.esc(plan.name)}</span><h3>${Math.round(plan.seconds / 60)} min</h3><strong>${P.money(plan.price_paise)}</strong><p>Pay with GPay or any UPI app, then send your screenshot for approval.</p><button class="button button-primary" type="button" data-buy-plan="${plan.id}">Purchase pack</button>
+        ${plan.popular ? '<span class="popular-tag">MOST LOVED</span>' : ''}
+        <span class="plan-kicker">PRIVATE TALK-TIME</span>
+        <h3>${Math.round(plan.seconds / 60)} <small>min</small></h3>
+        <strong>${P.money(plan.price_paise)}</strong>
+        <p>Instant UPI checkout · screenshot verification · private conversations.</p>
+        <button class="button button-primary" type="button" data-buy-plan="${plan.id}">Get this pack <span>→</span></button>
       </article>`).join('');
     $$('[data-buy-plan]').forEach((button) => button.addEventListener('click', () => openPayment(button.dataset.buyPlan)));
   }

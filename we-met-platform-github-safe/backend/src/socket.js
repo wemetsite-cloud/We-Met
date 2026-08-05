@@ -64,20 +64,28 @@ function createSocketServer(io) {
   }
 
   refreshDemoListeners();
+
+  // Placeholder listeners behave like normal listener cards. Their availability is
+  // rotated on a five-minute cadence so the directory feels naturally active.
   setInterval(async () => {
     if (!demoCache.length) return;
     let changed = false;
-    const result = await db.query(`SELECT id,name,bio,avatar,activity,randomize,enabled FROM demo_listeners WHERE enabled=true`);
-    const rows = result.rows;
-    for (const row of rows) {
-      if (!row.randomize) continue;
-      if (Math.random() < 0.22) {
-        const states = ['available','break','busy','offline'];
-        await db.query('UPDATE demo_listeners SET activity=$2,updated_at=now() WHERE id=$1',[row.id,states[Math.floor(Math.random()*states.length)]]);
-        changed = true;
-      }
+    const result = await db.query(`SELECT id,activity FROM demo_listeners WHERE enabled=true`);
+    for (const row of result.rows) {
+      const current = row.activity;
+      if (!['available','busy','break','offline'].includes(current)) continue;
+      // Keep the visible state for roughly five minutes, then randomly change it.
+      const stateResult = await db.query(
+        `SELECT EXTRACT(EPOCH FROM (now()-updated_at))::int AS age FROM demo_listeners WHERE id=$1`,
+        [row.id],
+      );
+      if (Number(stateResult.rows[0]?.age || 0) < 300) continue;
+      const states = ['available','available','busy','busy','break','offline'];
+      const next = states[Math.floor(Math.random() * states.length)];
+      await db.query('UPDATE demo_listeners SET activity=$2,updated_at=now() WHERE id=$1',[row.id,next]);
+      changed = true;
     }
-    if (changed) refreshDemoListeners();
+    if (changed) await refreshDemoListeners();
   }, 30000);
 
   io.use(async (socket, next) => {
@@ -163,6 +171,24 @@ function createSocketServer(io) {
       emitToUser(customerId, 'call:error', {
         message: `You need at least ${Math.ceil(config.minimumStartSeconds / 60)} minutes to start a call.`,
         needsTopup: true,
+      });
+      return;
+    }
+
+    // These directory profiles are intentionally presented exactly like all other
+    // listeners, but they are not live accounts. If selected while visible, respond
+    // naturally as an occupied listener rather than exposing implementation details.
+    if (preferredEmployeeId && String(preferredEmployeeId).startsWith('demo-')) {
+      const placeholder = demoCache.find((item) => item.id === preferredEmployeeId);
+      if (placeholder?.status === 'available') {
+        await db.query(
+          `UPDATE demo_listeners SET activity='busy', updated_at=now() WHERE id=$1`,
+          [placeholder.demoId],
+        );
+        await refreshDemoListeners();
+      }
+      emitToUser(customerId, 'call:error', {
+        message: 'That listener is currently on another call. Please try another listener.',
       });
       return;
     }
