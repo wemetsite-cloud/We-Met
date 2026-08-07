@@ -9,8 +9,12 @@ Most normal business values are already configured. Never send these private val
 1. New Supabase Session Pooler URI
 2. New admin password
 3. New listener password
+4. Direct UPI or Razorpay mode
+5. Direct UPI: exact receiving name and a working eligible UPI ID
+6. Razorpay: matching Test/Live Key ID, Key Secret and webhook secret
 
 It generates `JWT_SECRET` automatically.
+It also generates a matching VAPID public/private pair for browser notification-bar alerts.
 
 ## Render Blueprint
 
@@ -20,9 +24,14 @@ Render asks for:
 DATABASE_URL
 ADMIN_PASSWORD
 DEMO_EMPLOYEE_PASSWORD
+UPI_PAYMENT_PAYEE_NAME
+UPI_PAYMENT_ID
+VAPID_PUBLIC_KEY
+VAPID_PRIVATE_KEY
 ```
 
-Use the same new values used during local setup.
+Use the same new values used during local setup. Copy the VAPID pair from the
+local `backend/.env` only into Render; never upload that file.
 
 ## Optional after testing
 
@@ -56,6 +65,8 @@ Interface language: English
 Minimum starting balance: 2 minutes
 Ring timeout: 30 seconds
 Low-balance warning: 1 minute
-Payment UPI ID: salahkpsite@slc
-Payment mode: manual UPI proof approval, coupons and manual credit
+Default payment mode: Google Pay / universal direct UPI with transaction-ID verification
+Receiving requirement: an eligible working UPI ID that is not currently limited
+Later mode: Razorpay Standard Checkout with Live keys and https://wemet.xyz/api/webhooks/razorpay
+Background alerts: standards-based Web Push with private server VAPID key
 ```

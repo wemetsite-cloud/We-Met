@@ -75,9 +75,22 @@
     }, 4200);
   }
 
-  function notify(title, body) {
+  async function notify(title, body, options = {}) {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: 'assets/icon-192.png' });
+      try {
+        const registration = await navigator.serviceWorker?.ready;
+        if (registration) {
+          await registration.showNotification(title, {
+            body,
+            icon: 'assets/icon-192.png',
+            badge: 'assets/favicon.png',
+            tag: options.tag || 'we-met-update',
+            renotify: options.renotify === true,
+            requireInteraction: options.requireInteraction === true,
+            data: { url: options.url || './' },
+          });
+        }
+      } catch {}
     }
     toast(body);
   }

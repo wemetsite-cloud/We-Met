@@ -301,7 +301,7 @@ router.get('/plans', asyncHandler(async (_req, res) => {
 
 router.post('/plans', asyncHandler(async (req, res) => {
   const name = text(req.body.name, 80);
-  const pricePaise = integer(req.body.pricePaise, { min: 1, max: 100_000_000 });
+  const pricePaise = integer(req.body.pricePaise, { min: 100, max: 100_000_000 });
   const seconds = integer(req.body.seconds, { min: 1, max: 31_536_000 });
   const sortOrder = integer(req.body.sortOrder, { min: -10_000, max: 10_000 }) ?? 0;
   const popular = Boolean(req.body.popular);
@@ -329,7 +329,7 @@ router.post('/plans', asyncHandler(async (req, res) => {
 router.patch('/plans/:id', asyncHandler(async (req, res) => {
   const body = req.body;
   const name = body.name === undefined ? null : text(body.name, 80);
-  const pricePaise = body.pricePaise === undefined ? null : integer(body.pricePaise, { min: 1, max: 100_000_000 });
+  const pricePaise = body.pricePaise === undefined ? null : integer(body.pricePaise, { min: 100, max: 100_000_000 });
   const seconds = body.seconds === undefined ? null : integer(body.seconds, { min: 1, max: 31_536_000 });
   const sortOrder = body.sortOrder === undefined ? null : integer(body.sortOrder, { min: -10_000, max: 10_000 });
 
@@ -492,7 +492,7 @@ router.patch('/support/:id', asyncHandler(async (req, res) => {
     INSERT INTO notifications (user_id, title, body)
     VALUES ($1, $2, $3)
   `, [ticket.customer_id, title, body]);
-  req.app.locals.socketRuntime?.notifyUser(ticket.customer_id, { title, body });
+  await req.app.locals.notifyUser?.(ticket.customer_id, { title, body, url: './', tag: `we-met-support-${ticket.id}` });
 
   res.json({ ticket });
 }));
@@ -534,30 +534,52 @@ router.patch('/password-resets/:id', asyncHandler(async (req, res) => {
     ? `Your recovery request was approved. Return to the recovery screen and use your saved key.${adminMessage ? ` ${adminMessage}` : ''}`
     : `Your recovery request was declined.${adminMessage ? ` ${adminMessage}` : ' Contact support if you still need help.'}`;
   await db.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.user_id, title, body]);
-  req.app.locals.socketRuntime?.notifyUser(request.user_id, { title, body });
+  await req.app.locals.notifyUser?.(request.user_id, { title, body, url: './', tag: `we-met-recovery-${request.id}` });
   res.json({ request });
 }));
 
 router.get('/payments', asyncHandler(async (_req, res) => {
-  const result = await db.query(`
-    SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
-           payment.amount_paise,payment.seconds,payment.payee_upi_id,
-           payment.utr_reference,payment.customer_note,payment.status,
-           payment.admin_message,payment.reviewed_at,payment.created_at,
-           customer.name AS customer_name,customer.email AS customer_email
-    FROM payment_submissions payment
-    JOIN users customer ON customer.id=payment.customer_id
-    ORDER BY CASE payment.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
-             payment.created_at DESC
-    LIMIT 1000
-  `);
-  res.json({ payments: result.rows });
+  const [manual, razorpay] = await Promise.all([
+    db.query(`
+      SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
+             payment.amount_paise,payment.seconds,payment.payee_upi_id,
+             payment.payment_method,payment.checkout_reference,payment.destination_last4,
+             payment.utr_reference,payment.customer_note,payment.proof_size,payment.status,
+             payment.admin_message,payment.reviewed_at,payment.created_at,
+             customer.name AS customer_name,customer.email AS customer_email,
+             customer.phone AS customer_phone
+      FROM payment_submissions payment
+      JOIN users customer ON customer.id=payment.customer_id
+      ORDER BY CASE payment.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+               payment.created_at DESC
+      LIMIT 1000
+    `),
+    db.query(`
+      SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
+             payment.amount_paise,payment.seconds,payment.currency,
+             payment.razorpay_order_id,payment.razorpay_payment_id,
+             payment.payment_method,payment.status,payment.failure_description,
+             payment.captured_at,payment.credited_at,payment.created_at,
+             customer.name AS customer_name,customer.email AS customer_email,
+             customer.phone AS customer_phone
+      FROM razorpay_orders payment
+      JOIN users customer ON customer.id=payment.customer_id
+      ORDER BY payment.created_at DESC
+      LIMIT 1000
+    `),
+  ]);
+  res.json({ payments: manual.rows, razorpayOrders: razorpay.rows });
 }));
 
 router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
   const result = await db.query('SELECT proof_mime,proof_data FROM payment_submissions WHERE id=$1', [req.params.id]);
   const proof = result.rows[0];
-  if (!proof) return res.status(404).json({ error: 'Payment screenshot not found.' });
+  if (!proof?.proof_data || !proof?.proof_mime) {
+    return res.status(404).json({ error: 'No optional payment screenshot was attached.' });
+  }
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(proof.proof_mime)) {
+    return res.status(415).json({ error: 'This older attachment is not a supported safe image format.' });
+  }
   res.setHeader('Cache-Control', 'private, no-store');
   res.type(proof.proof_mime).send(proof.proof_data);
 }));
@@ -568,6 +590,11 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Choose approve or decline.' });
   }
   const adminMessage = text(req.body.adminMessage, 1000) || null;
+  const settlementRecordMatched = req.body.settlementRecordMatched === true
+    || req.body.bankStatementMatched === true;
+  if (action === 'approved' && !settlementRecordMatched) {
+    return res.status(400).json({ error: 'Confirm that the exact amount and transaction ID match the receiving UPI or bank record.' });
+  }
 
   const payment = await db.transaction(async (client) => {
     const found = await client.query(`
@@ -576,6 +603,23 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
     const record = found.rows[0];
     if (!record) throw Object.assign(new Error('Payment submission not found.'), { status: 404 });
     if (record.status !== 'pending') throw Object.assign(new Error('This payment has already been reviewed.'), { status: 409 });
+    if (action === 'approved' && record.manual_intent_id && !record.utr_reference) {
+      throw Object.assign(new Error('This transfer has no payment reference and cannot be approved.'), { status: 400 });
+    }
+    if (action === 'approved' && record.utr_reference) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [record.utr_reference]);
+      const duplicate = await client.query(`
+        SELECT id FROM payment_submissions
+        WHERE id<>$1
+          AND lower(regexp_replace(utr_reference, '\\s+', '', 'g'))=lower(regexp_replace($2, '\\s+', '', 'g'))
+          AND status='approved'
+        LIMIT 1
+        FOR UPDATE
+      `, [record.id, record.utr_reference]);
+      if (duplicate.rows[0]) {
+        throw Object.assign(new Error('This transfer reference was already approved for another submission.'), { status: 409 });
+      }
+    }
 
     const updated = await client.query(`
       UPDATE payment_submissions
@@ -594,7 +638,12 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
       await client.query(`
         INSERT INTO wallet_transactions(customer_id,seconds_delta,type,note,reference_id)
         VALUES($1,$2,'payment',$3,$4)
-      `, [record.customer_id, record.seconds, `${record.plan_name} · verified UPI payment`, record.id]);
+      `, [
+        record.customer_id,
+        record.seconds,
+        `${record.plan_name} · verified ${record.payment_method === 'bank_transfer' ? 'older bank transfer' : 'direct UPI payment'}`,
+        record.id,
+      ]);
     }
 
     const title = action === 'approved' ? 'Payment approved' : 'Payment declined';
@@ -605,7 +654,11 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
     return { ...updated.rows[0], notification: { title, body } };
   });
 
-  req.app.locals.socketRuntime?.notifyUser(payment.customer_id, payment.notification);
+  await req.app.locals.notifyUser?.(payment.customer_id, {
+    ...payment.notification,
+    url: './',
+    tag: `we-met-payment-${payment.id}`,
+  });
   res.json({ payment });
 }));
 
@@ -632,7 +685,7 @@ router.post('/notifications', asyncHandler(async (req, res) => {
       INSERT INTO notifications (user_id, title, body)
       VALUES ($1, $2, $3)
     `, [id, title, body]);
-    req.app.locals.socketRuntime?.notifyUser(id, { title, body });
+    await req.app.locals.notifyUser?.(id, { title, body, url: './', tag: `we-met-admin-${Date.now()}` });
   }
 
   res.json({ sent: userIds.length });

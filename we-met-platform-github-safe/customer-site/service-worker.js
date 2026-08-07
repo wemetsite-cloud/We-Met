@@ -1,4 +1,4 @@
-const VERSION = '5.5.0';
+const VERSION = '5.9.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -83,4 +83,41 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return;
   event.respondWith(networkFirst(request, request.mode === 'navigate'));
+});
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() || '' }; }
+  const icon = new URL(data.icon || 'assets/icon-192.png', self.registration.scope).href;
+  const badge = new URL(data.badge || 'assets/favicon.png', self.registration.scope).href;
+  event.waitUntil(self.registration.showNotification(data.title || 'We Met', {
+    body: data.body || 'You have a new update.',
+    icon,
+    badge,
+    tag: data.tag || 'we-met-update',
+    renotify: data.renotify === true,
+    requireInteraction: data.requireInteraction === true,
+    vibrate: Array.isArray(data.vibrate) ? data.vibrate : [180, 80, 180],
+    data: { url: data.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || './', self.registration.scope).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = windows.find((client) => client.url.startsWith(self.registration.scope));
+    if (existing) {
+      await existing.navigate(target).catch(() => null);
+      return existing.focus();
+    }
+    return self.clients.openWindow(target);
+  })());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'CLOSE_NOTIFICATION' || !event.data.tag) return;
+  event.waitUntil(self.registration.getNotifications({ tag: event.data.tag })
+    .then((items) => items.forEach((notification) => notification.close())));
 });

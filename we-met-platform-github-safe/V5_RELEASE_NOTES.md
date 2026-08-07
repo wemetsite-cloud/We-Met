@@ -1,4 +1,31 @@
-# We Met V5.3 release notes
+# We Met V5.9 release notes
+
+## V5.9 deploy-now UPI checkout
+
+- Replaced the customer bank account/IFSC screen with direct Google Pay and universal UPI app handoff while Razorpay KYC/Live Mode is pending.
+- Added an exact-amount UPI QR for desktop and second-device payment.
+- Receiving UPI details are private environment values and are returned only to authenticated customers.
+- Server-created expiring intents lock the plan, price, minutes and checkout reference.
+- Customers submit a required UPI transaction ID/UTR and may attach a validated 3 MB PNG/JPG/WebP screenshot.
+- Duplicate transaction references are transactionally blocked while pending or approved.
+- Admin must type the reference suffix after independently matching the exact amount and full reference in the receiving UPI app or bank statement.
+- Approval, wallet credit, ledger entry and customer notification happen in one database transaction and can occur only once.
+- Customer and admin histories show direct UPI payments, older transfers and Razorpay orders together.
+- Razorpay remains fully integrated and can be re-enabled after KYC by changing one payment-mode environment variable and adding Live keys.
+- Razorpay's third-party Checkout script is loaded only when Razorpay mode is active.
+- Preserved V5.7 History API navigation, rose Back controls, push alerts and private customer-phone administration.
+
+## V5.6 Razorpay automatic payments
+
+- Replaced the customer screenshot-upload flow with Razorpay Standard Checkout.
+- Every payment uses a server-created Razorpay Order whose price and talk-time come from the database.
+- Checkout success signatures are verified on the backend with the server-stored order ID.
+- The backend confirms payment ID, order ID, amount, currency and `captured` status before crediting talk-time.
+- Signed webhooks handle captured, authorised and failed events without trusting browser status.
+- Duplicate Checkout callbacks and webhook deliveries cannot credit the same order twice.
+- Customer and admin portals now show Razorpay status and references.
+- Existing manual payment proofs remain available to the administrator as legacy history.
+- Added Test/Live deployment instructions in `RAZORPAY_SETUP.md`.
 
 ## V5.3 account, layout and admin improvements
 
@@ -32,17 +59,17 @@
 - Failed chat delivery keeps the typed message in the input so it can be retried.
 - Customer and listener password recovery now has a private recovery key, status tracking, administrator approval/decline and a secure new-password step.
 
-## Manual UPI talk-time payments
+## Previous V5.1 manual UPI flow (legacy records only)
 
 1. The customer chooses an active minute pack.
-2. The customer pays the exact amount to `salahkpsite@slc` from a UPI app.
+2. The customer paid the exact amount to the configured legacy UPI account.
 3. The customer uploads a PNG, JPEG or WebP screenshot up to 5 MB, with an optional UTR and note.
 4. The request appears in **Admin → Payments**.
 5. The administrator checks the receiving UPI account independently and then approves or declines.
 6. Approval credits the exact plan duration once and creates a wallet-ledger entry. A second review is blocked.
 7. The customer receives an in-app notification and can see the payment status and administrator message.
 
-Screenshots are stored in PostgreSQL/Supabase so they survive a Render restart. They increase database storage usage, so backups and a retention policy are important before public launch.
+Older screenshots remain stored in PostgreSQL/Supabase for administrator history. V5.9 direct-UPI purchases accept an optional smaller screenshot, but approval still requires an independent receiving-account match.
 
 ## Password recovery
 
@@ -63,4 +90,4 @@ Customer, listener and admin portals now each include a manifest, 192/512 icons,
 - fresh database schema, repeat/idempotency check and V4.1-to-V5.0 migration
 - customer, listener and admin UI boot checks
 - real Socket.IO customer/listener call-chat delivery and database persistence
-- API-level screenshot upload, protected proof viewing, one-time minute credit, recovery approval and password completion
+- Razorpay signature verification, captured-payment checks, protected webhooks, one-time minute credit, recovery approval and password completion

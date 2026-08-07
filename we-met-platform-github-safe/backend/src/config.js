@@ -30,6 +30,12 @@ const number = (value, fallback) => {
 };
 
 const nodeEnv = process.env.NODE_ENV || 'development';
+const paymentGatewayMode = process.env.PAYMENT_GATEWAY_MODE || 'upi_direct';
+const supportEmail = process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com';
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
+const upiPaymentId = String(process.env.UPI_PAYMENT_ID || '').trim();
+const upiPaymentPayeeName = String(process.env.UPI_PAYMENT_PAYEE_NAME || '').trim();
 const publicUrl = (
   process.env.PUBLIC_URL
   || process.env.RENDER_EXTERNAL_URL
@@ -49,9 +55,26 @@ const config = {
   appName: process.env.APP_NAME || 'We Met',
   publicUrl,
   serveFrontends: bool(process.env.SERVE_FRONTENDS, true),
-  supportEmail: process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com',
-  paymentUpiId: process.env.PAYMENT_UPI_ID || 'salahkpsite@slc',
+  supportEmail,
   paymentPayeeName: process.env.PAYMENT_PAYEE_NAME || 'We Met',
+  paymentGatewayMode,
+  upiPayment: {
+    enabled: paymentGatewayMode === 'upi_direct',
+    payeeName: upiPaymentPayeeName,
+    upiId: upiPaymentId,
+    intentMinutes: number(process.env.UPI_PAYMENT_INTENT_MINUTES, 1440),
+  },
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+  },
+  webPush: {
+    enabled: Boolean(vapidPublicKey && vapidPrivateKey),
+    publicKey: vapidPublicKey,
+    privateKey: vapidPrivateKey,
+    subject: process.env.VAPID_SUBJECT || `mailto:${supportEmail}`,
+  },
 
   jwtSecret: process.env.JWT_SECRET || '',
   databaseUrl: process.env.DATABASE_URL || '',
@@ -101,6 +124,41 @@ function validateConfig() {
   }
   if (!config.demoEmployee.password || config.demoEmployee.password.length < 10) {
     problems.push('DEMO_EMPLOYEE_PASSWORD must contain at least 10 characters.');
+  }
+  if (!['upi_direct', 'razorpay'].includes(config.paymentGatewayMode)) {
+    problems.push('PAYMENT_GATEWAY_MODE must be upi_direct or razorpay.');
+  }
+  if (config.paymentGatewayMode === 'upi_direct') {
+    if (config.upiPayment.payeeName.length < 2) {
+      problems.push('UPI_PAYMENT_PAYEE_NAME must exactly match the receiving UPI account name.');
+    }
+    if (!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(config.upiPayment.upiId)) {
+      problems.push('UPI_PAYMENT_ID must be a valid receiving UPI ID.');
+    }
+    if (!Number.isInteger(config.upiPayment.intentMinutes) || config.upiPayment.intentMinutes < 15 || config.upiPayment.intentMinutes > 10080) {
+      problems.push('UPI_PAYMENT_INTENT_MINUTES must be between 15 and 10080.');
+    }
+  }
+  if (config.paymentGatewayMode === 'razorpay') {
+    if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(config.razorpay.keyId)) {
+      problems.push('RAZORPAY_KEY_ID must be a valid Test or Live Key ID.');
+    }
+    if (config.razorpay.keySecret.length < 8) problems.push('RAZORPAY_KEY_SECRET is required when Razorpay is enabled.');
+    if (!config.razorpay.webhookSecret || config.razorpay.webhookSecret.length < 16) {
+      problems.push('RAZORPAY_WEBHOOK_SECRET must be a private value of at least 16 characters.');
+    }
+  }
+  if (Boolean(config.webPush.publicKey) !== Boolean(config.webPush.privateKey)) {
+    problems.push('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be configured together.');
+  }
+  if (config.webPush.enabled && !/^[A-Za-z0-9_-]{80,100}$/.test(config.webPush.publicKey)) {
+    problems.push('VAPID_PUBLIC_KEY is not a valid P-256 public key.');
+  }
+  if (config.webPush.enabled && !/^[A-Za-z0-9_-]{40,60}$/.test(config.webPush.privateKey)) {
+    problems.push('VAPID_PRIVATE_KEY is not a valid P-256 private key.');
+  }
+  if (config.webPush.enabled && !/^(mailto:|https?:\/\/)/i.test(config.webPush.subject)) {
+    problems.push('VAPID_SUBJECT must start with mailto:, http:// or https://.');
   }
 
   if (config.isProduction) {

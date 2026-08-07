@@ -16,29 +16,119 @@
   let ringCountdown = null;
   let ringSecondsLeft = 30;
   let publicConfig = null;
+  let serviceWorkerRegistration = null;
+  let activeTab = 'desk';
+
+  const NAVIGATION_MARKER = 'we-met-listener-navigation';
+  const VALID_TABS = new Set(['desk', 'history', 'profile', 'notifications']);
+
+  function navigationState(tab = activeTab, overlay = null) {
+    return { marker: NAVIGATION_MARKER, tab: VALID_TABS.has(tab) ? tab : 'desk', overlay };
+  }
+
+  function currentOverlay() {
+    if (!$('#recoveryModal')?.classList.contains('hidden')) return 'recoveryModal';
+    if (!$('#incomingModal')?.classList.contains('hidden')) return 'incomingModal';
+    if (!$('#callView')?.classList.contains('hidden')) return 'callView';
+    return null;
+  }
+
+  function syncBackButton() {
+    $('#listenerBackButton')?.classList.toggle('hidden', !(currentOverlay() || (me && activeTab !== 'desk')));
+  }
+
+  function setNavigationState({ tab = activeTab, overlay = null } = {}, mode = 'push') {
+    const state = navigationState(tab, overlay);
+    if (mode === 'replace') history.replaceState(state, document.title);
+    else history.pushState(state, document.title);
+    syncBackButton();
+  }
+
+  function openManagedOverlay(selector, overlay, mode = 'push') {
+    const opening = $(selector)?.classList.contains('hidden');
+    show(selector);
+    if (opening) setNavigationState({ overlay }, mode);
+    syncBackButton();
+  }
+
+  function closeManagedOverlay(overlay, mode = 'back') {
+    if (mode === 'back' && history.state?.marker === NAVIGATION_MARKER && history.state.overlay === overlay) {
+      history.back();
+      return;
+    }
+    show(`#${overlay}`, false);
+    setNavigationState({ overlay: null }, 'replace');
+    syncBackButton();
+  }
+
+  function minimizeListenerCall(mode = 'back') {
+    if (!currentCall) return;
+    if (mode === 'back' && history.state?.overlay === 'callView') {
+      history.back();
+      return;
+    }
+    show('#callView', false);
+    show('#restoreListenerCall');
+    syncBackButton();
+  }
+
+  function restoreListenerCall() {
+    if (!currentCall) return;
+    openManagedOverlay('#callView', 'callView');
+    show('#restoreListenerCall', false);
+  }
+
+  function goBackInListener() {
+    if (currentOverlay() || activeTab !== 'desk') history.back();
+  }
+
+  function initNavigation() {
+    history.replaceState(navigationState('desk', null), document.title);
+    window.addEventListener('popstate', (event) => {
+      const previousOverlay = currentOverlay();
+      const state = event.state?.marker === NAVIGATION_MARKER
+        ? event.state
+        : navigationState('desk', null);
+      if (previousOverlay === 'incomingModal' && currentCall) {
+        socket?.emit('call:reject', { callId: currentCall.id });
+        stopRing();
+      }
+      if (previousOverlay === 'callView' && currentCall) minimizeListenerCall('none');
+      else show('#callView', false);
+      show('#incomingModal', false);
+      show('#recoveryModal', false);
+      if (me) selectTab(state.tab, { historyMode: 'none' });
+      syncBackButton();
+    });
+  }
 
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.4.0', { updateViaCache: 'none' });
-      await registration.update();
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.9.0', { updateViaCache: 'none' });
+      await serviceWorkerRegistration.update();
+      return serviceWorkerRegistration;
     } catch {}
   }
 
   function bind() {
     $('#loginForm').addEventListener('submit', login);
     $('#forgotBtn').addEventListener('click', openRecovery);
-    $('#closeRecovery').addEventListener('click', () => show('#recoveryModal', false));
+    $('#closeRecovery').addEventListener('click', () => closeManagedOverlay('recoveryModal'));
+    $('#listenerRecoveryBack').addEventListener('click', goBackInListener);
     $('#recoveryRequestForm').addEventListener('submit', requestRecovery);
     $('#employeeCheckRecovery').addEventListener('click', checkRecovery);
     $('#employeeCopyRecovery').addEventListener('click', () => copyValue($('#employeeRecoveryKey').value));
     $('#employeeResetForm').addEventListener('submit', completeRecovery);
     $('#logoutBtn').addEventListener('click', logout);
-    $$('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button)));
+    $('#listenerBackButton').addEventListener('click', goBackInListener);
+    $$('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.tab)));
+    $('#enablePushBtn').addEventListener('click', () => subscribeToPush({ prompt: true }));
     $('#onlineBtn').addEventListener('click', async () => {
+      const pushSetup = subscribeToPush({ prompt: true });
       await prepareRingtone();
-      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
       socket?.emit('employee:online');
+      pushSetup.catch(() => null);
     });
     $('#offlineBtn').addEventListener('click', () => socket?.emit('employee:offline'));
     $('#breakBtn').addEventListener('click', () => socket?.emit('employee:break', { enabled: status !== 'break' }));
@@ -52,22 +142,30 @@
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#employeeEmailForm').addEventListener('submit', changeEmail);
     $('#refreshHistory').addEventListener('click', loadHistory);
+    $('#minimizeListenerCall').addEventListener('click', () => minimizeListenerCall());
+    $('#restoreListenerCall').addEventListener('click', restoreListenerCall);
   }
 
   async function init() {
+    initNavigation();
     bind();
-    registerFreshServiceWorker();
+    await registerFreshServiceWorker();
     try { publicConfig = await P.api('/api/public/config'); } catch {}
     ringSecondsLeft = publicConfig?.ringSeconds || 30;
     if (P.Store.token) await loadMe();
   }
 
-  function selectTab(button) {
+  function selectTab(tab, { historyMode = 'push' } = {}) {
+    if (!VALID_TABS.has(tab)) tab = 'desk';
+    if (activeTab !== tab && historyMode === 'push') setNavigationState({ tab, overlay: null });
+    activeTab = tab;
+    const button = $(`[data-tab="${tab}"]`);
     $$('[data-tab]').forEach((item) => item.classList.toggle('active', item === button));
-    $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${button.dataset.tab}`));
-    button.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    if (button.dataset.tab === 'history') loadHistory();
-    if (button.dataset.tab === 'notifications') loadNotifications();
+    $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
+    button?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (tab === 'history') loadHistory();
+    if (tab === 'notifications') loadNotifications();
+    syncBackButton();
   }
 
   async function login(event) {
@@ -114,7 +212,92 @@
       show('#employeeResetForm', false);
       show('#employeeRecoveryPanel');
     }
-    show('#recoveryModal');
+    openManagedOverlay('#recoveryModal', 'recoveryModal');
+  }
+
+  function applicationServerKey(value) {
+    const padding = '='.repeat((4 - (value.length % 4)) % 4);
+    const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = atob(base64);
+    return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
+  }
+
+  function updatePushStatus(message, state = 'idle') {
+    $('#pushStatus').textContent = message;
+    $('#pushSetup').dataset.state = state;
+    const active = state === 'enabled';
+    const granted = 'Notification' in window && Notification.permission === 'granted';
+    $('#enablePushBtn').textContent = active
+      ? 'Call alerts enabled'
+      : (granted ? 'Retry alert setup' : 'Enable call alerts');
+    $('#enablePushBtn').disabled = active;
+  }
+
+  async function subscribeToPush({ prompt = false } = {}) {
+    if (!publicConfig?.pushEnabled || !publicConfig?.vapidPublicKey) {
+      updatePushStatus('Notification-bar alerts require VAPID keys in the server environment.', 'unavailable');
+      if (prompt) P.toast('Push alerts are not configured yet. In-app ringing still works.', 'info');
+      return false;
+    }
+    if (!('Notification' in window) || !('PushManager' in window)) {
+      updatePushStatus('This browser does not support notification-bar call alerts.', 'unavailable');
+      return false;
+    }
+
+    let permission = Notification.permission;
+    if (permission === 'default' && prompt) permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      updatePushStatus(permission === 'denied'
+        ? 'Notifications are blocked in browser settings. In-app ringing remains available.'
+        : 'Enable alerts so incoming calls can appear in your notification bar.', permission);
+      if (prompt && permission !== 'granted') P.toast('Call-alert permission was not enabled.', 'info');
+      return false;
+    }
+
+    try {
+      const registration = serviceWorkerRegistration || await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey(publicConfig.vapidPublicKey),
+        });
+      }
+      await P.api('/api/push/subscriptions', {
+        method: 'POST',
+        body: JSON.stringify(subscription.toJSON()),
+      });
+      updatePushStatus('Incoming calls can now appear in your notification bar.', 'enabled');
+      if (prompt) P.toast('Notification-bar call alerts are enabled.', 'success');
+      return true;
+    } catch (error) {
+      updatePushStatus('Push subscription could not be completed. In-app ringing remains available.', 'error');
+      if (prompt) P.toast(error.message || 'Call alerts could not be enabled.', 'error');
+      return false;
+    }
+  }
+
+  async function removePushSubscription() {
+    try {
+      const registration = serviceWorkerRegistration || await navigator.serviceWorker?.ready;
+      const subscription = await registration?.pushManager?.getSubscription();
+      if (!subscription) return;
+      if (P.Store.token) {
+        await P.api('/api/push/subscriptions', {
+          method: 'DELETE',
+          body: JSON.stringify({ endpoint: subscription.endpoint }),
+        }).catch(() => null);
+      }
+      await subscription.unsubscribe();
+    } catch {}
+  }
+
+  function closeCallNotification(callId) {
+    if (!callId) return;
+    navigator.serviceWorker?.controller?.postMessage({
+      type: 'CLOSE_NOTIFICATION',
+      tag: `we-met-call-${callId}`,
+    });
   }
 
   async function requestRecovery(event) {
@@ -184,7 +367,7 @@
         body: JSON.stringify({ requestId: $('#employeeRecoveryId').value, recoveryKey: $('#employeeRecoveryKey').value.trim(), newPassword: password }),
       });
       recoveryStorage(null);
-      show('#recoveryModal', false);
+      closeManagedOverlay('recoveryModal');
       P.toast(response.message, 'success');
     } catch (error) {
       P.toast(error.message, 'error');
@@ -217,15 +400,22 @@
     loadStats();
     loadHistory();
     loadNotifications();
+    if ('Notification' in window && Notification.permission === 'granted') {
+      subscribeToPush().catch(() => null);
+    } else {
+      updatePushStatus('Enable alerts so incoming calls can appear in your notification bar.');
+    }
+    syncBackButton();
   }
 
-  function logout() {
+  async function logout() {
     socket?.emit('employee:offline');
     socket?.disconnect();
     audioCall?.stop();
     stopRing();
     ringContext?.close().catch(() => {});
     ringContext = null;
+    await removePushSubscription();
     P.Store.clear();
     location.reload();
   }
@@ -267,8 +457,10 @@
     socket.on('call:incoming', incoming);
     socket.on('call:accepted', async (data) => {
       stopRing();
+      closeCallNotification(data.callId);
       show('#incomingModal', false);
-      show('#callView');
+      openManagedOverlay('#callView', 'callView', 'replace');
+      show('#restoreListenerCall', false);
       $('#callState').textContent = 'Connecting secure audio…';
       try {
         await audioCall.start(data.callId, data.initiatorId === me.id);
@@ -293,16 +485,21 @@
     });
     socket.on('call:ended', (data) => {
       stopRing();
+      closeCallNotification(data.callId || currentCall?.id);
       show('#incomingModal', false);
       show('#callView', false);
+      show('#restoreListenerCall', false);
       audioCall?.stop();
       currentCall = null;
+      if (history.state?.marker === NAVIGATION_MARKER && history.state.overlay) {
+        setNavigationState({ overlay: null }, 'replace');
+      }
       P.toast(data.reason || 'The call ended.');
       loadStats();
       loadHistory();
     });
     socket.on('chat:message', addChat);
-    socket.on('notification:new', (notification) => P.notify(notification.title, notification.body));
+    socket.on('notification:new', (notification) => P.notify(notification.title, notification.body, { tag: 'we-met-admin-update' }));
     socket.on('account:restricted', (data) => {
       P.toast(data.reason || 'Your account has been restricted.', 'error');
       logout();
@@ -340,9 +537,13 @@
     $('#incomingName').textContent = data.customer.name;
     $('#incomingInitials').textContent = initials(data.customer.name);
     $('#incomingBalance').textContent = P.duration(data.balanceSeconds);
-    show('#incomingModal');
+    openManagedOverlay('#incomingModal', 'incomingModal');
     startRing();
-    P.notify('Incoming call', `${data.customer.name} is calling for a Malayalam conversation.`);
+    P.notify('Incoming We Met call', 'A customer is calling for a private Malayalam conversation.', {
+      tag: `we-met-call-${data.callId}`,
+      renotify: true,
+      requireInteraction: true,
+    });
   }
 
   function accept() {

@@ -1,5 +1,4 @@
 const express = require('express');
-const QRCode = require('qrcode');
 const db = require('../db');
 const config = require('../config');
 const { asyncHandler } = require('../middleware');
@@ -14,46 +13,14 @@ router.get('/plans', asyncHandler(async (_req, res) => {
   res.json({ plans: result.rows });
 }));
 
-router.get('/payment-checkout/:planId', asyncHandler(async (req, res) => {
-  const result = await db.query(
-    `SELECT id,name,price_paise,seconds,popular
-     FROM plans WHERE id=$1 AND active=true`,
-    [req.params.planId],
-  );
-  const plan = result.rows[0];
-  if (!plan) return res.status(404).json({ error: 'This talk-time pack is no longer available.' });
-
-  const paymentParams = new URLSearchParams({
-    pa: config.paymentUpiId,
-    pn: config.paymentPayeeName,
-    am: (Number(plan.price_paise) / 100).toFixed(2),
-    cu: 'INR',
-    tn: `We Met ${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
-  }).toString();
-  const upiUrl = `upi://pay?${paymentParams}`;
-  const qrDataUrl = await QRCode.toDataURL(upiUrl, {
-    errorCorrectionLevel: 'M',
-    margin: 2,
-    width: 420,
-    color: { dark: '#301420', light: '#ffffff' },
-  });
-
-  res.setHeader('Cache-Control', 'private, no-store');
-  return res.json({
-    plan,
-    payeeUpiId: config.paymentUpiId,
-    payeeName: config.paymentPayeeName,
-    upiUrl,
-    googlePayUrl: `tez://upi/pay?${paymentParams}`,
-    googlePayIosUrl: `gpay://upi/pay?${paymentParams}`,
-    qrDataUrl,
-  });
-}));
-
 router.get('/config', (_req, res) => res.json({
   appName: config.appName,
   supportEmail: config.supportEmail,
-  paymentUpiId: config.paymentUpiId,
+  paymentGatewayMode: config.paymentGatewayMode,
+  razorpayEnabled: config.paymentGatewayMode === 'razorpay',
+  directUpiEnabled: config.paymentGatewayMode === 'upi_direct',
+  pushEnabled: config.webPush.enabled,
+  vapidPublicKey: config.webPush.enabled ? config.webPush.publicKey : '',
   paymentPayeeName: config.paymentPayeeName,
   iceServers: config.iceServers,
   minimumStartSeconds: config.minimumStartSeconds,
@@ -64,8 +31,8 @@ router.get('/config', (_req, res) => res.json({
 router.get('/legal/:type', (req, res) => {
   const documents = {
     terms: `We Met is intended for respectful, lawful conversations between people aged 18 or above. By creating an account, you confirm that you are at least 18 and accept these Terms and the Privacy Policy. Calls on the platform are intended to be in Malayalam, while the website interface is in English. Threats, harassment, sexual requests, fraud, asking for personal contact details, requesting OTPs or bank information, and any illegal activity are prohibited. The administrator may review account activity metadata, reports and support messages and may restrict, suspend or block accounts when necessary.`,
-    privacy: `We Met stores account information, wallet balance, call duration and status, text messages sent inside an active call, reports, notifications and support messages so the service can operate safely. Customer phone numbers and email addresses are not shown to listeners. Voice audio is not recorded by this version of the platform. Database and service providers may process information only as required to operate the service.`,
-    refund: `Manual UPI payments are reviewed by the administrator before talk-time is credited. Uploading a screenshot does not guarantee approval. Incorrect, duplicate or unverifiable submissions may be declined. Approved talk-time is not exchangeable for cash and is not refundable after use, except where required by law or expressly approved by the administrator.`,
+    privacy: `We Met stores account information, wallet balance, call duration and status, text messages sent inside an active call, payment references and status, optional payment screenshots, reports, notifications and support messages so the service can operate safely. UPI screenshots are supporting information only and may be removed after the required record-retention period. Razorpay processes gateway payment details under its own privacy and security terms when that gateway is enabled; We Met does not store your card number, UPI PIN or OTP. Customer phone numbers and email addresses are not shown to listeners. Voice audio is not recorded by this version of the platform. Database and service providers may process information only as required to operate the service.`,
+    refund: `Talk-time is credited only after a direct UPI payment is independently matched in the receiving account, or after Razorpay confirms that a gateway payment is captured when Razorpay is enabled. Failed, cancelled, incomplete, unmatched or duplicate payment attempts do not receive talk-time. Purchased talk-time is not exchangeable for cash and is not refundable after use, except where required by law or expressly approved by the administrator. Contact support with the UPI transaction ID or Razorpay payment reference if a completed payment is not reflected in your wallet.`,
     safety: `Do not share phone numbers, email addresses, social-media handles, passwords, OTPs, bank details, payment information or private images during calls or chats. End and report any conversation that feels unsafe. Reports are reviewed by the administrator, who may warn, restrict, suspend or block an account. Voice audio is not recorded by We Met.`,
   };
   const body = documents[req.params.type];

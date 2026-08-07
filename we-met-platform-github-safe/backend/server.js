@@ -4,6 +4,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 const config = require('./src/config');
 const db = require('./src/db');
+const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
 
 const app = express();
@@ -44,11 +45,16 @@ app.use((req, res, next) => {
   }
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; connect-src 'self' https: wss: ws:; img-src 'self' data: blob:; style-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "default-src 'self'; script-src 'self' https://checkout.razorpay.com; connect-src 'self' https: wss: ws:; img-src 'self' data: blob: https://*.razorpay.com; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; frame-src https://api.razorpay.com https://*.razorpay.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   );
   next();
 });
 
+app.use(
+  '/api/webhooks/razorpay',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  require('./src/routes/razorpay-webhook'),
+);
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', async (_req, res) => {
@@ -62,6 +68,9 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
+app.use('/api/push', require('./src/routes/push'));
+app.use('/api/customer/razorpay', require('./src/routes/razorpay'));
+app.use('/api/customer/manual-payments', require('./src/routes/manual-payments'));
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/employee', require('./src/routes/employee'));
 app.use('/api/admin', require('./src/routes/admin'));
@@ -75,8 +84,14 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e6,
 });
 
-const socketRuntime = require('./src/socket')(io);
+const socketRuntime = require('./src/socket')(io, { pushService });
 app.locals.socketRuntime = socketRuntime;
+app.locals.notifyUser = (userId, payload) => {
+  socketRuntime.notifyUser(userId, payload);
+  return pushService.sendToUser(userId, payload).catch((error) => {
+    console.error('Notification delivery failed:', error?.message || error);
+  });
+};
 
 app.get('/api/admin/live', authenticate, requireRole('admin'), (_req, res) => {
   res.json(socketRuntime.liveSnapshot());

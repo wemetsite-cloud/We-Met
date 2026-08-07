@@ -34,6 +34,14 @@ function validEmail(value) {
   return /^\S+@\S+\.\S+$/.test(value);
 }
 
+function normalisePhone(value) {
+  const original = String(value || '').trim();
+  const digits = original.replace(/\D/g, '');
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
+  return null;
+}
+
 function attemptKey(req, identifier) {
   return `${req.ip}:${identifier}`;
 }
@@ -75,12 +83,13 @@ function canRequestReset(req, identifier) {
 router.post('/register', asyncHandler(async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 80);
   const email = String(req.body.email || '').trim().toLowerCase();
-  const phone = String(req.body.phone || '').trim().slice(0, 30) || null;
+  const phone = normalisePhone(req.body.phone);
   const password = String(req.body.password || '');
   const termsAccepted = Boolean(req.body.termsAccepted);
 
   if (name.length < 2) return res.status(400).json({ error: 'Enter your full name.' });
   if (!validEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+  if (!phone) return res.status(400).json({ error: 'Enter a valid phone number with 10 to 15 digits.' });
   if (password.length < 8) return res.status(400).json({ error: 'Use a password with at least 8 characters.' });
   if (!termsAccepted) {
     return res.status(400).json({
@@ -177,6 +186,21 @@ router.post('/change-login', authenticate, asyncHandler(async (req, res) => {
   }
 
   res.json({ ok: true });
+}));
+
+router.post('/change-phone', authenticate, asyncHandler(async (req, res) => {
+  if (req.user.role !== 'customer') return res.status(403).json({ error: 'This action is for customer accounts.' });
+  const phone = normalisePhone(req.body.phone);
+  const currentPassword = String(req.body.currentPassword || '');
+  if (!phone) return res.status(400).json({ error: 'Enter a valid phone number with 10 to 15 digits.' });
+
+  const result = await db.query('SELECT password_hash FROM users WHERE id=$1', [req.user.id]);
+  if (!(await verifyPassword(currentPassword, result.rows[0]?.password_hash))) {
+    return res.status(400).json({ error: 'The current password is incorrect.' });
+  }
+
+  await db.query('UPDATE users SET phone=$2,updated_at=now() WHERE id=$1', [req.user.id, phone]);
+  res.json({ ok: true, phone });
 }));
 
 router.post('/forgot-password', asyncHandler(async (req, res) => {

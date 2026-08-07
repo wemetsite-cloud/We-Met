@@ -3,7 +3,7 @@ const config = require('./config');
 const { verifyToken } = require('./auth');
 const { activateExpiredSuspension } = require('./middleware');
 
-function createSocketServer(io) {
+function createSocketServer(io, { pushService = null } = {}) {
   const employees = new Map();
   const userSockets = new Map();
   const connectedUsers = new Map();
@@ -260,6 +260,17 @@ function createSocketServer(io) {
       customer: { id: customer.id, name: customer.name },
       balanceSeconds: Number(customer.balance_seconds),
     });
+    pushService?.sendToUser(employeeId, {
+      title: 'Incoming We Met call',
+      body: 'A customer is calling for a private Malayalam conversation. Tap to open the listener app.',
+      url: './',
+      tag: `we-met-call-${runtime.id}`,
+      urgency: 'high',
+      ttl: Math.max(30, Number(config.ringSeconds) + 10),
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [260, 100, 260, 100, 360],
+    }).catch((error) => console.error('Incoming-call push failed:', error?.message || error));
 
     runtime.ringTimer = setTimeout(() => {
       retryCall(runtime.id, 'The listener did not answer.').catch(console.error);

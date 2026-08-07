@@ -139,6 +139,17 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint text NOT NULL UNIQUE,
+  p256dh text NOT NULL,
+  auth text NOT NULL,
+  user_agent text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS password_reset_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -153,25 +164,71 @@ CREATE TABLE IF NOT EXISTS password_reset_requests (
   resolved_at timestamptz
 );
 
-CREATE TABLE IF NOT EXISTS payment_submissions (
+CREATE TABLE IF NOT EXISTS manual_payment_intents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   plan_id uuid REFERENCES plans(id) ON DELETE SET NULL,
   plan_name text NOT NULL,
+  amount_paise integer NOT NULL CHECK (amount_paise >= 100),
+  seconds integer NOT NULL CHECK (seconds > 0),
+  checkout_reference text NOT NULL UNIQUE,
+  expires_at timestamptz NOT NULL,
+  submitted_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS payment_submissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  manual_intent_id uuid UNIQUE REFERENCES manual_payment_intents(id) ON DELETE SET NULL,
+  plan_id uuid REFERENCES plans(id) ON DELETE SET NULL,
+  plan_name text NOT NULL,
   amount_paise integer NOT NULL CHECK (amount_paise > 0),
   seconds integer NOT NULL CHECK (seconds > 0),
-  payee_upi_id text NOT NULL,
+  payment_method text NOT NULL DEFAULT 'upi' CHECK (payment_method IN ('bank_transfer','upi')),
+  checkout_reference text,
+  destination_last4 text,
+  payee_upi_id text,
   utr_reference text,
   customer_note text,
-  proof_mime text NOT NULL,
-  proof_size integer NOT NULL CHECK (proof_size > 0 AND proof_size <= 5242880),
-  proof_data bytea NOT NULL,
+  proof_mime text,
+  proof_size integer CHECK (proof_size > 0 AND proof_size <= 3145728),
+  proof_data bytea,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','declined')),
   admin_message text,
   reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS razorpay_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_id uuid REFERENCES plans(id) ON DELETE SET NULL,
+  plan_name text NOT NULL,
+  amount_paise integer NOT NULL CHECK (amount_paise > 0),
+  seconds integer NOT NULL CHECK (seconds > 0),
+  currency text NOT NULL DEFAULT 'INR',
+  receipt text NOT NULL UNIQUE,
+  razorpay_order_id text NOT NULL UNIQUE,
+  razorpay_payment_id text UNIQUE,
+  last_payment_id text,
+  payment_method text,
+  status text NOT NULL DEFAULT 'created' CHECK (status IN ('created','attempted','authorized','paid','failed','refunded')),
+  failure_code text,
+  failure_description text,
+  captured_at timestamptz,
+  credited_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS razorpay_webhook_events (
+  event_id text PRIMARY KEY,
+  event_type text NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Safe upgrades from earlier packages.
@@ -192,6 +249,24 @@ ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS admin_message text;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '72 hours');
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
+ALTER TABLE payment_submissions ADD COLUMN IF NOT EXISTS manual_intent_id uuid REFERENCES manual_payment_intents(id) ON DELETE SET NULL;
+ALTER TABLE payment_submissions ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'upi';
+ALTER TABLE payment_submissions ALTER COLUMN payment_method SET DEFAULT 'upi';
+ALTER TABLE payment_submissions ADD COLUMN IF NOT EXISTS checkout_reference text;
+ALTER TABLE payment_submissions ADD COLUMN IF NOT EXISTS destination_last4 text;
+ALTER TABLE payment_submissions ALTER COLUMN payee_upi_id DROP NOT NULL;
+ALTER TABLE payment_submissions ALTER COLUMN proof_mime DROP NOT NULL;
+ALTER TABLE payment_submissions ALTER COLUMN proof_size DROP NOT NULL;
+ALTER TABLE payment_submissions ALTER COLUMN proof_data DROP NOT NULL;
+
+UPDATE payment_submissions
+SET payment_method='upi'
+WHERE manual_intent_id IS NULL AND payee_upi_id IS NOT NULL;
+
+DO $$ BEGIN
+  ALTER TABLE payment_submissions DROP CONSTRAINT IF EXISTS payment_submissions_payment_method_check;
+  ALTER TABLE payment_submissions ADD CONSTRAINT payment_submissions_payment_method_check CHECK (payment_method IN ('bank_transfer','upi'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ALTER TABLE password_reset_requests DROP CONSTRAINT IF EXISTS password_reset_requests_status_check;
 
@@ -234,10 +309,18 @@ CREATE INDEX IF NOT EXISTS idx_wallet_customer ON wallet_transactions(customer_i
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_password_resets_status ON password_reset_requests(status,created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_recovery_key ON password_reset_requests(recovery_key_hash) WHERE recovery_key_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_manual_payment_intents_customer ON manual_payment_intents(customer_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_manual_payment_intents_expiry ON manual_payment_intents(expires_at) WHERE submitted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_submission_manual_intent ON payment_submissions(manual_intent_id) WHERE manual_intent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_utr_normalized ON payment_submissions((lower(regexp_replace(utr_reference, '\s+', '', 'g')))) WHERE utr_reference IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payments_customer ON payment_submissions(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payment_submissions(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_razorpay_orders_customer ON razorpay_orders(customer_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_razorpay_orders_status ON razorpay_orders(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_razorpay_orders_payment ON razorpay_orders(razorpay_payment_id) WHERE razorpay_payment_id IS NOT NULL;
 
 INSERT INTO plans (name,price_paise,seconds,popular,active,sort_order) VALUES
 ('Starter',4900,300,false,true,10),

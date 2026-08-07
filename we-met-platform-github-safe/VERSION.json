@@ -1,5 +1,5 @@
 {
-  "version": "5.5.0",
-  "updated": "2026-08-05",
-  "notes": "Polished listener directory, optional phone at signup, installed-app install controls, five-minute placeholder availability rotation, and improved UPI proof checkout."
+  "version": "5.9.0",
+  "updated": "2026-08-07",
+  "notes": "Added UPI-first Google Pay and universal app handoff with exact-amount QR, UTR verification, transactional admin approval, improved navigation, and a one-setting switch to Razorpay after KYC."
 }
