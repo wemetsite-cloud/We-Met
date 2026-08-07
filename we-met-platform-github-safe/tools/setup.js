@@ -60,7 +60,7 @@ async function askPassword(label) {
 }
 
 (async () => {
-  console.log('\nWE MET V5.9 — SAFE LOCAL SETUP\n');
+  console.log('\nWE MET V5.11 — SAFE LOCAL SETUP\n');
   console.log('This creates backend\\.env only on this computer.');
   console.log('Never upload backend\\.env or share your database/password values.\n');
   console.log('Open Supabase > Connect > Session pooler > URI and copy the full URI.\n');

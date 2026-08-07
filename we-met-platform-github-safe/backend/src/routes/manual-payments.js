@@ -6,10 +6,8 @@ const config = require('../config');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
 const {
   ALLOWED_METHODS,
-  androidGooglePayUri,
   checkoutReference,
   detectImageMime,
-  googlePayUri,
   normaliseTransferReference,
   publicSubmission,
   upiPaymentUri,
@@ -40,20 +38,19 @@ function requireDirectUpi(req, res, next) {
   return next();
 }
 
-function publicIntent(intent) {
+function paymentDetails(intent) {
   const payment = config.upiPayment;
-  const paymentDetails = {
+  return {
     upiId: payment.upiId,
     payeeName: payment.payeeName,
     amountPaise: intent.amount_paise,
     reference: intent.checkout_reference,
     note: `We Met ${intent.checkout_reference}`,
   };
-  const upiUri = upiPaymentUri({
-    ...paymentDetails,
-  });
-  const gpayUri = googlePayUri(paymentDetails);
-  const androidGpayUri = androidGooglePayUri(paymentDetails);
+}
+
+function publicIntent(intent) {
+  const payment = config.upiPayment;
   return {
     id: intent.id,
     plan_id: intent.plan_id,
@@ -65,9 +62,6 @@ function publicIntent(intent) {
     upi: {
       id: payment.upiId,
       payee_name: payment.payeeName,
-      uri: upiUri,
-      google_pay_uri: gpayUri,
-      google_pay_android_uri: androidGpayUri,
     },
   };
 }
@@ -134,12 +128,14 @@ router.post('/intents', requireDirectUpi, asyncHandler(async (req, res) => {
     ]);
   }
 
-  const intent = publicIntent(intentResult.rows[0]);
-  const upiQrDataUrl = intent.upi
-    ? await QRCode.toDataURL(intent.upi.uri, {
+  const storedIntent = intentResult.rows[0];
+  const intent = publicIntent(storedIntent);
+  const qrPayload = upiPaymentUri(paymentDetails(storedIntent));
+  const upiQrDataUrl = qrPayload
+    ? await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: 'M',
       margin: 1,
-      width: 320,
+      width: 420,
       color: { dark: '#351522', light: '#FFFFFFFF' },
     })
     : '';

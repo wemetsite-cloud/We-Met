@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.10.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.11.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -212,8 +212,7 @@
     $('#couponForm').addEventListener('submit', redeem);
     $('#refreshPayments').addEventListener('click', loadPayments);
     $('#payWithRazorpay').addEventListener('click', startRazorpayCheckout);
-    $('#manualGooglePayLink').addEventListener('click', (event) => launchUpiApp(event, 'google-pay'));
-    $('#manualUpiLink').addEventListener('click', (event) => launchUpiApp(event, 'any'));
+    $('#downloadUpiQr').addEventListener('click', saveUpiQr);
     $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
     $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
     $('#manualPaymentForm').addEventListener('submit', submitManualPayment);
@@ -950,7 +949,7 @@
     $('#paymentTitle').textContent = `${plan.name} checkout`;
     $('#paymentEyebrow').textContent = mode === 'upi_direct' ? 'DIRECT UPI' : 'SECURE CHECKOUT';
     $('#paymentSubtitle').textContent = mode === 'upi_direct'
-      ? 'Open a UPI app with the exact amount filled, complete payment, then submit its transaction ID.'
+      ? 'Scan the QR or copy the receiving UPI ID, pay the exact amount, then submit the transaction ID.'
       : 'Complete payment through Razorpay. No screenshot or manual approval is required.';
     openManagedOverlay('#paymentModal', 'paymentModal');
     setPaymentStep('pay');
@@ -983,47 +982,25 @@
     $('#paymentSummary').innerHTML = `<div><small>Pack</small><strong>${P.esc(intent.plan_name)}</strong></div><div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
     $('#manualCheckoutReference').textContent = intent.checkout_reference;
     $('#manualUpiId').textContent = intent.upi.id;
-    $('#manualGooglePayLink').href = intent.upi.google_pay_uri;
-    $('#manualUpiLink').href = intent.upi.uri;
+    $('#manualPayeeName').textContent = intent.upi.payee_name;
     $('#manualUpiQr').src = intent.upi_qr_data_url;
     show('#manualCheckoutPanel');
   }
 
-  function mobilePlatform() {
-    const userAgent = navigator.userAgent || '';
-    if (/android/i.test(userAgent)) return 'android';
-    if (/iPad|iPhone|iPod/i.test(userAgent)) return 'ios';
-    return 'other';
-  }
-
-  function launchUpiApp(event, preference) {
-    event.preventDefault();
-    const payment = currentCheckout?.intent?.upi;
-    if (!payment?.uri) {
-      P.toast('The UPI payment link is not ready. Close checkout and try again.', 'error');
+  function saveUpiQr() {
+    const qrImage = $('#manualUpiQr');
+    if (!qrImage?.src?.startsWith('data:image/')) {
+      P.toast('The payment QR is not ready. Close checkout and try again.', 'error');
       return;
     }
-
-    const platform = mobilePlatform();
-    if (platform === 'other') {
-      P.toast('Scan the QR with a UPI app on your phone.', 'info');
-      return;
-    }
-
-    let target = payment.uri;
-    if (preference === 'google-pay') {
-      target = platform === 'android'
-        ? (payment.google_pay_android_uri || payment.uri)
-        : (payment.google_pay_uri || payment.uri);
-    }
-
-    const startedAt = Date.now();
-    window.location.assign(target);
-    window.setTimeout(() => {
-      if (document.visibilityState === 'visible' && Date.now() - startedAt < 5000) {
-        P.toast('Payment app did not open. Try Choose any UPI app or open We Met in Chrome.', 'info');
-      }
-    }, 1800);
+    const reference = currentCheckout?.intent?.checkout_reference || 'payment';
+    const download = document.createElement('a');
+    download.href = qrImage.src;
+    download.download = `we-met-upi-${reference}.png`;
+    document.body.append(download);
+    download.click();
+    download.remove();
+    P.toast('QR saved. Open your UPI app and use Scan from gallery.', 'success');
   }
 
   function previewManualProof(event) {

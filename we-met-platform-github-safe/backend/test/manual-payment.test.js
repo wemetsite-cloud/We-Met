@@ -1,9 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  androidGooglePayUri,
   detectImageMime,
-  googlePayUri,
   normaliseTransferReference,
   publicSubmission,
   upiPaymentUri,
@@ -16,7 +14,7 @@ test('normalises valid UPI transaction references and rejects unsafe values', ()
   assert.equal(normaliseTransferReference('<script>alert(1)</script>'), '');
 });
 
-test('builds an exact-amount UPI intent without exposing a secret', () => {
+test('builds a private exact-amount payload for the server-rendered QR', () => {
   const uri = upiPaymentUri({
     upiId: 'merchant@example',
     payeeName: 'We Met Test',
@@ -34,41 +32,7 @@ test('builds an exact-amount UPI intent without exposing a secret', () => {
   assert.match(uri, /pn=We%20Met%20Test/);
   assert.match(uri, /tn=We%20Met%20test%20payment/);
   assert.doesNotMatch(uri, /\+/);
-});
-
-test('builds an exact-amount Google Pay app link from the same server intent', () => {
-  const uri = googlePayUri({
-    upiId: 'merchant@example',
-    payeeName: 'We Met Test',
-    amountPaise: 9900,
-    reference: 'WM-TEST-GPAY-123',
-    note: 'We Met test payment',
-  });
-  const parsed = new URL(uri);
-  assert.equal(parsed.protocol, 'gpay:');
-  assert.equal(parsed.hostname, 'upi');
-  assert.equal(parsed.pathname, '/pay');
-  assert.equal(parsed.searchParams.get('pa'), 'merchant@example');
-  assert.equal(parsed.searchParams.get('am'), '99.00');
-  assert.equal(parsed.searchParams.get('cu'), 'INR');
-  assert.equal(parsed.searchParams.get('tr'), 'WM-TEST-GPAY-123');
-  assert.doesNotMatch(uri, /\+/);
-});
-
-test('builds a Chrome Android intent that opens the Google Pay package', () => {
-  const uri = androidGooglePayUri({
-    upiId: 'merchant@example',
-    payeeName: 'We Met Test',
-    amountPaise: 9900,
-    reference: 'WM-TEST-ANDROID-123',
-    note: 'We Met test payment',
-  });
-  assert.match(uri, /^intent:\/\/pay\?/);
-  assert.match(uri, /pa=merchant%40example/);
-  assert.match(uri, /pn=We%20Met%20Test/);
-  assert.match(uri, /am=99\.00/);
-  assert.match(uri, /#Intent;scheme=upi;package=com\.google\.android\.apps\.nbu\.paisa\.user;end$/);
-  assert.doesNotMatch(uri, /\+/);
+  assert.doesNotMatch(uri, /gpay:|intent:/i);
 });
 
 test('accepts only recognised raster-image signatures', () => {

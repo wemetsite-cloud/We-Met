@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#172033">
+  <meta name="theme-color" content="#351522">
   <meta name="description" content="We Met administration dashboard.">
   <title>We Met Admin</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=5.9.0">
-  <link rel="stylesheet" href="style.css?v=5.9.0">
+  <link rel="manifest" href="manifest.webmanifest?v=5.11.0">
+  <link rel="stylesheet" href="style.css?v=5.11.0">
 </head>
 <body>
   <div id="loginView" class="login-screen">
@@ -34,11 +34,11 @@
         <button data-page="broadcast"><b>✦</b><span>Notifications</span></button>
         <button data-page="security"><b>⚙</b><span>Security</span></button>
       </nav>
-      <div class="side-footer"><small>We Met v5</small><button id="logout" class="side-logout">Log out</button></div>
+      <div class="side-footer"><small>We Met control centre</small><button id="logout" class="side-logout">Log out</button></div>
     </aside>
 
     <div class="content">
-      <header><button id="menuBtn" class="menu" type="button" aria-label="Open menu">☰</button><button id="adminBackButton" class="admin-back hidden" type="button" aria-label="Go back"><span aria-hidden="true">←</span><b>Back</b></button><div><h1 id="pageTitle">Overview</h1><p id="pageDesc">We Met platform live summary</p></div><div class="admin-chip"><span>SS</span><div><b>Sabith Salah Kp</b><small>Administrator</small></div></div></header>
+      <header><button id="menuBtn" class="menu" type="button" aria-label="Open menu">☰</button><button id="adminBackButton" class="admin-back hidden" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><div class="page-heading"><h1 id="pageTitle">Overview</h1><p id="pageDesc">We Met platform live summary</p></div><div class="admin-chip"><span>SS</span><div><b>Sabith Salah Kp</b><small>Administrator</small></div></div></header>
       <main>
         <section id="page-overview" class="page active">
           <div class="metric-grid"><article><div class="metric-icon purple">◎</div><small>Customers</small><strong id="mCustomers">0</strong><span>Registered accounts</span></article><article><div class="metric-icon cyan">↟</div><small>People online now</small><strong id="mConcurrent">0</strong><span id="mConcurrentBreakdown">0 customers • 0 listeners</span></article><article><div class="metric-icon green">●</div><small>Online listeners</small><strong id="mOnline">0</strong><span>Available, ringing or busy</span></article><article><div class="metric-icon blue">◷</div><small>Total talk-time</small><strong id="mTalk">0:00</strong><span>Connected call duration</span></article><article><div class="metric-icon orange">!</div><small>Needs attention</small><strong id="mAttention">0</strong><span>Reports, tickets and pending transfers</span></article></div>
@@ -72,6 +72,6 @@
   </div>
 
   <div id="actionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-card"><button id="closeModal" class="close" type="button" aria-label="Close">×</button><h2 id="modalTitle">Account action</h2><div id="modalBody"></div></div></div>
-  <script src="config.js?v=5.9.0"></script><script src="api.js?v=5.9.0"></script><script src="app.js?v=5.9.0"></script>
+  <script src="config.js?v=5.11.0"></script><script src="api.js?v=5.11.0"></script><script src="app.js?v=5.11.0"></script>
 </body>
 </html>

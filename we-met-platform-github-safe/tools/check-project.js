@@ -83,13 +83,13 @@ for (const portal of ['customer-site', 'employee-site', 'admin-site']) {
   const serviceWorker = fs.readFileSync(path.join(root, portal, 'service-worker.js'), 'utf8');
   const portalHtml = fs.readFileSync(path.join(root, portal, 'index.html'), 'utf8');
   const portalApp = fs.readFileSync(path.join(root, portal, 'app.js'), 'utf8');
-  if (!serviceWorker.includes("const VERSION = '5.9.0'") || !serviceWorker.includes("cache: 'no-store'")) {
+  if (!serviceWorker.includes("const VERSION = '5.11.0'") || !serviceWorker.includes("cache: 'no-store'")) {
     failed = true;
     console.error(`Stale-cache protection is missing from ${portal}/service-worker.js`);
   }
-  if (!portalHtml.includes('?v=5.9.0') || !portalApp.includes("updateViaCache: 'none'")) {
+  if (!portalHtml.includes('?v=5.11.0') || !portalApp.includes("updateViaCache: 'none'")) {
     failed = true;
-    console.error(`V5.9 cache-busting registration is missing from ${portal}`);
+    console.error(`V5.11 cache-busting registration is missing from ${portal}`);
   }
 }
 
@@ -149,10 +149,13 @@ const invariants = [
   [workflowSources.customerWorker.includes("addEventListener('push'") && workflowSources.customerUi.includes('paymentEnableAlerts'), 'Customer payment alerts must support opt-in Web Push.'],
   [workflowSources.server.includes("app.use('/api/customer/manual-payments'") && schema.includes('manual_payment_intents') && workflowSources.manualPayments.includes("router.post('/intents'") && workflowSources.manualPayments.includes("router.post('/submissions'"), 'Direct transfers must use authenticated server-priced intents and a dedicated submission route.'],
   [workflowSources.manualPayments.includes('pg_advisory_xact_lock') && workflowSources.manualPayments.includes('detectImageMime') && workflowSources.manualPayments.includes('MAX_PROOF_BYTES') && schema.includes('uq_wallet_payment_credit'), 'Transfer references, optional screenshots and wallet credits must be protected against duplicates and unsafe uploads.'],
-  [workflowSources.manualPaymentService.includes('googlePayUri') && workflowSources.manualPaymentService.includes('gpay://upi/pay?') && workflowSources.manualPayments.includes('google_pay_uri'), 'The server-priced intent must provide exact-amount Google Pay and universal UPI app links.'],
-  [workflowSources.customerUi.includes('/api/customer/manual-payments/intents') && workflowSources.customerUi.includes('/api/customer/manual-payments/submissions') && workflowSources.customerHtml.includes('id="manualPaymentForm"') && workflowSources.customerHtml.includes('id="manualGooglePayLink"') && !workflowSources.customerHtml.includes('id="manualAccountNumber"'), 'Customer checkout must be UPI-first and must not ask for bank account details.'],
+  [workflowSources.manualPaymentService.includes('upiPaymentUri') && workflowSources.manualPaymentService.includes('encodeURIComponent') && workflowSources.manualPayments.includes('QRCode.toDataURL(qrPayload') && workflowSources.manualPayments.includes('upi_qr_data_url'), 'The backend must generate an exact-amount, percent-safe UPI QR without exposing a payment-app redirect.'],
+  [!workflowSources.manualPaymentService.includes('googlePayUri') && !workflowSources.manualPaymentService.includes('androidGooglePayUri') && !workflowSources.manualPayments.includes('google_pay_uri') && !workflowSources.manualPayments.includes('google_pay_android_uri'), 'Payment-app-specific redirect URLs must not be generated or returned.'],
+  [workflowSources.customerUi.includes('/api/customer/manual-payments/intents') && workflowSources.customerUi.includes('/api/customer/manual-payments/submissions') && workflowSources.customerUi.includes('saveUpiQr') && !workflowSources.customerUi.includes('launchUpiApp') && workflowSources.customerHtml.includes('id="manualUpiQr"') && workflowSources.customerHtml.includes('id="manualUpiId"') && workflowSources.customerHtml.includes('id="downloadUpiQr"') && !workflowSources.customerHtml.includes('id="manualGooglePayLink"') && !workflowSources.customerHtml.includes('id="manualAccountNumber"'), 'Customer checkout must offer only the QR and copyable UPI ID, with no app redirect or bank-account form.'],
+  [workflowSources.customerHtml.includes('id="appBackButton"') && workflowSources.employeeHtml.includes('id="listenerBackButton"') && workflowSources.adminHtml.includes('id="adminBackButton"') && !workflowSources.customerHtml.includes('<b>Back</b>') && !workflowSources.employeeHtml.includes('<b>Back</b>') && !workflowSources.adminHtml.includes('<b>Back</b>'), 'Top navigation must use accessible icon-only Back buttons across every portal.'],
+  [workflowSources.adminCss.includes('V5.11 rose control centre') && workflowSources.adminCss.includes('grid-template-columns:repeat(auto-fit,minmax(280px,1fr))') && workflowSources.adminCss.includes('max-height:calc(100dvh - 122px)'), 'The admin workspace must retain its rose responsive card, form and scrolling polish.'],
   [workflowSources.admin.includes('settlementRecordMatched') && workflowSources.admin.includes("record.status !== 'pending'") && workflowSources.adminUi.includes('UPI APP or BANK STATEMENT') && workflowSources.adminUi.includes('settlementRecordMatched: action === \'approved\''), 'Admin approval must explicitly confirm an independent receiving-account match.'],
-  [!workflowSources.public.includes('payment-checkout') && !workflowSources.customer.includes("router.post('/payments'") && workflowSources.backendPackage.includes('qrcode') && workflowSources.backendPackage.includes('multer'), 'Only the protected V5.9 intent/UTR flow may expose direct UPI checkout.'],
+  [!workflowSources.public.includes('payment-checkout') && !workflowSources.customer.includes("router.post('/payments'") && workflowSources.backendPackage.includes('qrcode') && workflowSources.backendPackage.includes('multer'), 'Only the protected V5.11 QR/UTR flow may expose direct UPI checkout.'],
 ];
 for (const [valid, message] of invariants) {
   if (!valid) {
