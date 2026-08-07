@@ -1,4 +1,4 @@
-# We Met V5.3 — publish-ready package
+# We Met V5.9 — publish-ready application
 
 We Met is a responsive platform for private Malayalam browser voice conversations. The interface is English. Customer, listener and admin portals remain separate frontends with their own HTML, JavaScript, CSS and assets.
 
@@ -20,21 +20,46 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 
 ## Applications
 
-- `customer-site/` — customer landing page, wallet, manual UPI proof submission, voice call, reliable chat, recovery and installable PWA
+- `customer-site/` — customer landing page, dual-mode payment checkout, wallet, voice call, reliable chat, recovery and installable PWA
 - `employee-site/` — listener login, availability, incoming calls, voice call, reliable chat, recovery and installable PWA
-- `admin-site/` — users, listeners, calls, plans, payment verification, recovery approvals, coupons, safety, support and installable PWA
+- `admin-site/` — users, listeners, calls, plans, UPI verification, Razorpay history, recovery approvals, coupons, safety, support and installable PWA
 - `backend/` — Express, PostgreSQL/Supabase, Socket.IO and WebRTC signalling
 
-## V5 improvements
+## V5.9 improvements
+
+- deploy-now `upi_direct` mode with Google Pay, universal UPI app handoff and exact-amount QR
+- signed-in-only receiving UPI details supplied from private server environment variables
+- expiring, server-priced payment intents so plan amount and talk-time cannot be changed in the browser
+- required UTR/transaction reference, duplicate-reference protection and optional 3 MB image upload
+- admin approval requires matching the amount and transaction ID in the receiving UPI app or bank statement
+- transactional one-time wallet credit with customer/admin notifications
+- one-setting switch to the existing secure Razorpay flow after KYC and Live Mode activation
+- Razorpay Checkout loads only when Razorpay mode is enabled
+- direct-UPI and Razorpay records remain together in customer and admin history
+- rose Back controls on every non-home customer, listener and admin screen
+- History API state for tabs, payment/legal/auth overlays and active-call minimising, so Back stays inside the app
+- direct UPI payments are clearly labelled as administrator-verified, while screenshots are never treated as settlement confirmation
+- Web Push subscriptions with server-side VAPID delivery for background notification-bar alerts
+- incoming listener calls use urgent, persistent notification tags and open the listener PWA when tapped
+- customer payment/admin messages can reach the notification bar after opt-in
+- phone is required for new customer accounts, can be securely updated by existing customers, and appears in admin search, details and payments
+- refreshed rose checkout presentation, automatic capture confirmation and clearer failure/cancellation states
+
+- Razorpay Standard Checkout with server-created Orders
+- server-side Checkout signature and captured-payment verification
+- signed, idempotent webhook handling for captured, authorised and failed payments
+- automatic one-time wallet credit with customer notification
+- Test/Live configuration through private environment variables
+- Razorpay transaction history in both customer and admin portals
+- direct-UPI and older transfer records remain available for customer/admin audit history
 
 - V5.3 registration uses one required 18+ / Terms / Privacy confirmation and no date-of-birth field
 - Talk-time packs use a responsive 2-column mobile, 3-column tablet and 4-column large-screen grid
 - Admin overview shows unique concurrently connected users with customer/listener counts and refreshes automatically
 - Customer directory has a bounded, touch-friendly mobile scroller with a sticky table header
 - Customer, listener and admin use network-first service workers, versioned assets and automatic one-time reload after deployment
-- Guided purchase checkout with a dedicated Google Pay link, universal UPI app chooser and exact-amount QR code
-- Screenshot preview before submission and a live verification screen that continues updating after the customer returns to the wallet
-- Automatic wallet refresh when the administrator approves a payment, with decline messages shown directly to the customer
+- Secure Checkout supports the payment methods Razorpay enables for the merchant account
+- Automatic wallet refresh when a captured payment is confirmed
 
 - local `.env` and `node_modules` removed from the distributed package
 - secret-safe GitHub copy generator
@@ -48,8 +73,8 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 - Docker secret exclusions
 - exposed temporary passwords removed from package documentation and defaults
 - fixed in-call chat correlation and added delivery acknowledgement
-- customer pack selection, UPI deep link and screenshot upload to `salahkpsite@slc`
-- transaction-locked approval/decline so one payment cannot credit minutes twice
+- customer pack selection with server-controlled prices and durations
+- transaction-locked, idempotent credit so one Razorpay order cannot add minutes twice
 - recovery key, request tracking, admin approval and customer/listener password completion
 - install manifests and offline app shells for all three portals
 
@@ -64,6 +89,6 @@ Health:   https://YOUR-SERVICE.onrender.com/api/health
 
 ## Important
 
-Manual UPI proof verification, coupon codes and manual admin wallet credits are active. The administrator must verify every submitted transaction independently in the receiving UPI account before approval. This is not an automatic payment gateway.
+For immediate direct-UPI deployment, read `UPI_DIRECT_DEPLOY_NOW.md`. A limited receiving UPI ID cannot be fixed or bypassed in website code; use an eligible working UPI ID or contact the bank/provider. Razorpay Test Mode cannot receive real customer money; after KYC unlocks Live Mode, follow `RAZORPAY_SETUP.md`, configure the signed webhook, enable automatic capture and change the payment-mode environment variable. Configure `PUSH_NOTIFICATIONS_SETUP.md` with one persistent VAPID key pair so customers and listeners can opt into notification-bar alerts. Coupon codes and manual admin wallet adjustments remain available.
 
 Use a paid always-on server and a TURN relay before serving real customers. Keep this version on one server instance until shared multi-instance call state is implemented.

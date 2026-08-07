@@ -67,14 +67,19 @@ It asks for:
 3. The same admin password again
 4. New listener password
 5. The same listener password again
+6. Payment mode: direct transfer now or Razorpay
+7. For direct transfer: exact beneficiary name, account number twice, IFSC, optional bank name and optional UPI fallback
+8. For Razorpay: matching Test or Live Key ID, private Key Secret and webhook secret
 
-Use completely new passwords. Each must contain at least 10 characters.
+Use completely new passwords. Each account password must contain at least 10 characters. Choose direct transfer until Razorpay Live Mode is available. Razorpay Test Mode is only a simulation and cannot receive real customer money.
 
 The setup then:
 
+- installs exact Node packages from the lockfile
 - creates `backend/.env` locally
 - generates a private random JWT secret
-- installs Node packages
+- generates a matching browser-notification VAPID key pair
+- stores either the bank-transfer settings or Razorpay values only in the local backend environment file
 - creates/upgrades the Supabase tables
 - updates the seeded admin and listener passwords once
 - changes `RESET_SEEDED_PASSWORDS` back to `false`
@@ -115,6 +120,7 @@ Test these before publishing:
 - place and accept a call
 - test microphone and text chat
 - end the call and verify wallet deduction
+- if direct transfer is selected, test a real small transfer, submit its reference, match it in the receiving bank statement and approve it once
 
 Keep the new admin and listener passwords private. You will enter the same values in Render.
 
@@ -186,7 +192,7 @@ render.yaml
 
 Render reads the prepared build, start, health-check, region and timing settings from `render.yaml`.
 
-## 9. Enter the three requested secret values
+## 9. Enter the requested private/configuration values
 
 During the initial Blueprint flow, Render asks for values marked `sync: false`.
 
@@ -201,6 +207,35 @@ Enter the same new admin password used during local setup.
 ### `DEMO_EMPLOYEE_PASSWORD`
 
 Enter the same new listener password used during local setup.
+
+### Direct-UPI values
+
+Enter `UPI_PAYMENT_PAYEE_NAME` exactly as the receiver appears in the UPI app and set `UPI_PAYMENT_ID` to an eligible working receiving UPI ID. The website cannot bypass a UPI or bank receive limit; replace a limited destination or contact the provider.
+
+These values are private deployment configuration; never commit them to GitHub. Signed-in customers receive the UPI details only inside a server-created, expiring payment intent.
+
+Read `UPI_DIRECT_DEPLOY_NOW.md` before opening payments to customers.
+
+### Razorpay later
+
+After KYC unlocks Live Mode, add `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` in Render, configure the webhook, change `PAYMENT_GATEWAY_MODE=razorpay`, and redeploy. Use one complete matching set of Live values.
+
+```text
+https://wemet.xyz/api/webhooks/razorpay
+```
+
+Read `RAZORPAY_SETUP.md` for webhook events, payment capture and Test-to-Live switching.
+
+### `VAPID_PUBLIC_KEY`
+
+Copy `VAPID_PUBLIC_KEY` from the local `backend/.env` created by
+`SETUP_WINDOWS.bat`.
+
+### `VAPID_PRIVATE_KEY`
+
+Copy the matching `VAPID_PRIVATE_KEY` from the same local file. Keep it private
+and never add it to frontend code or GitHub. Read `PUSH_NOTIFICATIONS_SETUP.md`
+for permission behaviour and testing.
 
 Do not put quotation marks around values in the Render form.
 
@@ -241,6 +276,9 @@ If deployment fails:
 - `password authentication failed` → the Supabase URI/password is wrong
 - `JWT_SECRET must...` → remove a manual bad JWT variable and let Render generate it
 - `ADMIN_PASSWORD must...` → enter at least 10 characters
+- `UPI_PAYMENT_PAYEE_NAME must...` → enter the exact name shown for the receiving UPI account
+- `UPI_PAYMENT_ID must...` → enter a valid working UPI ID such as `name@provider`
+- Razorpay configuration errors → either add a complete matching key set or change back to `PAYMENT_GATEWAY_MODE=upi_direct`
 - `Database unavailable` → verify the Session Pooler URI and Supabase project status
 
 ## 12. Open the live portals
@@ -260,15 +298,16 @@ Admin:    https://YOUR-SERVICE.onrender.com/admin/
 Health:   https://YOUR-SERVICE.onrender.com/api/health
 ```
 
-## 13. Test the V5 payment flow
+## 13. Test the direct-UPI payment flow
 
 1. Sign in to the customer portal and open **Wallet**.
-2. Choose a minute pack and confirm the UPI ID is `salahkpsite@slc`.
-3. For a real payment, pay the exact pack amount and upload only the successful-payment screenshot.
-4. Sign in to **Admin → Payments** and open the proof.
-5. Check the receiving UPI account independently; never trust the screenshot alone.
-6. Approve to add the pack minutes once, or decline with an optional message.
-7. Refresh the customer Wallet and confirm the payment status and wallet-ledger credit.
+2. Create a small temporary plan in Admin, then choose it as the customer.
+3. Tap Google Pay or **Choose any UPI app**, confirm the prefilled receiver and exact amount, complete one small payment, and submit its real transaction ID/UTR.
+4. Confirm the customer status is **pending** and no minutes have been added yet.
+5. Sign in to **Admin → Payments** and open the receiving UPI app or bank statement independently.
+6. Match the exact amount and complete transaction ID; type the requested last four characters and approve.
+7. Confirm the status becomes **approved** and the minutes are added once.
+8. Refresh and retry the approval to confirm duplicate wallet credit is impossible, then disable the temporary plan.
 
 ## 14. Test password recovery
 

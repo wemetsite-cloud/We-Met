@@ -17,10 +17,12 @@ services:
         value: "We Met"
       - key: SUPPORT_EMAIL
         value: "wemetsite@gmail.com"
-      - key: PAYMENT_UPI_ID
-        value: "salahkpsite@slc"
       - key: PAYMENT_PAYEE_NAME
         value: "We Met"
+      - key: PUBLIC_URL
+        value: "https://wemet.xyz"
+      - key: ALLOWED_ORIGINS
+        value: "https://wemet.xyz,https://www.wemet.xyz"
       - key: SERVE_FRONTENDS
         value: "true"
       - key: DATABASE_URL
@@ -58,4 +60,16 @@ services:
       - key: STUN_URL
         value: "stun:stun.l.google.com:19302"
       - key: PAYMENT_GATEWAY_MODE
-        value: "manual-proof"
+        value: "upi_direct"
+      - key: UPI_PAYMENT_PAYEE_NAME
+        sync: false
+      - key: UPI_PAYMENT_ID
+        sync: false
+      - key: UPI_PAYMENT_INTENT_MINUTES
+        value: "1440"
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: "mailto:wemetsite@gmail.com"

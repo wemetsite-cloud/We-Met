@@ -1,15 +1,16 @@
-WE MET V5.0 — QUICK START
+WE MET V5.9 — QUICK START
 
-1. Reset the Supabase database password that was previously shared.
-2. Extract this ZIP to a new folder.
-3. Double-click SETUP_WINDOWS.bat.
-4. Paste the new Supabase Session Pooler URI.
-5. Choose new private admin and listener passwords.
-6. Double-click START_WINDOWS.bat and test locally.
-7. Double-click MAKE_SAFE_GITHUB_COPY_WINDOWS.bat.
-8. Upload only the generated we-met-platform-github-safe folder to a PRIVATE GitHub repository.
-9. In Render choose New > Blueprint and connect the repository.
-10. Enter DATABASE_URL, ADMIN_PASSWORD and DEMO_EMPLOYEE_PASSWORD.
-11. Deploy Blueprint.
+1. Extract this ZIP to a new folder.
+2. Double-click SETUP_WINDOWS.bat.
+3. Paste the Supabase Session Pooler URI.
+4. Choose new private admin and listener passwords.
+5. Choose option 1 for direct transfer until Razorpay Live Mode is available.
+6. Enter the exact beneficiary name, confirm the account number, enter IFSC, and optionally enter bank name/UPI.
+7. Double-click START_WINDOWS.bat and test locally.
+8. Double-click MAKE_SAFE_GITHUB_COPY_WINDOWS.bat.
+9. Upload only the generated we-met-platform-github-safe folder to a PRIVATE GitHub repository.
+10. In Render choose New > Blueprint and connect the repository.
+11. Enter the database, account-password, receiving-UPI and generated VAPID values requested by Render.
+12. Deploy, test the real UTR approval flow in DIRECT_TRANSFER_DEPLOY_NOW.md, and test push alerts using PUSH_NOTIFICATIONS_SETUP.md.
 
 Full explanation: PUBLISH_STEP_BY_STEP.md

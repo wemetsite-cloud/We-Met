@@ -1,16 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title We Met V5.0 Safe Setup
+title We Met V5.9 Safe Setup
 where node >nul 2>nul
 if errorlevel 1 (
   echo Node.js is not installed or is not in PATH.
   echo Install Node.js LTS, restart Windows, then run this file again.
-  pause
-  exit /b 1
-)
-node tools\setup.js
-if errorlevel 1 (
   pause
   exit /b 1
 )
@@ -19,6 +14,11 @@ echo Installing backend packages...
 call npm run install:backend
 if errorlevel 1 (
   echo Package installation failed.
+  pause
+  exit /b 1
+)
+node tools\setup.js
+if errorlevel 1 (
   pause
   exit /b 1
 )
@@ -39,7 +39,7 @@ if errorlevel 1 (
 )
 echo.
 echo ==============================================
-echo WE MET V5.0 SETUP COMPLETED
+echo WE MET V5.9 SETUP COMPLETED
 echo Run START_WINDOWS.bat to start the platform.
 echo ==============================================
 pause
