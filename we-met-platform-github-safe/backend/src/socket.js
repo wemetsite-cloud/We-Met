@@ -242,13 +242,30 @@ function createSocketServer(io, { pushService = null } = {}) {
       `, [customerId, employeeId]);
       callRow = callResult.rows[0];
     } catch (error) {
-      employee.state = 'available';
+      if (employees.get(employeeId) === employee) employee.state = 'available';
       broadcastListeners();
       if (error.code === '23505') {
         emitToUser(customerId, 'call:error', { message: 'A call is already in progress.' });
         return;
       }
       throw error;
+    }
+
+    // The listener may have selected Break/Offline while the call row was being
+    // inserted. Re-check persisted availability before creating a runtime or push alert.
+    const stillOnline = await db.query(`
+      SELECT 1 FROM users
+      WHERE id=$1 AND role='employee' AND status='active' AND listener_availability='online'
+    `, [employeeId]);
+    if (!stillOnline.rows[0] || employees.get(employeeId) !== employee || employee.state !== 'ringing') {
+      await db.query(`
+        UPDATE calls SET status='cancelled',ended_at=now(),end_reason='Listener availability changed before ringing'
+        WHERE id=$1 AND status='ringing'
+      `, [callRow.id]);
+      if (employees.get(employeeId) === employee && employee.state === 'ringing') employee.state = 'available';
+      broadcastListeners();
+      await ringCustomer(customerId, null, [...triedEmployees, employeeId]);
+      return;
     }
 
     const runtime = {
@@ -492,9 +509,26 @@ function createSocketServer(io, { pushService = null } = {}) {
     }, 1000);
   }
 
+  function activeCallForUser(userId) {
+    const callId = userCall.get(userId);
+    if (!callId) return null;
+    const runtime = calls.get(callId);
+    if (!runtime || !['ringing', 'connecting', 'active'].includes(runtime.status)) {
+      userCall.delete(userId);
+      return null;
+    }
+    return runtime;
+  }
+
+  function availabilityReply(acknowledge, payload) {
+    if (typeof acknowledge === 'function') acknowledge(payload);
+  }
+
   function safeHandler(handler) {
     return (...args) => Promise.resolve(handler(...args)).catch((error) => {
       console.error('Socket event failed:', error);
+      const acknowledge = args[args.length - 1];
+      if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'The server could not save that change.' });
     });
   }
 
@@ -531,38 +565,48 @@ function createSocketServer(io, { pushService = null } = {}) {
     });
 
     socket.on('employee:online', safeHandler(async (_payload = {}, acknowledge) => {
-      if (user.role !== 'employee' || userCall.has(user.id)) return;
+      if (user.role !== 'employee') return availabilityReply(acknowledge, { ok: false, error: 'This is not a listener account.' });
+      if (activeCallForUser(user.id)) return availabilityReply(acknowledge, { ok: false, error: 'Finish the current call before changing availability.' });
+
       await db.query(`UPDATE users SET listener_availability='online',updated_at=now() WHERE id=$1 AND role='employee'`, [user.id]);
       user.listener_availability = 'online';
-      rememberEmployee(user);
+      rememberEmployee(user, 'available');
       socket.emit('employee:status', { status: 'online' });
       broadcastListeners();
-      if (typeof acknowledge === 'function') acknowledge({ ok: true, status: 'online' });
+      availabilityReply(acknowledge, { ok: true, status: 'online' });
     }));
 
     socket.on('employee:break', safeHandler(async ({ enabled } = {}, acknowledge) => {
-      if (user.role !== 'employee' || userCall.has(user.id)) return;
-      const employee = employees.get(user.id);
-      if (!employee) return;
+      if (user.role !== 'employee') return availabilityReply(acknowledge, { ok: false, error: 'This is not a listener account.' });
+      if (activeCallForUser(user.id)) return availabilityReply(acknowledge, { ok: false, error: 'Finish the current call before changing availability.' });
+
       const availability = enabled ? 'break' : 'online';
-      await db.query('UPDATE users SET listener_availability=$2,updated_at=now() WHERE id=$1', [user.id, availability]);
+      await db.query(`UPDATE users SET listener_availability=$2,updated_at=now() WHERE id=$1 AND role='employee'`, [user.id, availability]);
       user.listener_availability = availability;
-      employee.state = enabled ? 'break' : 'available';
+      rememberEmployee(user, enabled ? 'break' : 'available');
       socket.emit('employee:status', { status: availability });
       broadcastListeners();
-      if (typeof acknowledge === 'function') acknowledge({ ok: true, status: availability });
+      availabilityReply(acknowledge, { ok: true, status: availability });
     }));
 
     socket.on('employee:offline', safeHandler(async (_payload = {}, acknowledge) => {
-      if (user.role !== 'employee') return;
-      const callId = userCall.get(user.id);
-      if (callId) await endCall(callId, 'The listener went offline.');
-      await db.query(`UPDATE users SET listener_availability='offline',updated_at=now() WHERE id=$1`, [user.id]);
+      if (user.role !== 'employee') return availabilityReply(acknowledge, { ok: false, error: 'This is not a listener account.' });
+
+      // Save Offline first. This makes the listener unavailable immediately even if a
+      // ringing/active call takes a moment to finish or its cleanup encounters an error.
+      await db.query(`UPDATE users SET listener_availability='offline',updated_at=now() WHERE id=$1 AND role='employee'`, [user.id]);
       user.listener_availability = 'offline';
       employees.delete(user.id);
       socket.emit('employee:status', { status: 'offline' });
       broadcastListeners();
-      if (typeof acknowledge === 'function') acknowledge({ ok: true, status: 'offline' });
+      availabilityReply(acknowledge, { ok: true, status: 'offline' });
+
+      const runtime = activeCallForUser(user.id);
+      if (runtime) {
+        await endCall(runtime.id, 'The listener went offline.').catch((error) => {
+          console.error('Could not finish call after listener went offline:', error);
+        });
+      }
     }));
 
     socket.on('call:request', safeHandler(async ({ employeeId = null } = {}) => {

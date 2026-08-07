@@ -82,11 +82,12 @@ for (const portal of ['customer-site', 'employee-site', 'admin-site']) {
   const serviceWorker = fs.readFileSync(path.join(root, portal, 'service-worker.js'), 'utf8');
   const portalHtml = fs.readFileSync(path.join(root, portal, 'index.html'), 'utf8');
   const portalApp = fs.readFileSync(path.join(root, portal, 'app.js'), 'utf8');
-  if (!serviceWorker.includes("const VERSION = '5.15.0'") || !serviceWorker.includes("cache: 'no-store'")) {
+  const cacheVersion = serviceWorker.match(/const VERSION = '([^']+)'/)?.[1] || '';
+  if (!cacheVersion || !serviceWorker.includes("cache: 'no-store'")) {
     failed = true;
     console.error(`Stale-cache protection is missing from ${portal}/service-worker.js`);
   }
-  if (!portalHtml.includes('?v=5.15.0') || !portalApp.includes("updateViaCache: 'none'")) {
+  if (!cacheVersion || !portalHtml.includes(`?v=${cacheVersion}`) || !portalApp.includes(`service-worker.js?v=${cacheVersion}`) || !portalApp.includes("updateViaCache: 'none'")) {
     failed = true;
     console.error(`Current cache-busting registration is missing from ${portal}`);
   }
@@ -146,7 +147,9 @@ const invariants = [
   [workflowSources.auth.includes('normalisePhone') && workflowSources.auth.includes("router.post('/change-phone'") && workflowSources.customerHtml.includes('id="regPhone"') && workflowSources.customerHtml.includes('id="profilePhone"'), 'Customer phone capture and password-confirmed updates are required.'],
   [schema.includes('push_subscriptions') && workflowSources.server.includes("app.use('/api/push'") && workflowSources.push.includes('webPush.sendNotification') && workflowSources.pushRoute.includes("router.post('/subscriptions'"), 'Authenticated Web Push subscriptions and server delivery are required.'],
   [workflowSources.socket.includes('pushService?.sendToUser') && workflowSources.employeeWorker.includes("addEventListener('push'") && workflowSources.employeeWorker.includes("addEventListener('notificationclick'"), 'Listener incoming calls must reach the notification bar and reopen the PWA.'],
-  [schema.includes('listener_availability') && workflowSources.socket.includes('hydratePersistentEmployees') && workflowSources.socket.includes("listener_availability='online'") && workflowSources.socket.includes("runtime?.status === 'ringing'") && workflowSources.employeeUi.includes('Enable notification permission before going online.'), 'Listener availability must persist after the site closes and reconnect a pending pushed call.'],
+  [workflowSources.employeeWorker.includes('SET_LISTENER_AVAILABILITY') && workflowSources.employeeWorker.includes("readAvailability() !== 'online'") && workflowSources.employeeUi.includes('syncAvailabilityToWorker(nextStatus)') && workflowSources.push.includes("listener_availability='online'"), 'Background call notifications must be shown only while the listener is explicitly Online.'],
+  [schema.includes('listener_availability') && workflowSources.socket.includes('hydratePersistentEmployees') && workflowSources.socket.includes("listener_availability='online'") && workflowSources.socket.includes("runtime?.status === 'ringing'") && !workflowSources.employeeUi.includes('Enable notification permission before going online.') && workflowSources.employeeUi.includes("sendAvailabilityCommand('employee:online')"), 'Listener availability must persist independently of optional notification permission.'],
+  [workflowSources.socket.includes('activeCallForUser') && workflowSources.socket.includes('availabilityReply') && workflowSources.socket.includes('Listener availability changed before ringing'), 'Listener Online/Break/Offline transitions must recover from stale calls and block late ring assignments.'],
   [workflowSources.socket.includes("title: customer.name") && workflowSources.socket.includes("body: 'is calling you'") && workflowSources.socket.includes('silent: true') && workflowSources.employeeWorker.includes('silent: data.silent === true'), 'Background listener call notifications must be silent and show only the caller name with a simple calling message.'],
   [workflowSources.customerWorker.includes("addEventListener('push'") && workflowSources.customerUi.includes('paymentEnableAlerts'), 'Customer payment alerts must support opt-in Web Push.'],
   [workflowSources.server.includes("app.use('/api/customer/manual-payments'") && schema.includes('manual_payment_intents') && workflowSources.manualPayments.includes("router.post('/intents'") && workflowSources.manualPayments.includes("router.post('/submissions'"), 'Direct transfers must use authenticated server-priced intents and a dedicated submission route.'],

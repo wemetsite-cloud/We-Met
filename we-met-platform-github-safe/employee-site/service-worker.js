@@ -1,6 +1,8 @@
-const VERSION = '5.15.0';
+const VERSION = '5.15.1';
 const CACHE_PREFIX = 'we-met-listener-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
+const STATE_CACHE = 'we-met-runtime-listener-state';
+const AVAILABILITY_KEY = new URL('__listener_availability__', self.registration.scope).href;
 const STATIC = ['./','index.html','style.css','app.js','api.js','socket-loader.js','webrtc.js','config.js','manifest.webmanifest','assets/logo.svg','assets/favicon.png','assets/icon-192.png','assets/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -43,23 +45,56 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(networkFirst(request, request.mode === 'navigate'));
 });
 
+async function saveAvailability(status) {
+  const normalized = ['online', 'break', 'offline'].includes(status) ? status : 'offline';
+  const cache = await caches.open(STATE_CACHE);
+  await cache.put(AVAILABILITY_KEY, new Response(normalized, {
+    headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
+  }));
+}
+
+async function readAvailability() {
+  try {
+    const cache = await caches.open(STATE_CACHE);
+    const response = await cache.match(AVAILABILITY_KEY);
+    return response ? await response.text() : 'offline';
+  } catch {
+    return 'offline';
+  }
+}
+
+async function closeCallNotifications() {
+  const notifications = await self.registration.getNotifications();
+  notifications
+    .filter((notification) => String(notification.tag || '').startsWith('we-met-call-'))
+    .forEach((notification) => notification.close());
+}
+
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() || '' }; }
-  const icon = new URL(data.icon || 'assets/icon-192.png', self.registration.scope).href;
-  const badge = new URL(data.badge || 'assets/favicon.png', self.registration.scope).href;
-  const options = {
-    body: data.body || 'You have a new update.',
-    icon,
-    badge,
-    tag: data.tag || 'we-met-update',
-    renotify: data.renotify === true,
-    requireInteraction: data.requireInteraction === true,
-    silent: data.silent === true,
-    data: { url: data.url || './' },
-  };
-  if (!options.silent) options.vibrate = Array.isArray(data.vibrate) ? data.vibrate : [180, 80, 180];
-  event.waitUntil(self.registration.showNotification(data.title || 'We Met', options));
+
+  event.waitUntil((async () => {
+    const tag = data.tag || 'we-met-update';
+    // Call pushes remain available while the PWA is minimized or suspended, but a
+    // listener who explicitly selected Break/Offline must never see a call alert.
+    if (String(tag).startsWith('we-met-call-') && await readAvailability() !== 'online') return;
+
+    const icon = new URL(data.icon || 'assets/icon-192.png', self.registration.scope).href;
+    const badge = new URL(data.badge || 'assets/favicon.png', self.registration.scope).href;
+    const options = {
+      body: data.body || 'You have a new update.',
+      icon,
+      badge,
+      tag,
+      renotify: data.renotify === true,
+      requireInteraction: data.requireInteraction === true,
+      silent: data.silent === true,
+      data: { url: data.url || './' },
+    };
+    if (!options.silent) options.vibrate = Array.isArray(data.vibrate) ? data.vibrate : [180, 80, 180];
+    await self.registration.showNotification(data.title || 'We Met', options);
+  })());
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -77,6 +112,13 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SET_LISTENER_AVAILABILITY') {
+    event.waitUntil((async () => {
+      await saveAvailability(event.data.status);
+      if (event.data.status !== 'online') await closeCallNotifications();
+    })());
+    return;
+  }
   if (event.data?.type !== 'CLOSE_NOTIFICATION' || !event.data.tag) return;
   event.waitUntil(self.registration.getNotifications({ tag: event.data.tag })
     .then((items) => items.forEach((notification) => notification.close())));
