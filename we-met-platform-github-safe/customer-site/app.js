@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.9.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.10.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -212,6 +212,8 @@
     $('#couponForm').addEventListener('submit', redeem);
     $('#refreshPayments').addEventListener('click', loadPayments);
     $('#payWithRazorpay').addEventListener('click', startRazorpayCheckout);
+    $('#manualGooglePayLink').addEventListener('click', (event) => launchUpiApp(event, 'google-pay'));
+    $('#manualUpiLink').addEventListener('click', (event) => launchUpiApp(event, 'any'));
     $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
     $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
     $('#manualPaymentForm').addEventListener('submit', submitManualPayment);
@@ -985,6 +987,43 @@
     $('#manualUpiLink').href = intent.upi.uri;
     $('#manualUpiQr').src = intent.upi_qr_data_url;
     show('#manualCheckoutPanel');
+  }
+
+  function mobilePlatform() {
+    const userAgent = navigator.userAgent || '';
+    if (/android/i.test(userAgent)) return 'android';
+    if (/iPad|iPhone|iPod/i.test(userAgent)) return 'ios';
+    return 'other';
+  }
+
+  function launchUpiApp(event, preference) {
+    event.preventDefault();
+    const payment = currentCheckout?.intent?.upi;
+    if (!payment?.uri) {
+      P.toast('The UPI payment link is not ready. Close checkout and try again.', 'error');
+      return;
+    }
+
+    const platform = mobilePlatform();
+    if (platform === 'other') {
+      P.toast('Scan the QR with a UPI app on your phone.', 'info');
+      return;
+    }
+
+    let target = payment.uri;
+    if (preference === 'google-pay') {
+      target = platform === 'android'
+        ? (payment.google_pay_android_uri || payment.uri)
+        : (payment.google_pay_uri || payment.uri);
+    }
+
+    const startedAt = Date.now();
+    window.location.assign(target);
+    window.setTimeout(() => {
+      if (document.visibilityState === 'visible' && Date.now() - startedAt < 5000) {
+        P.toast('Payment app did not open. Try Choose any UPI app or open We Met in Chrome.', 'info');
+      }
+    }, 1800);
   }
 
   function previewManualProof(event) {

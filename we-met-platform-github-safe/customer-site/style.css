@@ -168,7 +168,7 @@ img{display:block;max-width:100%}
   .app-back{padding:8px 10px;min-height:38px}.app-back b{font-size:11px}.app-back:not(.hidden)+.brand span{display:none}.app-back:not(.hidden)+.brand img{width:35px;height:35px}.modal-back{margin-top:0}
 }
 
-/* V5.9 UPI-first checkout */
+/* V5.10 UPI-first checkout */
 .payment-progress.manual-mode{grid-template-columns:repeat(3,1fr)}
 .payment-progress.manual-mode:before{left:16.66%;right:16.66%}
 .payment-progress.razorpay-mode{grid-template-columns:repeat(2,1fr)}

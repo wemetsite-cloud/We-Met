@@ -6,6 +6,7 @@ const config = require('../config');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
 const {
   ALLOWED_METHODS,
+  androidGooglePayUri,
   checkoutReference,
   detectImageMime,
   googlePayUri,
@@ -52,6 +53,7 @@ function publicIntent(intent) {
     ...paymentDetails,
   });
   const gpayUri = googlePayUri(paymentDetails);
+  const androidGpayUri = androidGooglePayUri(paymentDetails);
   return {
     id: intent.id,
     plan_id: intent.plan_id,
@@ -65,6 +67,7 @@ function publicIntent(intent) {
       payee_name: payment.payeeName,
       uri: upiUri,
       google_pay_uri: gpayUri,
+      google_pay_android_uri: androidGpayUri,
     },
   };
 }

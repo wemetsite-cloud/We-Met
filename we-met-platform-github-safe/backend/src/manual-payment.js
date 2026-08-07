@@ -15,9 +15,21 @@ function checkoutReference() {
   return `WM-${date}-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
 }
 
+function encodeUpiValue(value) {
+  return encodeURIComponent(String(value))
+    .replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function upiQuery(parameters) {
+  return Object.entries(parameters)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeUpiValue(key)}=${encodeUpiValue(value)}`)
+    .join('&');
+}
+
 function upiPaymentUri({ upiId, payeeName, amountPaise, reference, note }) {
   if (!upiId) return '';
-  const params = new URLSearchParams({
+  const query = upiQuery({
     pa: upiId,
     pn: payeeName,
     am: (Number(amountPaise) / 100).toFixed(2),
@@ -25,12 +37,19 @@ function upiPaymentUri({ upiId, payeeName, amountPaise, reference, note }) {
     tr: reference,
     tn: note || `We Met ${reference}`,
   });
-  return `upi://pay?${params.toString()}`;
+  return `upi://pay?${query}`;
 }
 
 function googlePayUri({ upiId, payeeName, amountPaise, reference, note }) {
   const universalUri = upiPaymentUri({ upiId, payeeName, amountPaise, reference, note });
   return universalUri ? universalUri.replace(/^upi:\/\/pay\?/, 'gpay://upi/pay?') : '';
+}
+
+function androidGooglePayUri({ upiId, payeeName, amountPaise, reference, note }) {
+  const universalUri = upiPaymentUri({ upiId, payeeName, amountPaise, reference, note });
+  if (!universalUri) return '';
+  const query = universalUri.slice(universalUri.indexOf('?') + 1);
+  return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
 }
 
 function detectImageMime(buffer) {
@@ -71,6 +90,7 @@ function publicSubmission(row) {
 
 module.exports = {
   ALLOWED_METHODS,
+  androidGooglePayUri,
   checkoutReference,
   detectImageMime,
   googlePayUri,
