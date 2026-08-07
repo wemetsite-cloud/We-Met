@@ -84,7 +84,7 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e6,
 });
 
-const socketRuntime = require('./src/socket')(io, { pushService });
+const socketRuntime = require('./src/socket')(io);
 app.locals.socketRuntime = socketRuntime;
 app.locals.notifyUser = (userId, payload) => {
   socketRuntime.notifyUser(userId, payload);

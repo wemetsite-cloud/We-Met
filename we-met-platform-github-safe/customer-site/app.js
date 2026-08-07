@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.15.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.16.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -519,7 +519,9 @@
     socket = io(P.socketUrl, {
       auth: { token: P.Store.token },
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 8,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelayMax: 10000,
     });
 
     audioCall = new AudioCall({
@@ -528,15 +530,11 @@
       remoteAudio: $('#remoteAudio'),
       onState: (state) => {
         if (!currentCall) return;
-        if (state === 'connected' && !currentCall.mediaReady) {
-          currentCall.mediaReady = true;
-          socket.emit('call:media-ready', { callId: currentCall.id });
-        }
         if (state === 'connected' && currentCall.mediaConnected !== true) {
           currentCall.mediaConnected = true;
           socket.emit('call:media-state', { callId: currentCall.id, connected: true });
         }
-        if (['failed', 'disconnected'].includes(state)) {
+        if (['failed', 'disconnected', 'closed'].includes(state)) {
           $('#callState').textContent = 'Audio paused while the connection recovers…';
           if (currentCall.mediaConnected !== false) {
             currentCall.mediaConnected = false;
@@ -547,7 +545,12 @@
     });
 
     socket.on('connect', () => socket.emit('listeners:get'));
-    socket.on('connect_error', (error) => P.toast(error.message || 'Could not connect to the calling server.', 'error'));
+    socket.on('disconnect', () => {
+      if (!currentCall) return;
+      closeCall();
+      P.toast('Connection lost. The call was closed safely.', 'error');
+    });
+    socket.on('connect_error', (error) => console.warn('Calling server reconnecting:', error?.message || error));
     socket.on('listeners:update', ({ listeners: next = [] }) => {
       listeners = next;
       renderListeners();
@@ -573,12 +576,25 @@
     socket.on('call:accepted', async (data) => {
       if (!currentCall) currentCall = { id: data.callId };
       currentCall.status = 'connecting';
-      $('#callState').textContent = 'Connecting secure audio…';
+      currentCall.mediaConnected = false;
+      $('#callState').textContent = 'Preparing microphone…';
       try {
-        await audioCall.start(data.callId, data.initiatorId === me.id);
+        await audioCall.prepare(data.callId);
+        if (!currentCall || currentCall.id !== data.callId) return;
+        $('#callState').textContent = 'Connecting secure audio…';
+        socket.emit('webrtc:ready', { callId: data.callId });
       } catch (error) {
         P.toast(error.message || 'Please allow microphone access.', 'error');
         socket.emit('call:end', { callId: data.callId });
+      }
+    });
+    socket.on('webrtc:start', async ({ callId } = {}) => {
+      if (!currentCall || currentCall.id !== callId) return;
+      try {
+        await audioCall.createOffer();
+      } catch (error) {
+        P.toast(error.message || 'The audio connection could not start.', 'error');
+        socket.emit('call:end', { callId });
       }
     });
     socket.on('call:connected', () => {

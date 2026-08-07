@@ -75,27 +75,10 @@
     }, 4200);
   }
 
-  async function notify(title, body, options = {}) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        const registration = await navigator.serviceWorker?.ready;
-        if (registration) {
-          const notificationOptions = {
-            body,
-            icon: 'assets/icon-192.png',
-            badge: 'assets/favicon.png',
-            tag: options.tag || 'we-met-update',
-            renotify: options.renotify === true,
-            requireInteraction: options.requireInteraction === true,
-            silent: options.silent === true,
-            data: { url: options.url || './' },
-          };
-          if (!notificationOptions.silent && Array.isArray(options.vibrate)) notificationOptions.vibrate = options.vibrate;
-          await registration.showNotification(title, notificationOptions);
-        }
-      } catch {}
-    }
-    toast(body);
+  async function notify(title, body) {
+    // Listener portal intentionally uses in-app alerts only.
+    // Incoming calls are delivered through the live Socket.IO connection.
+    toast(title ? `${title}: ${body}` : body);
   }
 
   window.Portal = {

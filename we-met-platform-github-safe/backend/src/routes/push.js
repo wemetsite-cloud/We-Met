@@ -20,6 +20,10 @@ function subscriptionFrom(body = {}) {
 }
 
 router.post('/subscriptions', asyncHandler(async (req, res) => {
+  if (req.user.role === 'employee') {
+    await db.query('DELETE FROM push_subscriptions WHERE user_id=$1', [req.user.id]);
+    return res.json({ ok: true, disabledForListener: true });
+  }
   if (!push.enabled()) return res.status(503).json({ error: 'Push notifications are not configured yet.' });
   const subscription = subscriptionFrom(req.body);
   if (!subscription) return res.status(400).json({ error: 'The push subscription is invalid.' });

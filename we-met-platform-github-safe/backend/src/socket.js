@@ -3,7 +3,7 @@ const config = require('./config');
 const { verifyToken } = require('./auth');
 const { activateExpiredSuspension } = require('./middleware');
 
-function createSocketServer(io, { pushService = null } = {}) {
+function createSocketServer(io) {
   const employees = new Map();
   const userSockets = new Map();
   const connectedUsers = new Map();
@@ -56,29 +56,29 @@ function createSocketServer(io, { pushService = null } = {}) {
     io.emit('listeners:update', { listeners: publicListeners() });
   }
 
+  function hasLiveSocket(userId) {
+    return Boolean(userSockets.get(userId)?.size);
+  }
+
   function rememberEmployee(user, state = 'available') {
+    const availability = user.listener_availability === 'break' ? 'break' : 'online';
     employees.set(user.id, {
       state,
+      availability,
       name: user.name,
       bio: user.bio || '',
       lastAssigned: employees.get(user.id)?.lastAssigned || 0,
     });
   }
 
-  async function hydratePersistentEmployees() {
-    try {
-      const result = await db.query(`
-        SELECT id,name,bio,listener_availability
-        FROM users
-        WHERE role='employee' AND status='active' AND listener_availability IN ('online','break')
-      `);
-      for (const employee of result.rows) {
-        rememberEmployee(employee, employee.listener_availability === 'break' ? 'break' : 'available');
-      }
-      broadcastListeners();
-    } catch (error) {
-      console.error('Listener availability restore failed:', error?.message || error);
+  function restoreEmployeeAfterCall(employeeId) {
+    const employee = employees.get(employeeId);
+    if (!employee) return;
+    if (!hasLiveSocket(employeeId)) {
+      employees.delete(employeeId);
+      return;
     }
+    employee.state = employee.availability === 'break' ? 'break' : 'available';
   }
 
   function accountUnavailable(user) {
@@ -89,7 +89,6 @@ function createSocketServer(io, { pushService = null } = {}) {
   }
 
   refreshDemoListeners();
-  const persistentEmployeesReady = hydratePersistentEmployees();
 
   // Placeholder listeners behave like normal listener cards. Their availability is
   // rotated on a five-minute cadence so the directory feels naturally active.
@@ -142,13 +141,13 @@ function createSocketServer(io, { pushService = null } = {}) {
   function findAvailableEmployee(excluded = [], preferredEmployeeId = null) {
     if (preferredEmployeeId) {
       const preferred = employees.get(preferredEmployeeId);
-      if (preferred?.state === 'available' && !excluded.includes(preferredEmployeeId)) {
+      if (preferred?.state === 'available' && hasLiveSocket(preferredEmployeeId) && !excluded.includes(preferredEmployeeId)) {
         return preferredEmployeeId;
       }
     }
 
     return [...employees.entries()]
-      .filter(([id, employee]) => employee.state === 'available' && !excluded.includes(id))
+      .filter(([id, employee]) => employee.state === 'available' && hasLiveSocket(id) && !excluded.includes(id))
       .sort((a, b) => a[1].lastAssigned - b[1].lastAssigned)[0]?.[0] || null;
   }
 
@@ -176,7 +175,6 @@ function createSocketServer(io, { pushService = null } = {}) {
   }
 
   async function ringCustomer(customerId, preferredEmployeeId = null, triedEmployees = []) {
-    await persistentEmployeesReady;
     if (userCall.has(customerId)) {
       emitToUser(customerId, 'call:error', { message: 'You already have a call in progress.' });
       return;
@@ -229,6 +227,11 @@ function createSocketServer(io, { pushService = null } = {}) {
     }
 
     const employee = employees.get(employeeId);
+    if (!employee || employee.state !== 'available' || !hasLiveSocket(employeeId)) {
+      if (!hasLiveSocket(employeeId)) employees.delete(employeeId);
+      await ringCustomer(customerId, null, [...triedEmployees, employeeId]);
+      return;
+    }
     employee.state = 'ringing';
     employee.lastAssigned = ++assignmentSequence;
     broadcastListeners();
@@ -257,7 +260,7 @@ function createSocketServer(io, { pushService = null } = {}) {
       SELECT 1 FROM users
       WHERE id=$1 AND role='employee' AND status='active' AND listener_availability='online'
     `, [employeeId]);
-    if (!stillOnline.rows[0] || employees.get(employeeId) !== employee || employee.state !== 'ringing') {
+    if (!stillOnline.rows[0] || !hasLiveSocket(employeeId) || employees.get(employeeId) !== employee || employee.state !== 'ringing') {
       await db.query(`
         UPDATE calls SET status='cancelled',ended_at=now(),end_reason='Listener availability changed before ringing'
         WHERE id=$1 AND status='ringing'
@@ -277,7 +280,9 @@ function createSocketServer(io, { pushService = null } = {}) {
       tried: [...triedEmployees, employeeId],
       customer: { id: customer.id, name: customer.name },
       balanceSeconds: Number(customer.balance_seconds),
-      ready: new Set(),
+      signalingReady: new Set(),
+      offerStarted: false,
+      activating: false,
       mediaConnected: new Set(),
       ringTimer: null,
       connectTimer: null,
@@ -306,17 +311,6 @@ function createSocketServer(io, { pushService = null } = {}) {
       customer: runtime.customer,
       balanceSeconds: runtime.balanceSeconds,
     });
-    pushService?.sendToUser(employeeId, {
-      title: customer.name,
-      body: 'is calling you',
-      url: './',
-      tag: `we-met-call-${runtime.id}`,
-      urgency: 'high',
-      ttl: Math.max(30, Number(config.ringSeconds) + 10),
-      renotify: false,
-      requireInteraction: false,
-      silent: true,
-    }).catch((error) => console.error('Incoming-call push failed:', error?.message || error));
 
     runtime.ringTimer = setTimeout(() => {
       retryCall(runtime.id, 'The listener did not answer.').catch(console.error);
@@ -342,8 +336,7 @@ function createSocketServer(io, { pushService = null } = {}) {
     userCall.delete(runtime.customerId);
     userCall.delete(runtime.employeeId);
 
-    const employee = employees.get(runtime.employeeId);
-    if (employee) employee.state = 'available';
+    restoreEmployeeAfterCall(runtime.employeeId);
 
     emitToUser(runtime.employeeId, 'call:ended', { callId, reason });
     emitToUser(runtime.customerId, 'call:retrying', { reason });
@@ -379,8 +372,7 @@ function createSocketServer(io, { pushService = null } = {}) {
     userCall.delete(runtime.customerId);
     userCall.delete(runtime.employeeId);
 
-    const employee = employees.get(runtime.employeeId);
-    if (employee) employee.state = 'available';
+    restoreEmployeeAfterCall(runtime.employeeId);
 
     emitToUser(runtime.customerId, 'call:ended', { callId, reason, needsTopup });
     emitToUser(runtime.employeeId, 'call:ended', { callId, reason });
@@ -388,23 +380,28 @@ function createSocketServer(io, { pushService = null } = {}) {
   }
 
   async function activateCallIfReady(runtime) {
-    if (!runtime || runtime.status !== 'connecting') return;
-    if (runtime.ready.size !== 2 || runtime.mediaConnected.size !== 2) return;
+    if (!runtime || runtime.status !== 'connecting' || runtime.activating) return;
+    if (runtime.mediaConnected.size !== 2) return;
 
-    if (runtime.connectTimer) clearTimeout(runtime.connectTimer);
-    runtime.status = 'active';
+    runtime.activating = true;
+    try {
+      const result = await db.query(`
+        UPDATE calls
+        SET status = 'active', started_at = now()
+        WHERE id = $1 AND status = 'connecting'
+        RETURNING id
+      `, [runtime.id]);
+      if (!result.rows[0] || runtime.ending) return;
 
-    const result = await db.query(`
-      UPDATE calls
-      SET status = 'active', started_at = now()
-      WHERE id = $1 AND status = 'connecting'
-      RETURNING id
-    `, [runtime.id]);
-    if (!result.rows[0]) return;
-
-    emitToUser(runtime.customerId, 'call:connected', { callId: runtime.id });
-    emitToUser(runtime.employeeId, 'call:connected', { callId: runtime.id });
-    startBilling(runtime);
+      if (runtime.connectTimer) clearTimeout(runtime.connectTimer);
+      runtime.connectTimer = null;
+      runtime.status = 'active';
+      emitToUser(runtime.customerId, 'call:connected', { callId: runtime.id });
+      emitToUser(runtime.employeeId, 'call:connected', { callId: runtime.id });
+      startBilling(runtime);
+    } finally {
+      runtime.activating = false;
+    }
   }
 
   function updateMediaState(runtime, userId, connected) {
@@ -592,21 +589,17 @@ function createSocketServer(io, { pushService = null } = {}) {
     socket.on('employee:offline', safeHandler(async (_payload = {}, acknowledge) => {
       if (user.role !== 'employee') return availabilityReply(acknowledge, { ok: false, error: 'This is not a listener account.' });
 
-      // Save Offline first. This makes the listener unavailable immediately even if a
-      // ringing/active call takes a moment to finish or its cleanup encounters an error.
+      const runtime = activeCallForUser(user.id);
       await db.query(`UPDATE users SET listener_availability='offline',updated_at=now() WHERE id=$1 AND role='employee'`, [user.id]);
       user.listener_availability = 'offline';
       employees.delete(user.id);
       socket.emit('employee:status', { status: 'offline' });
       broadcastListeners();
-      availabilityReply(acknowledge, { ok: true, status: 'offline' });
 
-      const runtime = activeCallForUser(user.id);
       if (runtime) {
-        await endCall(runtime.id, 'The listener went offline.').catch((error) => {
-          console.error('Could not finish call after listener went offline:', error);
-        });
+        await endCall(runtime.id, 'The listener went offline.');
       }
+      availabilityReply(acknowledge, { ok: true, status: 'offline' });
     }));
 
     socket.on('call:request', safeHandler(async ({ employeeId = null } = {}) => {
@@ -625,19 +618,30 @@ function createSocketServer(io, { pushService = null } = {}) {
       if (user.role !== 'employee') return;
       const runtime = calls.get(callId);
       if (!runtime || runtime.employeeId !== user.id || runtime.status !== 'ringing') return;
+      if (user.listener_availability !== 'online' || !hasLiveSocket(user.id)) {
+        await retryCall(callId, 'The listener is no longer available.');
+        return;
+      }
 
       if (runtime.ringTimer) clearTimeout(runtime.ringTimer);
-      runtime.status = 'connecting';
-      runtime.connectTimer = setTimeout(() => {
-        endCall(callId, 'The audio connection could not be established.').catch(console.error);
-      }, 45_000);
-
+      runtime.ringTimer = null;
       const result = await db.query(`
         UPDATE calls SET status = 'connecting'
         WHERE id = $1 AND status = 'ringing'
         RETURNING id
       `, [callId]);
-      if (!result.rows[0]) return;
+      if (!result.rows[0]) {
+        await endCall(callId, 'The call could not be accepted.');
+        return;
+      }
+
+      runtime.status = 'connecting';
+      runtime.signalingReady.clear();
+      runtime.mediaConnected.clear();
+      runtime.offerStarted = false;
+      runtime.connectTimer = setTimeout(() => {
+        endCall(callId, 'The audio connection could not be established.').catch(console.error);
+      }, 45_000);
 
       const employee = employees.get(user.id);
       if (employee) employee.state = 'busy';
@@ -658,14 +662,16 @@ function createSocketServer(io, { pushService = null } = {}) {
       }
     }));
 
-    socket.on('call:media-ready', safeHandler(async ({ callId } = {}) => {
+    socket.on('webrtc:ready', safeHandler(async ({ callId } = {}) => {
       const runtime = calls.get(callId);
       if (!runtime || runtime.status !== 'connecting') return;
       if (![runtime.customerId, runtime.employeeId].includes(user.id)) return;
 
-      runtime.ready.add(user.id);
-      updateMediaState(runtime, user.id, true);
-      await activateCallIfReady(runtime);
+      runtime.signalingReady.add(user.id);
+      if (runtime.signalingReady.size === 2 && !runtime.offerStarted) {
+        runtime.offerStarted = true;
+        emitToUser(runtime.customerId, 'webrtc:start', { callId: runtime.id });
+      }
     }));
 
     socket.on('call:media-state', safeHandler(async ({ callId, connected } = {}) => {
@@ -731,13 +737,18 @@ function createSocketServer(io, { pushService = null } = {}) {
 
       const callId = userCall.get(user.id);
       const runtime = calls.get(callId);
-      if (user.role === 'employee' && runtime?.status === 'ringing') {
+
+      if (user.role === 'employee') {
+        employees.delete(user.id);
         broadcastListeners();
-        return;
       }
-      if (callId) {
+
+      if (runtime?.status === 'ringing' && user.role === 'employee') {
+        await retryCall(runtime.id, 'The listener disconnected before answering.');
+      } else if (callId) {
         await endCall(callId, `${user.role === 'employee' ? 'The listener' : 'The customer'} disconnected.`);
       }
+
     }));
   });
 

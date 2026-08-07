@@ -48,19 +48,14 @@ async function removeExpired(endpoints) {
 
 async function sendToUser(userId, payload) {
   if (!enabled() || !userId) return { sent: 0, removed: 0 };
-  configure();
 
-  // Incoming-call pushes are availability-sensitive. Re-check the persisted listener
-  // state immediately before delivery so an Offline/Break change cannot leave a stale
-  // call notification queued for that listener.
-  if (String(payload?.tag || '').startsWith('we-met-call-')) {
-    const availability = await db.query(`
-      SELECT 1 FROM users
-      WHERE id=$1 AND role='employee' AND status='active' AND listener_availability='online'
-    `, [userId]);
-    if (!availability.rows[0]) return { sent: 0, removed: 0 };
+  const account = await db.query('SELECT role FROM users WHERE id=$1', [userId]);
+  if (account.rows[0]?.role === 'employee') {
+    await db.query('DELETE FROM push_subscriptions WHERE user_id=$1', [userId]);
+    return { sent: 0, removed: 0 };
   }
 
+  configure();
   const result = await db.query(`
     SELECT endpoint,p256dh,auth
     FROM push_subscriptions

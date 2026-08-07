@@ -13,6 +13,9 @@
       this.bound = false;
       this.muted = false;
       this.pendingIce = [];
+      this.offerStarted = false;
+      this.lastState = null;
+      this.bindSignals();
     }
 
     bindSignals() {
@@ -30,7 +33,7 @@
           this.socket.emit('webrtc:answer', { callId, payload: this.peer.localDescription });
         } catch (error) {
           console.error('Could not answer WebRTC offer:', error);
-          this.onState('failed');
+          this.reportState('failed');
         }
       });
 
@@ -40,7 +43,10 @@
           await this.ensurePeer();
           await this.peer.setRemoteDescription(payload);
           await this.flushPendingIce();
-        } catch (error) { console.error('Could not set WebRTC answer:', error); }
+        } catch (error) {
+          console.error('Could not set WebRTC answer:', error);
+          this.reportState('failed');
+        }
       });
 
       this.socket.on('webrtc:ice', async ({ callId, payload }) => {
@@ -51,7 +57,9 @@
             return;
           }
           await this.peer.addIceCandidate(payload);
-        } catch (error) { console.warn('ICE candidate rejected:', error); }
+        } catch (error) {
+          console.warn('ICE candidate rejected:', error);
+        }
       });
     }
 
@@ -59,8 +67,11 @@
       if (!this.peer?.remoteDescription || !this.pendingIce.length) return;
       const candidates = this.pendingIce.splice(0);
       for (const candidate of candidates) {
-        try { await this.peer.addIceCandidate(candidate); }
-        catch (error) { console.warn('Queued ICE candidate rejected:', error); }
+        try {
+          await this.peer.addIceCandidate(candidate);
+        } catch (error) {
+          console.warn('Queued ICE candidate rejected:', error);
+        }
       }
     }
 
@@ -68,7 +79,7 @@
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('This browser does not support microphone calling. Use a recent Chrome, Edge or Safari browser.');
       }
-      if (this.localStream) return this.localStream;
+      if (this.localStream?.active) return this.localStream;
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -81,8 +92,14 @@
       return this.localStream;
     }
 
+    reportState(state) {
+      if (!state || state === this.lastState) return;
+      this.lastState = state;
+      this.onState(state);
+    }
+
     async ensurePeer() {
-      if (this.peer) return this.peer;
+      if (this.peer && this.peer.signalingState !== 'closed') return this.peer;
       const stream = await this.ensureMedia();
       this.peer = new RTCPeerConnection({ iceServers: this.iceServers });
       stream.getTracks().forEach((track) => this.peer.addTrack(track, stream));
@@ -97,26 +114,46 @@
         this.remoteAudio.srcObject = streams[0];
         this.remoteAudio.play().catch(() => {});
       };
-      this.peer.onconnectionstatechange = () => this.onState(this.peer.connectionState);
+      this.peer.onconnectionstatechange = () => {
+        const state = this.peer?.connectionState;
+        if (state) this.reportState(state);
+      };
       this.peer.oniceconnectionstatechange = () => {
-        if (['failed', 'disconnected'].includes(this.peer?.iceConnectionState)) {
-          this.onState(this.peer.iceConnectionState);
-        }
+        const state = this.peer?.iceConnectionState;
+        if (state === 'connected' || state === 'completed') this.reportState('connected');
+        else if (['failed', 'disconnected', 'closed'].includes(state)) this.reportState(state);
       };
       return this.peer;
     }
 
-    async start(callId, initiator) {
+    async prepare(callId) {
+      if (!callId) throw new Error('Missing call ID.');
       this.stopPeerOnly();
       this.pendingIce = [];
       this.callId = callId;
-      this.bindSignals();
+      this.offerStarted = false;
+      this.lastState = null;
       await this.ensurePeer();
-      if (initiator) {
+    }
+
+    async createOffer() {
+      if (!this.callId || this.offerStarted) return;
+      this.offerStarted = true;
+      try {
+        await this.ensurePeer();
         const offer = await this.peer.createOffer({ offerToReceiveAudio: true });
         await this.peer.setLocalDescription(offer);
-        this.socket.emit('webrtc:offer', { callId, payload: this.peer.localDescription });
+        this.socket.emit('webrtc:offer', { callId: this.callId, payload: this.peer.localDescription });
+      } catch (error) {
+        this.offerStarted = false;
+        throw error;
       }
+    }
+
+    // Backward-compatible helper for older cached callers.
+    async start(callId, initiator = false) {
+      await this.prepare(callId);
+      if (initiator) await this.createOffer();
     }
 
     toggleMute() {
@@ -131,9 +168,13 @@
       if (this.peer) {
         this.peer.ontrack = null;
         this.peer.onicecandidate = null;
+        this.peer.onconnectionstatechange = null;
+        this.peer.oniceconnectionstatechange = null;
         this.peer.close();
       }
       this.peer = null;
+      this.offerStarted = false;
+      this.lastState = null;
       if (this.remoteAudio) this.remoteAudio.srcObject = null;
     }
 

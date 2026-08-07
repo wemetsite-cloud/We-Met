@@ -16,7 +16,6 @@
   let ringCountdown = null;
   let ringSecondsLeft = 30;
   let publicConfig = null;
-  let serviceWorkerRegistration = null;
   let activeTab = 'desk';
 
   const NAVIGATION_MARKER = 'we-met-listener-navigation';
@@ -105,9 +104,8 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.15.1', { updateViaCache: 'none' });
-      await serviceWorkerRegistration.update();
-      return serviceWorkerRegistration;
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.16.0', { updateViaCache: 'none' });
+      await registration.update();
     } catch {}
   }
 
@@ -123,7 +121,6 @@
     $('#logoutBtn').addEventListener('click', logout);
     $('#listenerBackButton').addEventListener('click', goBackInListener);
     $$('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.tab)));
-    $('#enablePushBtn').addEventListener('click', () => subscribeToPush({ prompt: true }));
     $('#onlineBtn').addEventListener('click', goOnline);
     $('#offlineBtn').addEventListener('click', () => sendAvailabilityCommand('employee:offline').catch((error) => P.toast(error.message, 'error')));
     $('#breakBtn').addEventListener('click', () => sendAvailabilityCommand('employee:break', { enabled: status !== 'break' }).catch((error) => P.toast(error.message, 'error')));
@@ -210,130 +207,12 @@
     openManagedOverlay('#recoveryModal', 'recoveryModal');
   }
 
-  function applicationServerKey(value) {
-    const padding = '='.repeat((4 - (value.length % 4)) % 4);
-    const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const bytes = atob(base64);
-    return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
-  }
-
-  function updatePushStatus(message, state = 'idle') {
-    $('#pushStatus').textContent = message;
-    $('#pushSetup').dataset.state = state;
-    const active = state === 'enabled';
-    const granted = 'Notification' in window && Notification.permission === 'granted';
-    $('#enablePushBtn').textContent = active
-      ? 'Call alerts enabled'
-      : (granted ? 'Retry alert setup' : 'Enable call alerts');
-    $('#enablePushBtn').disabled = active;
-  }
-
-  async function subscribeToPush({ prompt = false } = {}) {
-    if (!publicConfig?.pushEnabled || !publicConfig?.vapidPublicKey) {
-      updatePushStatus('Notification-bar alerts require VAPID keys in the server environment.', 'unavailable');
-      if (prompt) P.toast('Call alerts are not configured. You can still go online normally.', 'info');
-      return false;
-    }
-    if (!('Notification' in window) || !('PushManager' in window)) {
-      updatePushStatus('This browser does not support notification-bar call alerts.', 'unavailable');
-      return false;
-    }
-
-    let permission = Notification.permission;
-    if (permission === 'default' && prompt) permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      updatePushStatus(permission === 'denied'
-        ? 'Notifications are blocked in browser settings. You can still use Online, Break and Offline normally.'
-        : 'Enable alerts so incoming calls can appear in your notification bar.', permission);
-      if (prompt && permission !== 'granted') P.toast('Call-alert permission was not enabled.', 'info');
-      return false;
-    }
-
-    try {
-      const registration = serviceWorkerRegistration || await navigator.serviceWorker.ready;
-      const expectedKey = applicationServerKey(publicConfig.vapidPublicKey);
-      let subscription = await registration.pushManager.getSubscription();
-      const currentKey = subscription?.options?.applicationServerKey
-        ? new Uint8Array(subscription.options.applicationServerKey)
-        : null;
-      const keyMatches = currentKey
-        && currentKey.length === expectedKey.length
-        && currentKey.every((value, index) => value === expectedKey[index]);
-
-      // A VAPID-key rotation invalidates an older browser subscription. Replace it
-      // automatically instead of leaving the listener with a subscription that can no
-      // longer receive background call alerts.
-      if (subscription && !keyMatches) {
-        await P.api('/api/push/subscriptions', {
-          method: 'DELETE',
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-        }).catch(() => null);
-        await subscription.unsubscribe().catch(() => null);
-        subscription = null;
-      }
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: expectedKey,
-        });
-      }
-      await P.api('/api/push/subscriptions', {
-        method: 'POST',
-        body: JSON.stringify(subscription.toJSON()),
-      });
-      updatePushStatus('Incoming calls can now appear in your notification bar.', 'enabled');
-      if (prompt) P.toast('Notification-bar call alerts are enabled.', 'success');
-      return true;
-    } catch (error) {
-      updatePushStatus('Push subscription could not be completed. Availability controls still work normally.', 'error');
-      if (prompt) P.toast(error.message || 'Call alerts could not be enabled.', 'error');
-      return false;
-    }
-  }
-
-  async function removePushSubscription() {
-    try {
-      const registration = serviceWorkerRegistration || await navigator.serviceWorker?.ready;
-      const subscription = await registration?.pushManager?.getSubscription();
-      if (!subscription) return;
-      if (P.Store.token) {
-        await P.api('/api/push/subscriptions', {
-          method: 'DELETE',
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-        }).catch(() => null);
-      }
-      await subscription.unsubscribe();
-    } catch {}
-  }
-
-  function closeCallNotification(callId) {
-    if (!callId) return;
-    navigator.serviceWorker?.controller?.postMessage({
-      type: 'CLOSE_NOTIFICATION',
-      tag: `we-met-call-${callId}`,
-    });
-  }
-
-
-  async function syncAvailabilityToWorker(nextStatus) {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-      const registration = serviceWorkerRegistration || await navigator.serviceWorker.ready;
-      const worker = navigator.serviceWorker.controller || registration.active || registration.waiting;
-      worker?.postMessage({ type: 'SET_LISTENER_AVAILABILITY', status: nextStatus });
-    } catch {}
-  }
-
   async function goOnline() {
-    // Start push setup from the user's click so browsers are allowed to show the
-    // permission prompt, but never make availability depend on notification setup.
-    const pushSetup = subscribeToPush({ prompt: true }).catch(() => false);
     try {
       await sendAvailabilityCommand('employee:online');
     } catch (error) {
       P.toast(error.message, 'error');
     }
-    await pushSetup;
   }
 
   async function requestRecovery(event) {
@@ -436,11 +315,6 @@
     loadStats();
     loadHistory();
     loadNotifications();
-    if ('Notification' in window && Notification.permission === 'granted') {
-      subscribeToPush().catch(() => null);
-    } else {
-      updatePushStatus('Enable alerts so incoming calls can appear in your notification bar.');
-    }
     syncBackButton();
   }
 
@@ -462,7 +336,6 @@
     stopRing();
     ringContext?.close().catch(() => {});
     ringContext = null;
-    await removePushSubscription();
     P.Store.clear();
     location.reload();
   }
@@ -483,15 +356,11 @@
       remoteAudio: $('#remoteAudio'),
       onState: (state) => {
         if (!currentCall) return;
-        if (state === 'connected' && !currentCall.ready) {
-          currentCall.ready = true;
-          socket.emit('call:media-ready', { callId: currentCall.id });
-        }
         if (state === 'connected' && currentCall.mediaConnected !== true) {
           currentCall.mediaConnected = true;
           socket.emit('call:media-state', { callId: currentCall.id, connected: true });
         }
-        if (['failed', 'disconnected'].includes(state)) {
+        if (['failed', 'disconnected', 'closed'].includes(state)) {
           $('#callState').textContent = 'Audio paused while the connection recovers…';
           if (currentCall.mediaConnected !== false) {
             currentCall.mediaConnected = false;
@@ -501,26 +370,58 @@
       },
     });
 
-    socket.on('connect_error', (error) => P.toast(error.message || 'Could not connect to the calling server.', 'error'));
+    socket.on('connect', () => {
+      $('#connectionBadge').title = 'Calling server connected';
+    });
+    socket.on('disconnect', () => {
+      $('#connectionBadge').title = 'Reconnecting to the calling server';
+      $('#onlineBtn').disabled = true;
+      $('#offlineBtn').disabled = true;
+      $('#breakBtn').disabled = true;
+      if (currentCall) {
+        stopRing();
+        audioCall?.stop();
+        show('#incomingModal', false);
+        show('#callView', false);
+        show('#restoreListenerCall', false);
+        currentCall = null;
+        if (history.state?.marker === NAVIGATION_MARKER && history.state.overlay) {
+          setNavigationState({ overlay: null }, 'replace');
+        }
+        P.toast('Connection lost. The call was closed safely.', 'error');
+      }
+    });
+    socket.on('connect_error', (error) => console.warn('Calling server reconnecting:', error?.message || error));
     socket.on('employee:status', (data) => setStatus(data.status));
     socket.on('call:incoming', incoming);
     socket.on('call:accepted', async (data) => {
       stopRing();
-      closeCallNotification(data.callId);
       show('#incomingModal', false);
       openManagedOverlay('#callView', 'callView', 'replace');
       show('#restoreListenerCall', false);
-      $('#callState').textContent = 'Connecting secure audio…';
+      $('#callState').textContent = 'Preparing microphone…';
       try {
-        await audioCall.start(data.callId, data.initiatorId === me.id);
+        await audioCall.prepare(data.callId);
+        if (!currentCall || currentCall.id !== data.callId) return;
+        $('#callState').textContent = 'Connecting secure audio…';
+        socket.emit('webrtc:ready', { callId: data.callId });
       } catch (error) {
         P.toast(error.message || 'Please allow microphone access.', 'error');
         socket.emit('call:end', { callId: data.callId });
       }
     });
+    socket.on('webrtc:start', async ({ callId } = {}) => {
+      if (!currentCall || currentCall.id !== callId) return;
+      try {
+        await audioCall.createOffer();
+      } catch (error) {
+        P.toast(error.message || 'The audio connection could not start.', 'error');
+        socket.emit('call:end', { callId });
+      }
+    });
     socket.on('call:connected', () => {
       $('#callState').textContent = 'Connected · customer billing is active';
-      P.notify('We Met', 'The customer is connected.');
+      P.toast('Customer connected.', 'success');
     });
     socket.on('call:audio-paused', () => {
       if (currentCall) $('#callState').textContent = 'Audio paused · customer is not being charged';
@@ -534,11 +435,12 @@
     });
     socket.on('call:ended', (data) => {
       stopRing();
-      closeCallNotification(data.callId || currentCall?.id);
       show('#incomingModal', false);
       show('#callView', false);
       show('#restoreListenerCall', false);
       audioCall?.stop();
+      $('#acceptBtn').disabled = false;
+      $('#rejectBtn').disabled = false;
       currentCall = null;
       if (history.state?.marker === NAVIGATION_MARKER && history.state.overlay) {
         setNavigationState({ overlay: null }, 'replace');
@@ -548,7 +450,7 @@
       loadHistory();
     });
     socket.on('chat:message', addChat);
-    socket.on('notification:new', (notification) => P.notify(notification.title, notification.body, { tag: 'we-met-admin-update' }));
+    socket.on('notification:new', (notification) => P.toast(`${notification.title}: ${notification.body}`, 'info'));
     socket.on('account:restricted', (data) => {
       P.toast(data.reason || 'Your account has been restricted.', 'error');
       logout();
@@ -557,7 +459,6 @@
 
   function setStatus(nextStatus) {
     status = nextStatus;
-    syncAvailabilityToWorker(nextStatus);
     const label = nextStatus === 'online' ? 'Online' : nextStatus === 'break' ? 'On break' : 'Offline';
     $('#connectionBadge').textContent = label;
     $('#connectionBadge').className = `status ${nextStatus}`;
@@ -572,7 +473,7 @@
         ? 'Break mode is active'
         : 'You are offline';
     $('#deskText').textContent = nextStatus === 'online'
-      ? 'You are online and available for calls. Notification-bar alerts are optional.'
+      ? 'You are online and available for calls.'
       : nextStatus === 'break'
         ? 'End your break when you are ready to receive calls again.'
         : 'Go online when you are ready to receive Malayalam calls.';
@@ -586,24 +487,23 @@
     // Never surface a call after the listener has already moved to Break/Offline.
     // The server also protects this, but this client guard closes the final race window.
     if (status !== 'online') {
-      closeCallNotification(data.callId);
       socket?.emit('call:reject', { callId: data.callId });
       return;
     }
-    currentCall = { id: data.callId, customer: data.customer };
+    currentCall = { id: data.callId, customer: data.customer, mediaConnected: false };
+    $('#acceptBtn').disabled = false;
+    $('#rejectBtn').disabled = false;
     $('#incomingName').textContent = data.customer.name;
     $('#incomingInitials').textContent = initials(data.customer.name);
     $('#incomingBalance').textContent = P.duration(data.balanceSeconds);
     openManagedOverlay('#incomingModal', 'incomingModal');
     startRing();
-    P.notify(data.customer.name, 'is calling you', {
-      tag: `we-met-call-${data.callId}`,
-      silent: true,
-    });
   }
 
   function accept() {
-    if (!currentCall) return;
+    if (!currentCall || !socket?.connected) return;
+    $('#acceptBtn').disabled = true;
+    $('#rejectBtn').disabled = true;
     socket.emit('call:accept', { callId: currentCall.id });
     $('#customerName').textContent = currentCall.customer.name;
     $('#customerInitials').textContent = initials(currentCall.customer.name);

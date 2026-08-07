@@ -8,8 +8,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=5.15.1">
-  <link rel="stylesheet" href="style.css?v=5.15.1">
+  <link rel="manifest" href="manifest.webmanifest?v=5.16.0">
+  <link rel="stylesheet" href="style.css?v=5.16.0">
 </head>
 <body>
   <div id="loginView" class="login-view">
@@ -30,13 +30,12 @@
     <main class="shell">
       <section class="welcome">
         <div><span class="eyebrow">YOUR LISTENER DESK</span><h1 id="hello">Hello</h1><p>Manage your availability and receive private Malayalam calls.</p></div>
-        <div class="shift-card"><span>Current availability</span><strong id="shiftStatus">Offline</strong><small class="availability-persistence">Online remains active after closing this site, until you choose Break or Go offline.</small><div class="shift-buttons"><button id="onlineBtn" class="button button-primary" type="button">Go online</button><button id="breakBtn" class="button button-soft" type="button" disabled>Break</button><button id="offlineBtn" class="button button-quiet" type="button" disabled>Go offline</button></div></div>
+        <div class="shift-card"><span>Current availability</span><strong id="shiftStatus">Offline</strong><small class="availability-persistence">Keep this listener site/PWA open or minimized while Online. Your Online choice is restored automatically after a reconnect.</small><div class="shift-buttons"><button id="onlineBtn" class="button button-primary" type="button">Go online</button><button id="breakBtn" class="button button-soft" type="button" disabled>Break</button><button id="offlineBtn" class="button button-quiet" type="button" disabled>Go offline</button></div></div>
       </section>
 
       <nav class="tabs" aria-label="Listener navigation"><button class="active" data-tab="desk" type="button">Desk</button><button data-tab="history" type="button">Call history</button><button data-tab="profile" type="button">Profile</button><button data-tab="notifications" type="button">Admin messages</button></nav>
 
       <section id="tab-desk" class="tab active">
-        <section id="pushSetup" class="push-setup" data-state="idle"><div class="push-icon" aria-hidden="true">♢</div><div><span class="eyebrow">OPTIONAL CALL ALERTS</span><h2>Notification-bar call alerts</h2><p id="pushStatus">Optional: enable alerts if you want incoming-call notifications. This is not required to go Online, take a Break, or go Offline.</p></div><button id="enablePushBtn" class="button button-primary" type="button">Enable call alerts</button></section>
         <div class="stats"><article><small>Talk-time today</small><strong id="todayTime">0:00</strong></article><article><small>Total completed calls</small><strong id="totalCalls">0</strong></article><article><small>All-time talk-time</small><strong id="totalTime">0:00</strong></article></div>
         <div class="desk-grid"><section class="availability-card"><div class="desk-mark"><img src="assets/logo.svg" alt=""></div><span class="language-chip">Malayalam calls</span><h2 id="deskTitle">You are offline</h2><p id="deskText">Go online when you are ready to receive calls.</p></section><section class="guide-card"><span class="eyebrow">PRIVACY REMINDER</span><h2>Customer information stays private</h2><ul><li>Never ask for phone numbers, email addresses or social profiles.</li><li>Never request OTPs, bank details, passwords or private images.</li><li>Report unsafe behaviour immediately from the call screen or history.</li></ul></section></div>
       </section>
@@ -55,6 +54,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Call active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=5.15.1"></script><script src="socket-loader.js?v=5.15.1"></script><script src="api.js?v=5.15.1"></script><script src="webrtc.js?v=5.15.1"></script><script src="app.js?v=5.15.1"></script>
+  <script src="config.js?v=5.16.0"></script><script src="socket-loader.js?v=5.16.0"></script><script src="api.js?v=5.16.0"></script><script src="webrtc.js?v=5.16.0"></script><script src="app.js?v=5.16.0"></script>
 </body>
 </html>
