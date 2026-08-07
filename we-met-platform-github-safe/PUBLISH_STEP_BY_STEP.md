@@ -302,7 +302,7 @@ Health:   https://YOUR-SERVICE.onrender.com/api/health
 
 1. Sign in to the customer portal and open **Wallet**.
 2. Create a small temporary plan in Admin, then choose it as the customer.
-3. Tap Google Pay or **Choose any UPI app**, confirm the prefilled receiver and exact amount, complete one small payment, and submit its real transaction ID/UTR.
+3. Scan the QR or copy the receiving UPI ID, confirm the receiver and exact amount in the payment app, complete one small payment, and submit its real transaction ID/UTR.
 4. Confirm the customer status is **pending** and no minutes have been added yet.
 5. Sign in to **Admin → Payments** and open the receiving UPI app or bank statement independently.
 6. Match the exact amount and complete transaction ID; type the requested last four characters and approve.

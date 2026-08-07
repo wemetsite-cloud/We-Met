@@ -1,8 +1,8 @@
 {
   "name": "we-met-platform",
-  "version": "5.9.0",
+  "version": "5.11.0",
   "private": true,
-  "description": "Publish-ready customer, listener and admin PWAs with direct UPI app checkout, verified wallet credits, Razorpay-ready payments, Malayalam browser calls and secure recovery.",
+  "description": "Publish-ready customer, listener and admin PWAs with QR-only direct UPI checkout, verified wallet credits, Razorpay-ready payments, Malayalam browser calls and secure recovery.",
   "scripts": {
     "install:backend": "npm --prefix backend ci --registry=https://registry.npmjs.org/",
     "start": "npm --prefix backend start",

@@ -1,11 +1,13 @@
-# V5.9 release verification
+# V5.11 release verification
 
 Verified on 2026-08-07:
 
 - project JavaScript syntax and HTML ID wiring passed
-- 11 UPI-link, payment, Razorpay, push and image-validation tests passed
-- clean production install completed from `backend/package-lock.json`
-- production dependency audit reported 0 vulnerabilities
+- 10 QR-only payment, UTR, Razorpay, push and image-validation tests passed
+- the production dependency graph is unchanged from the clean-install/audit-validated V5.9 release; only the application version changed in `backend/package-lock.json`
+- customer API and HTML contain no Google Pay, Android intent or universal UPI redirect field/button
+- customer, listener and admin top navigation uses accessible icon-only Back controls
+- rose admin cards, sticky forms, mobile tables and dynamic-viewport scrolling passed project invariants
 - direct-UPI production configuration validation passed
 - Render Blueprint YAML parsed successfully
 - source scan found no populated UPI, Razorpay-secret or webhook-secret environment values

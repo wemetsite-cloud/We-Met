@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title We Met V5.9 Safe Setup
+title We Met V5.11 Safe Setup
 where node >nul 2>nul
 if errorlevel 1 (
   echo Node.js is not installed or is not in PATH.
@@ -39,7 +39,7 @@ if errorlevel 1 (
 )
 echo.
 echo ==============================================
-echo WE MET V5.9 SETUP COMPLETED
+echo WE MET V5.11 SETUP COMPLETED
 echo Run START_WINDOWS.bat to start the platform.
 echo ==============================================
 pause

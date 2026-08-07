@@ -1,7 +1,7 @@
 # We Met Razorpay setup
 
-V5.9 ships with temporary `upi_direct` mode enabled by default so the site
-can hand customers to Google Pay or another UPI app while KYC is pending. Follow
+V5.11 ships with temporary `upi_direct` mode enabled by default so customers
+can scan the exact-amount QR or copy the receiving UPI ID while KYC is pending. Follow
 `UPI_DIRECT_DEPLOY_NOW.md` for that manually verified flow. After Razorpay Live Mode is
 unlocked, We Met can switch to Razorpay Standard Checkout. The backend creates every order from
 the selected database plan, verifies the Checkout signature on the server,

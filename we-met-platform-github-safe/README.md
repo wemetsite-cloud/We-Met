@@ -1,4 +1,4 @@
-# We Met V5.9 — publish-ready application
+# We Met V5.11 — QR-only publish-ready application
 
 We Met is a responsive platform for private Malayalam browser voice conversations. The interface is English. Customer, listener and admin portals remain separate frontends with their own HTML, JavaScript, CSS and assets.
 
@@ -25,9 +25,20 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 - `admin-site/` — users, listeners, calls, plans, UPI verification, Razorpay history, recovery approvals, coupons, safety, support and installable PWA
 - `backend/` — Express, PostgreSQL/Supabase, Socket.IO and WebRTC signalling
 
+## V5.11 QR-only checkout and interface polish
+
+- customers see only the exact-amount UPI QR, receiving UPI ID and verified payee name
+- no Google Pay, universal UPI or browser-to-app redirect URL is returned to the customer
+- customers can copy the UPI ID or save the QR for a payment app's **Scan from gallery** option
+- the exact amount remains server-controlled and every payment still requires a unique transaction ID/UTR
+- customer, listener and admin top Back controls are compact icon-only buttons with accessible labels
+- the admin control centre now uses the We Met rose theme, responsive cards, sticky forms and bounded touch-friendly tables
+- mobile overlays, lists, forms, tables and active-call screens respect dynamic viewport and safe-area sizes
+- obsolete duplicate deployment notes were removed from the publish package
+
 ## V5.9 improvements
 
-- deploy-now `upi_direct` mode with Google Pay, universal UPI app handoff and exact-amount QR
+- deploy-now `upi_direct` mode with an exact-amount QR and copyable UPI ID
 - signed-in-only receiving UPI details supplied from private server environment variables
 - expiring, server-priced payment intents so plan amount and talk-time cannot be changed in the browser
 - required UTR/transaction reference, duplicate-reference protection and optional 3 MB image upload

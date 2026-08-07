@@ -65,7 +65,7 @@ Interface language: English
 Minimum starting balance: 2 minutes
 Ring timeout: 30 seconds
 Low-balance warning: 1 minute
-Default payment mode: Google Pay / universal direct UPI with transaction-ID verification
+Default payment mode: QR + copyable UPI ID with transaction-ID verification
 Receiving requirement: an eligible working UPI ID that is not currently limited
 Later mode: Razorpay Standard Checkout with Live keys and https://wemet.xyz/api/webhooks/razorpay
 Background alerts: standards-based Web Push with private server VAPID key
