@@ -21,13 +21,13 @@ const upload = multer({
   limits: { fileSize: MAX_PROOF_BYTES, files: 1, fields: 8 },
 });
 
-function optionalProof(req, res, next) {
+function paymentProof(req, res, next) {
   upload.single('proof')(req, res, (error) => {
     if (!error) return next();
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'The optional payment screenshot must be 3 MB or smaller.' });
+      return res.status(413).json({ error: 'The payment screenshot must be 3 MB or smaller.' });
     }
-    return res.status(400).json({ error: 'The optional payment screenshot could not be uploaded.' });
+    return res.status(400).json({ error: 'The payment screenshot could not be uploaded.' });
   });
 }
 
@@ -142,11 +142,11 @@ router.post('/intents', requireDirectUpi, asyncHandler(async (req, res) => {
 
   return res.status(201).json({
     intent: { ...intent, upi_qr_data_url: upiQrDataUrl },
-    notice: 'Minutes are added only after the administrator matches the UPI transaction ID and exact amount in the receiving account.',
+    notice: 'After paying, submit the successful UTR and payment screenshot for administrator review.',
   });
 }));
 
-router.post('/submissions', requireDirectUpi, optionalProof, asyncHandler(async (req, res) => {
+router.post('/submissions', requireDirectUpi, paymentProof, asyncHandler(async (req, res) => {
   const intentId = String(req.body.intentId || '');
   const paymentMethod = String(req.body.paymentMethod || 'upi');
   const transferReference = normaliseTransferReference(req.body.utrReference);
@@ -158,15 +158,14 @@ router.post('/submissions', requireDirectUpi, optionalProof, asyncHandler(async 
     return res.status(400).json({ error: 'Enter the 6–64 character UTR, UPI transaction ID, or bank reference.' });
   }
 
-  let proofMime = null;
-  let proofBuffer = null;
-  if (req.file) {
-    proofMime = detectImageMime(req.file.buffer);
-    if (!proofMime) {
-      return res.status(400).json({ error: 'The optional proof must be a genuine PNG, JPG, or WebP image.' });
-    }
-    proofBuffer = req.file.buffer;
+  if (!req.file) {
+    return res.status(400).json({ error: 'Attach the successful-payment screenshot.' });
   }
+  const proofMime = detectImageMime(req.file.buffer);
+  if (!proofMime) {
+    return res.status(400).json({ error: 'The screenshot must be a genuine PNG, JPG, or WebP image.' });
+  }
+  const proofBuffer = req.file.buffer;
 
   const output = await db.transaction(async (client) => {
     const intentResult = await client.query(`
@@ -223,7 +222,7 @@ router.post('/submissions', requireDirectUpi, optionalProof, asyncHandler(async 
     await client.query('UPDATE manual_payment_intents SET submitted_at=now() WHERE id=$1', [intent.id]);
     const admins = await client.query(`SELECT id FROM users WHERE role='admin' AND status='active'`);
     const title = 'Payment awaiting verification';
-    const body = `${req.user.name} submitted ${intent.plan_name}. Match the UPI transaction ID and exact amount in the receiving account before approval.`;
+    const body = `${req.user.name} submitted ${intent.plan_name} with a UTR and payment screenshot for review.`;
     await client.query(`
       INSERT INTO notifications(user_id,title,body)
       SELECT id,$1,$2 FROM users WHERE role='admin' AND status='active'

@@ -105,7 +105,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.11.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.14.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -125,13 +125,12 @@
     $$('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.tab)));
     $('#enablePushBtn').addEventListener('click', () => subscribeToPush({ prompt: true }));
     $('#onlineBtn').addEventListener('click', async () => {
-      const pushSetup = subscribeToPush({ prompt: true });
-      await prepareRingtone();
-      socket?.emit('employee:online');
-      pushSetup.catch(() => null);
+      const alertsReady = await subscribeToPush({ prompt: true });
+      if (!alertsReady) return P.toast('Enable notification permission before going online.', 'error');
+      await sendAvailabilityCommand('employee:online').catch((error) => P.toast(error.message, 'error'));
     });
-    $('#offlineBtn').addEventListener('click', () => socket?.emit('employee:offline'));
-    $('#breakBtn').addEventListener('click', () => socket?.emit('employee:break', { enabled: status !== 'break' }));
+    $('#offlineBtn').addEventListener('click', () => sendAvailabilityCommand('employee:offline').catch((error) => P.toast(error.message, 'error')));
+    $('#breakBtn').addEventListener('click', () => sendAvailabilityCommand('employee:break', { enabled: status !== 'break' }).catch((error) => P.toast(error.message, 'error')));
     $('#acceptBtn').addEventListener('click', accept);
     $('#rejectBtn').addEventListener('click', () => socket?.emit('call:reject', { callId: currentCall?.id }));
     $('#endBtn').addEventListener('click', () => socket?.emit('call:end', { callId: currentCall?.id }));
@@ -236,7 +235,7 @@
   async function subscribeToPush({ prompt = false } = {}) {
     if (!publicConfig?.pushEnabled || !publicConfig?.vapidPublicKey) {
       updatePushStatus('Notification-bar alerts require VAPID keys in the server environment.', 'unavailable');
-      if (prompt) P.toast('Push alerts are not configured yet. In-app ringing still works.', 'info');
+      if (prompt) P.toast('Push alerts are not configured, so persistent Online mode is unavailable.', 'info');
       return false;
     }
     if (!('Notification' in window) || !('PushManager' in window)) {
@@ -248,7 +247,7 @@
     if (permission === 'default' && prompt) permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       updatePushStatus(permission === 'denied'
-        ? 'Notifications are blocked in browser settings. In-app ringing remains available.'
+        ? 'Notifications are blocked in browser settings. Enable them before going online.'
         : 'Enable alerts so incoming calls can appear in your notification bar.', permission);
       if (prompt && permission !== 'granted') P.toast('Call-alert permission was not enabled.', 'info');
       return false;
@@ -271,7 +270,7 @@
       if (prompt) P.toast('Notification-bar call alerts are enabled.', 'success');
       return true;
     } catch (error) {
-      updatePushStatus('Push subscription could not be completed. In-app ringing remains available.', 'error');
+      updatePushStatus('Push subscription could not be completed, so Online mode was not enabled.', 'error');
       if (prompt) P.toast(error.message || 'Call alerts could not be enabled.', 'error');
       return false;
     }
@@ -408,8 +407,18 @@
     syncBackButton();
   }
 
+  function sendAvailabilityCommand(event, payload = {}) {
+    return new Promise((resolve, reject) => {
+      if (!socket?.connected) return reject(new Error('Reconnect before changing availability.'));
+      socket.timeout(8000).emit(event, payload, (error, response) => {
+        if (error || !response?.ok) return reject(new Error('Availability could not be saved. Try again.'));
+        resolve(response);
+      });
+    });
+  }
+
   async function logout() {
-    socket?.emit('employee:offline');
+    await sendAvailabilityCommand('employee:offline').catch(() => null);
     socket?.disconnect();
     audioCall?.stop();
     stopRing();
@@ -522,7 +531,7 @@
         ? 'Break mode is active'
         : 'You are offline';
     $('#deskText').textContent = nextStatus === 'online'
-      ? 'You will hear a ringtone when a customer calls.'
+      ? 'You stay available after closing this page and receive a silent caller-name notification.'
       : nextStatus === 'break'
         ? 'End your break when you are ready to receive calls again.'
         : 'Go online when you are ready to receive Malayalam calls.';
@@ -539,10 +548,9 @@
     $('#incomingBalance').textContent = P.duration(data.balanceSeconds);
     openManagedOverlay('#incomingModal', 'incomingModal');
     startRing();
-    P.notify('Incoming We Met call', 'A customer is calling for a private Malayalam conversation.', {
+    P.notify(data.customer.name, 'is calling you', {
       tag: `we-met-call-${data.callId}`,
-      renotify: true,
-      requireInteraction: true,
+      silent: true,
     });
   }
 

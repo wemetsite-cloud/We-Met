@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.11.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.14.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -836,13 +836,13 @@
     paymentPlans = plans;
     const directUpiMode = publicConfig?.directUpiEnabled;
     const planDescription = directUpiMode
-      ? 'One-tap UPI app checkout · verified wallet credit · private conversations.'
+      ? 'Simple QR payment · verified wallet credit · private conversations.'
       : 'Secure Razorpay checkout · automatic wallet credit · private conversations.';
     $('#walletPaymentIntro').textContent = directUpiMode
-      ? 'Choose Google Pay or any UPI app. The recipient and exact amount are filled for you; submit the completed transaction ID for verification.'
+      ? 'Scan the QR or copy the UPI ID, pay the exact amount, then submit the successful UTR and payment screenshot.'
       : 'Pay through Razorpay and receive your minutes automatically after the payment is captured.';
     $('#paymentHistoryIntro').textContent = directUpiMode
-      ? 'Direct UPI payments remain pending until the amount and transaction ID are independently verified in the receiving account.'
+      ? 'Direct UPI payments remain pending until an administrator reviews the submitted UTR and screenshot.'
       : 'Razorpay payment status and wallet credit update automatically.';
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
@@ -915,6 +915,8 @@
     show('#paymentPayContent', false);
     show('#paymentLoading');
     if (mode) currentCheckout = { mode };
+    $('#paymentModal .payment-card').classList.toggle('simple-upi-mode', isDirectPaymentMode(mode));
+    $('#paymentSummary').classList.toggle('simple-upi-summary', isDirectPaymentMode(mode));
     setPaymentStep('pay');
   }
 
@@ -946,10 +948,10 @@
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
     resetPaymentCheckout(mode);
     currentCheckout = { mode, plan };
-    $('#paymentTitle').textContent = `${plan.name} checkout`;
+    $('#paymentTitle').textContent = mode === 'upi_direct' ? 'Scan to pay' : `${plan.name} checkout`;
     $('#paymentEyebrow').textContent = mode === 'upi_direct' ? 'DIRECT UPI' : 'SECURE CHECKOUT';
     $('#paymentSubtitle').textContent = mode === 'upi_direct'
-      ? 'Scan the QR or copy the receiving UPI ID, pay the exact amount, then submit the transaction ID.'
+      ? 'Pay the exact amount shown below.'
       : 'Complete payment through Razorpay. No screenshot or manual approval is required.';
     openManagedOverlay('#paymentModal', 'paymentModal');
     setPaymentStep('pay');
@@ -979,8 +981,7 @@
   }
 
   function renderDirectUpiIntent(intent) {
-    $('#paymentSummary').innerHTML = `<div><small>Pack</small><strong>${P.esc(intent.plan_name)}</strong></div><div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
-    $('#manualCheckoutReference').textContent = intent.checkout_reference;
+    $('#paymentSummary').innerHTML = `<div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
     $('#manualUpiId').textContent = intent.upi.id;
     $('#manualPayeeName').textContent = intent.upi.payee_name;
     $('#manualUpiQr').src = intent.upi_qr_data_url;
@@ -1143,9 +1144,9 @@
     currentCheckout.mode = directMode ? (payment.gateway || 'upi_direct') : 'razorpay';
     const details = (directMode ? {
       pending: {
-        title: 'UPI payment submitted — verification pending',
-        text: 'The administrator will match the exact amount and UPI transaction ID in the receiving account before adding talk-time.',
-        note: 'Do not pay again while this submission is pending. A screenshot by itself is not treated as payment confirmation.',
+        title: 'UPI payment submitted — review pending',
+        text: 'The administrator will review your submitted UTR and payment screenshot before adding talk-time.',
+        note: 'Do not pay again while this submission is pending.',
         icon: '<i></i>',
       },
       approved: {
@@ -1155,8 +1156,8 @@
         icon: '✓',
       },
       declined: {
-        title: 'UPI payment could not be verified',
-        text: payment.admin_message || 'The UPI transaction ID or amount could not be matched in the receiving account.',
+        title: 'UPI payment was declined',
+        text: payment.admin_message || 'The administrator declined the submitted UTR and screenshot.',
         note: 'Check the administrator message. If money was debited, contact support with the correct transaction ID.',
         icon: '!',
       },
@@ -1232,7 +1233,7 @@
     $('#paymentTitle').textContent = 'Payment status';
     $('#paymentEyebrow').textContent = isDirectPaymentMode(mode) ? 'UPI VERIFICATION' : 'SECURE CONFIRMATION';
     $('#paymentSubtitle').textContent = isDirectPaymentMode(mode)
-      ? 'The receiving account must independently match the exact amount and UPI transaction ID.'
+      ? 'Your submitted UTR and payment screenshot are shown here.'
       : 'Razorpay confirmation and wallet credit update here.';
     openManagedOverlay('#paymentModal', 'paymentModal');
   }

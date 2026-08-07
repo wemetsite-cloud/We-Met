@@ -8,8 +8,8 @@
   <title>We Met Admin</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=5.11.0">
-  <link rel="stylesheet" href="style.css?v=5.11.0">
+  <link rel="manifest" href="manifest.webmanifest?v=5.14.0">
+  <link rel="stylesheet" href="style.css?v=5.14.0">
 </head>
 <body>
   <div id="loginView" class="login-screen">
@@ -46,7 +46,7 @@
           <section class="panel"><div class="panel-head"><div><span class="eyebrow">ALL TIME</span><h2>Call status summary</h2></div></div><div id="callSummary" class="summary-bars"></div></section>
         </section>
 
-        <section id="page-customers" class="page"><div class="toolbar"><div><span class="eyebrow">CUSTOMER DIRECTORY</span><h2>Accounts, contact details and wallet balances</h2></div><div class="toolbar-actions"><input id="customerSearch" placeholder="Search name, email or phone"><button id="reloadCustomers" class="ghost">Refresh</button></div></div><div class="table-wrap customer-directory-scroll" tabindex="0" role="region" aria-label="Scrollable customer directory"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Balance</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead><tbody id="customersTable"></tbody></table></div></section>
+        <section id="page-customers" class="page"><div class="toolbar customer-toolbar"><div><span class="eyebrow">CUSTOMER DIRECTORY</span><h2>Accounts, contacts and wallet controls</h2><p>Search customers and manage each account from a clear responsive card.</p></div><div class="toolbar-actions"><input id="customerSearch" placeholder="Search name, email or phone"><button id="reloadCustomers" class="ghost">Refresh</button></div></div><div class="customer-overview-strip" aria-label="Customer summary"><article><small>Total customers</small><strong id="customerCount">0</strong></article><article><small>Active accounts</small><strong id="customerActiveCount">0</strong></article><article><small>Phone available</small><strong id="customerPhoneCount">0</strong></article><article><small>Total wallet time</small><strong id="customerWalletTotal">0:00</strong></article></div><div id="customersTable" class="customer-directory-scroll customer-directory-grid" role="list" aria-live="polite"></div></section>
 
         <section id="page-employees" class="page"><div class="grid-form"><form id="employeeForm" class="panel stack"><span class="eyebrow">ADD LISTENER</span><h2>Create employee account</h2><label>Name<input id="empName" required></label><label>Username<input id="empUsername" placeholder="Optional"></label><label>Email<input id="empEmail" type="email" required></label><label>Temporary password<input id="empPassword" type="password" minlength="8" required></label><label>Employee ID<input id="empCode" placeholder="Optional — generated if blank"></label><label>Phone<input id="empPhone" placeholder="Private admin record"></label><label>UPI ID<input id="empUpi" placeholder="Optional"></label><label>Short public bio<textarea id="empBio" maxlength="500" placeholder="Short English bio; calls are in Malayalam"></textarea></label><button class="primary">Create listener</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">STAFF DIRECTORY</span><h2>Listener accounts</h2></div><button id="reloadEmployees" class="ghost">Refresh</button></div><div id="employeeCards" class="employee-cards"></div></section></div></section>
 
@@ -54,7 +54,7 @@
 
 <section id="page-plans" class="page"><div class="grid-form"><form id="planForm" class="panel stack"><span class="eyebrow">PLAN SETUP</span><h2>Create talk-time plan</h2><label>Plan name<input id="planName" required></label><label>Price in INR<input id="planPrice" type="number" min="1" required></label><label>Minutes<input id="planMinutes" type="number" min="1" required></label><label class="check"><input id="planPopular" type="checkbox"><span>Show popular badge</span></label><button class="primary">Create plan</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">REFERENCE PRICING</span><h2>Current plans</h2></div></div><div id="plansList" class="card-list"></div></section></div></section>
 
-        <section id="page-payments" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">PAYMENT ACTIVITY</span><h2>UPI verification and gateway history</h2><p>Approve a direct UPI payment only after its exact amount and transaction ID appear in the receiving UPI app or bank statement. Screenshots are supporting information—not confirmation.</p></div><button id="reloadPayments" class="ghost">Refresh</button></div><div id="paymentsList" class="ticket-list"></div></section></section>
+        <section id="page-payments" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">PAYMENT ACTIVITY</span><h2>UPI submissions and gateway history</h2><p>Review the customer's UTR and uploaded payment screenshot, then approve or decline.</p></div><button id="reloadPayments" class="ghost">Refresh</button></div><div id="paymentsList" class="ticket-list"></div></section></section>
 
         <section id="page-coupons" class="page"><div class="grid-form"><form id="couponForm" class="panel stack"><span class="eyebrow">WALLET CODE</span><h2>Create redeem code</h2><label>Code<input id="couponCode" placeholder="Leave blank to auto-generate"></label><label>Label or note<input id="couponLabel"></label><label>Minutes<input id="couponMinutes" type="number" min="1" required></label><label>Maximum uses<input id="couponUses" type="number" min="1" placeholder="Blank means unlimited"></label><label>Expiry date<input id="couponExpiry" type="datetime-local"></label><button class="primary">Create coupon</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">REDEEM CODES</span><h2>Coupon inventory</h2></div><button id="reloadCoupons" class="ghost">Refresh</button></div><div id="couponsList" class="card-list"></div></section></div></section>
 
@@ -72,6 +72,6 @@
   </div>
 
   <div id="actionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-card"><button id="closeModal" class="close" type="button" aria-label="Close">×</button><h2 id="modalTitle">Account action</h2><div id="modalBody"></div></div></div>
-  <script src="config.js?v=5.11.0"></script><script src="api.js?v=5.11.0"></script><script src="app.js?v=5.11.0"></script>
+  <script src="config.js?v=5.14.0"></script><script src="api.js?v=5.14.0"></script><script src="app.js?v=5.14.0"></script>
 </body>
 </html>

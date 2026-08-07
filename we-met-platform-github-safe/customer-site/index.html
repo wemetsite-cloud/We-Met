@@ -8,8 +8,8 @@
   <title>We Met — Talk freely. Feel lighter.</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=5.11.0">
-  <link rel="stylesheet" href="style.css?v=5.11.0">
+  <link rel="manifest" href="manifest.webmanifest?v=5.14.0">
+  <link rel="stylesheet" href="style.css?v=5.14.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -205,7 +205,7 @@
       <div class="payment-heading"><span id="paymentEyebrow" class="eyebrow">PAYMENT CHECKOUT</span><h2 id="paymentTitle">Add talk-time</h2><p id="paymentSubtitle">Follow the exact payment instructions shown below.</p></div>
       <ol id="paymentProgress" class="payment-progress" aria-label="Payment progress">
         <li data-payment-progress="pay"><b>1</b><span>Checkout</span></li>
-        <li data-payment-progress="submit"><b>2</b><span>Reference</span></li>
+        <li data-payment-progress="submit"><b>2</b><span>Details</span></li>
         <li data-payment-progress="status"><b>3</b><span>Confirmation</span></li>
       </ol>
 
@@ -222,37 +222,33 @@
             <small>We Met never receives or stores your UPI PIN, OTP or card number.</small>
           </div>
           <div id="manualCheckoutPanel" class="manual-checkout-panel hidden">
-            <div class="manual-safety-banner upi-ready-banner"><b>Simple QR + UPI ID payment</b><span>We Met will not redirect to a payment app. Scan the QR or copy the UPI ID and pay manually from any trusted UPI application.</span></div>
-            <div id="manualUpiDetails" class="payment-methods qr-only-methods">
-              <section class="upi-actions-card">
-                <span class="payment-kicker">COPY UPI ID</span>
-                <h3>Pay manually in your UPI app</h3>
-                <p>Copy the receiving ID, open Google Pay or another UPI app yourself, and pay the exact amount shown above.</p>
-                <div class="upi-id-card"><div><small>Receiving UPI ID</small><strong id="manualUpiId">—</strong></div><button class="button button-primary" type="button" data-copy-payment="manualUpiId">Copy UPI ID</button></div>
-                <div class="payment-detail-grid"><div><small>Payee name</small><strong id="manualPayeeName">—</strong></div><div><small>Checkout reference</small><strong id="manualCheckoutReference">—</strong></div></div>
-                <ol class="manual-payment-guide"><li><b>1</b><span>Copy the UPI ID above.</span></li><li><b>2</b><span>Open your UPI app and choose Pay to UPI ID.</span></li><li><b>3</b><span>Confirm the payee and pay the exact displayed amount.</span></li></ol>
-              </section>
+            <div id="manualUpiDetails" class="simple-upi-layout">
               <section class="payment-qr-card">
-                <span class="payment-kicker">SCAN TO PAY</span>
-                <div class="qr-frame"><img id="manualUpiQr" alt="UPI payment QR code with exact amount and checkout reference"></div>
-                <strong>Scan with any UPI app</strong><small>Recipient and exact amount are included</small>
-                <button id="downloadUpiQr" class="button button-soft qr-save-button" type="button">Save QR to phone</button>
+                <span class="payment-kicker">SCAN &amp; PAY</span>
+                <div class="qr-frame"><img id="manualUpiQr" alt="UPI payment QR code with the exact amount"></div>
+                <strong>Scan using any UPI app</strong>
+                <button id="downloadUpiQr" class="qr-save-link" type="button">Save QR</button>
+              </section>
+              <section class="simple-upi-details">
+                <span class="payment-kicker">OR USE UPI ID</span>
+                <div class="simple-upi-id"><strong id="manualUpiId">—</strong><button class="button button-soft" type="button" data-copy-payment="manualUpiId">Copy</button></div>
+                <small>Payee: <b id="manualPayeeName">—</b></small>
               </section>
             </div>
-            <p class="payment-safe-note"><span>Before paying:</span> Confirm that the payee name and exact amount match this page. Never share your UPI PIN or OTP. Save the successful transaction ID and return here for verification.</p>
-            <button id="manualTransferContinue" class="button button-primary button-large payment-next" type="button">I completed the UPI payment</button>
+            <p class="simple-payment-note">Check the payee and amount before paying. Never share your UPI PIN or OTP.</p>
+            <button id="manualTransferContinue" class="button button-primary button-large payment-next" type="button">I have paid</button>
           </div>
         </div>
       </section>
 
       <section id="paymentStepSubmit" class="payment-step hidden" data-payment-step="submit">
-        <div class="upload-intro"><span class="upload-icon">✓</span><div><span class="payment-kicker">UPI TRANSACTION ID</span><h3>Tell us which payment to verify</h3><p>Copy the completed transaction ID or UTR from your UPI app. A screenshot is optional and never replaces independent account verification.</p></div></div>
+        <div class="upload-intro"><span class="upload-icon">✓</span><div><span class="payment-kicker">PAYMENT DETAILS</span><h3>Add your UTR and screenshot</h3><p>Copy the successful UPI transaction ID or UTR and attach the completed-payment screenshot.</p></div></div>
         <form id="manualPaymentForm" class="stack">
           <label>UPI transaction ID / UTR <span class="required-label">Required</span><input id="manualUtr" name="utrReference" autocomplete="off" inputmode="text" minlength="6" maxlength="64" placeholder="Example: 423456789012" required><small>Use the unique reference from the successful transaction—not your phone number or UPI ID.</small></label>
-          <label>Payment screenshot <span class="optional-label">Optional</span><input id="manualProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPG, or WebP up to 3 MB. Remove unrelated private information before uploading.</small></label>
-          <div id="manualProofPreview" class="proof-preview hidden"><img id="manualProofImage" alt="Selected screenshot preview"><div><strong id="manualProofName"></strong><small>The administrator will still confirm the UTR and amount in the receiving account.</small></div></div>
+          <label>Payment screenshot <span class="required-label">Required</span><input id="manualProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp" required><small>Attach the successful-payment screen as PNG, JPG, or WebP up to 3 MB.</small></label>
+          <div id="manualProofPreview" class="proof-preview hidden"><img id="manualProofImage" alt="Selected screenshot preview"><div><strong id="manualProofName"></strong><small>This screenshot and the UTR will be shown to the administrator.</small></div></div>
           <label>Optional note<textarea id="manualCustomerNote" name="customerNote" maxlength="500" placeholder="Only add a note if the payment needs clarification"></textarea></label>
-          <div class="payment-form-actions"><button id="manualBackToTransfer" class="button button-quiet" type="button">Back to UPI</button><button class="button button-primary" type="submit">Submit for payment verification</button></div>
+          <div class="payment-form-actions"><button id="manualBackToTransfer" class="button button-quiet" type="button">Back to UPI</button><button class="button button-primary" type="submit">Send payment details</button></div>
         </form>
       </section>
 
@@ -281,6 +277,6 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=5.11.0"></script><script src="socket-loader.js?v=5.11.0"></script><script src="api.js?v=5.11.0"></script><script src="webrtc.js?v=5.11.0"></script><script src="app.js?v=5.11.0"></script>
+  <script src="config.js?v=5.14.0"></script><script src="socket-loader.js?v=5.14.0"></script><script src="api.js?v=5.14.0"></script><script src="webrtc.js?v=5.14.0"></script><script src="app.js?v=5.14.0"></script>
 </body>
 </html>

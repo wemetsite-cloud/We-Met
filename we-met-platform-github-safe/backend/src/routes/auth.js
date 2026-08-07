@@ -23,6 +23,7 @@ function publicUser(user) {
     bio: user.bio,
     employeeCode: user.employee_code,
     upiId: user.upi_id,
+    listenerAvailability: user.listener_availability,
     balanceSeconds: user.balance_seconds,
     status: user.status,
     suspendedUntil: user.suspended_until,

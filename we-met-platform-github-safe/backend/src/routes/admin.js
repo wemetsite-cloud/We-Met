@@ -59,7 +59,7 @@ router.get('/users', asyncHandler(async (req, res) => {
 
   const result = await db.query(`
     SELECT id, role, name, username, email, phone, bio,
-           employee_code, upi_id, balance_seconds, status, suspended_until,
+           employee_code, upi_id, listener_availability, balance_seconds, status, suspended_until,
            suspension_reason, created_at
     FROM users
     ${where}
@@ -101,7 +101,7 @@ router.post('/employees', asyncHandler(async (req, res) => {
       )
       VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id, role, name, username, email, phone, upi_id, bio,
-                employee_code, status, created_at
+                employee_code, listener_availability, status, created_at
     `, [
       name,
       username,
@@ -575,7 +575,7 @@ router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
   const result = await db.query('SELECT proof_mime,proof_data FROM payment_submissions WHERE id=$1', [req.params.id]);
   const proof = result.rows[0];
   if (!proof?.proof_data || !proof?.proof_mime) {
-    return res.status(404).json({ error: 'No optional payment screenshot was attached.' });
+    return res.status(404).json({ error: 'No payment screenshot was attached.' });
   }
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(proof.proof_mime)) {
     return res.status(415).json({ error: 'This older attachment is not a supported safe image format.' });
@@ -590,11 +590,6 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Choose approve or decline.' });
   }
   const adminMessage = text(req.body.adminMessage, 1000) || null;
-  const settlementRecordMatched = req.body.settlementRecordMatched === true
-    || req.body.bankStatementMatched === true;
-  if (action === 'approved' && !settlementRecordMatched) {
-    return res.status(400).json({ error: 'Confirm that the exact amount and transaction ID match the receiving UPI or bank record.' });
-  }
 
   const payment = await db.transaction(async (client) => {
     const found = await client.query(`
@@ -604,7 +599,10 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
     if (!record) throw Object.assign(new Error('Payment submission not found.'), { status: 404 });
     if (record.status !== 'pending') throw Object.assign(new Error('This payment has already been reviewed.'), { status: 409 });
     if (action === 'approved' && record.manual_intent_id && !record.utr_reference) {
-      throw Object.assign(new Error('This transfer has no payment reference and cannot be approved.'), { status: 400 });
+      throw Object.assign(new Error('This payment has no UTR and cannot be approved.'), { status: 400 });
+    }
+    if (action === 'approved' && record.manual_intent_id && (!record.proof_data || !record.proof_mime)) {
+      throw Object.assign(new Error('This payment has no screenshot and cannot be approved.'), { status: 400 });
     }
     if (action === 'approved' && record.utr_reference) {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [record.utr_reference]);
@@ -641,7 +639,7 @@ router.patch('/payments/:id', asyncHandler(async (req, res) => {
       `, [
         record.customer_id,
         record.seconds,
-        `${record.plan_name} · verified ${record.payment_method === 'bank_transfer' ? 'older bank transfer' : 'direct UPI payment'}`,
+        `${record.plan_name} · administrator-approved ${record.payment_method === 'bank_transfer' ? 'older bank transfer' : 'direct UPI payment'}`,
         record.id,
       ]);
     }

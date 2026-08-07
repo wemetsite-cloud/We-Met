@@ -10,7 +10,7 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .pill.pending{background:#fff2df;color:#97600f}.pill.approved,.pill.completed{background:#e8fff7;color:#08775e}.pill.declined{background:#fff0f3;color:var(--red)}.payment-review{align-items:flex-start}.payment-review>div:first-child{min-width:0}.proof-image{display:block;max-width:100%;max-height:68vh;margin:14px auto;border:1px solid var(--line);border-radius:14px;object-fit:contain;background:#f5f6f8}.panel-head p{margin:5px 0 0;color:var(--muted);font-size:11px}
 
-/* V5.3 live presence and touch-friendly customer directory */
+/* Live presence and touch-friendly customer directory */
 .metric-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
 .metric-icon.cyan{background:#e8fbff;color:#087b94}
 .table-wrap{max-width:100%;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
@@ -27,7 +27,7 @@
 .payment-group-heading b{color:var(--ink);font-size:13px}
 .gateway-label{display:inline-flex;border-radius:999px;background:#f2edff;color:#6243a2;padding:7px 10px;font-size:10px;font-weight:800;white-space:nowrap}
 
-/* V5.11 — consistent rose navigation and clearer contact records */
+/* Consistent rose navigation and clearer contact records */
 .admin-back{border:0;border-radius:13px;min-height:42px;padding:8px 13px 8px 9px;background:linear-gradient(135deg,#f0448f,#c92f78);color:#fff;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 10px 25px rgba(201,47,120,.22);transition:transform .16s,box-shadow .16s}
 .admin-back span{display:grid;place-items:center;width:25px;height:25px;border-radius:9px;background:rgba(255,255,255,.18);font-size:17px;line-height:1}
 .admin-back:hover{transform:translateY(-1px);box-shadow:0 13px 30px rgba(201,47,120,.28)}
@@ -37,7 +37,7 @@
 .contact-missing{color:var(--muted);font-style:italic;white-space:nowrap}
 @media(max-width:760px){.admin-back{min-height:40px;padding:7px 9px}.admin-back b{display:none}.content>header>div:not(.admin-chip){min-width:0}.content>header h1,.content>header p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 
-/* V5.11 rose control centre, icon navigation and responsive workspace */
+/* Rose control centre, icon navigation and responsive workspace */
 :root{--nav:#321522;--nav2:#4e1d35;--primary:#cf347b;--primary-soft:#fff0f6;--teal:#119a72;--bg:#fff8fb;--ink:#2b1922;--muted:#7a6973;--line:#ecdce4;--shadow:0 16px 42px rgba(100,29,62,.08)}
 body{background:linear-gradient(180deg,#fff9fc 0%,#f8f4f7 100%)}
 .login-screen{background:linear-gradient(145deg,#fff0f6,#f7f2f6)}
@@ -90,3 +90,51 @@ main{min-width:0;padding:28px clamp(18px,2.4vw,36px)}
   .admin-chip{display:none}.toolbar-actions{flex-direction:column}.toolbar-actions .ghost{width:100%}
   .ticket,.mini-card,.live-row{align-items:flex-start;flex-direction:column}.panel{padding:16px 14px}
 }
+
+/* Responsive customer control cards and simplified payment review */
+.customer-toolbar>div:first-child{max-width:660px}.customer-toolbar p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+.customer-overview-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:15px}
+.customer-overview-strip article{min-width:0;padding:15px 17px;border:1px solid rgba(201,47,120,.12);border-radius:16px;background:linear-gradient(145deg,#fff,#fff7fb);box-shadow:0 10px 28px rgba(100,29,62,.055)}
+.customer-overview-strip small,.customer-overview-strip strong{display:block}.customer-overview-strip small{color:var(--muted);font-size:10px}.customer-overview-strip strong{margin-top:5px;color:var(--primary);font-size:22px;overflow-wrap:anywhere}
+.customer-directory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:13px;max-height:none;overflow:visible;padding:1px;scrollbar-gutter:auto}
+.customer-card{min-width:0;padding:17px;border:1px solid rgba(201,47,120,.12);border-radius:20px;background:linear-gradient(155deg,#fff 0%,#fff8fb 100%);box-shadow:0 14px 36px rgba(92,25,57,.065)}
+.customer-card header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:11px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.customer-card header>div{min-width:0}.customer-card header strong,.customer-card header small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.customer-card header strong{font-size:15px}.customer-card header small{margin-top:4px;color:var(--muted);font-size:10px}
+.customer-avatar{width:43px;height:43px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#f563a3,#bd286d);color:#fff;font-size:12px;font-weight:900;box-shadow:0 9px 20px rgba(201,47,120,.2)}
+.customer-contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:13px 0}.customer-contact-grid>div{min-width:0;padding:10px 11px;border-radius:13px;background:#fff;border:1px solid rgba(201,47,120,.09)}
+.customer-contact-grid small,.customer-contact-grid strong,.customer-contact-grid a,.customer-contact-grid span{display:block;min-width:0}.customer-contact-grid small{margin-bottom:5px;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.customer-contact-grid strong,.customer-contact-grid a,.customer-contact-grid span{font-size:11px;overflow-wrap:anywhere;white-space:normal}
+.customer-card-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.customer-card-actions button{min-width:0;min-height:38px;padding:7px 5px;font-size:9px;white-space:normal;line-height:1.2}
+.customer-empty{grid-column:1/-1;padding:48px 20px;border:1px dashed rgba(201,47,120,.24);border-radius:20px;background:#fff;text-align:center}.customer-empty b{font-size:17px}.customer-empty p{margin:7px 0 0;color:var(--muted);font-size:12px}
+.payment-utr{display:grid;gap:5px;padding:11px 12px!important;border:1px solid rgba(201,47,120,.13);border-radius:13px;background:#fff7fb}.payment-utr b{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.payment-utr strong{color:var(--primary);font-size:14px;overflow-wrap:anywhere}.payment-review-actions{min-width:150px;justify-content:flex-end}.payment-review-actions button{flex:1 1 auto}.payment-review-actions button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:1100px){.customer-overview-strip{grid-template-columns:1fr 1fr}.customer-card-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.customer-directory-grid{max-height:none!important;overflow:visible!important;grid-template-columns:1fr}.customer-overview-strip{grid-template-columns:1fr 1fr}.payment-review-actions{width:100%;justify-content:stretch}.payment-review-actions button{flex:1}.customer-card-actions{grid-template-columns:1fr 1fr}}
+@media(max-width:430px){.customer-overview-strip{gap:7px}.customer-overview-strip article{padding:12px}.customer-overview-strip strong{font-size:18px}.customer-card{padding:14px}.customer-contact-grid{grid-template-columns:1fr}.customer-card-actions{grid-template-columns:1fr 1fr}.customer-card-actions button:last-child{grid-column:1/-1}.customer-card header{grid-template-columns:auto minmax(0,1fr)}.customer-card header>.pill{grid-column:2;justify-self:start}}
+
+/* Themed scroll surfaces and swipeable mobile summaries */
+*{scrollbar-width:thin;scrollbar-color:rgba(201,47,120,.56) rgba(236,220,228,.36)}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:rgba(236,220,228,.28);border-radius:999px}
+*::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#f36da8,#c92f78);border:3px solid transparent;background-clip:padding-box;border-radius:999px;min-height:44px}
+*::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#ef5b9d,#aa225f);border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+aside nav{scrollbar-color:rgba(255,145,192,.58) rgba(255,255,255,.06);scroll-behavior:smooth}
+aside nav::-webkit-scrollbar-track{background:rgba(255,255,255,.05)}
+aside nav::-webkit-scrollbar-thumb{background:rgba(255,145,192,.58);border:3px solid transparent;background-clip:padding-box}
+.table-wrap,.customer-directory-scroll,.modal-card,.grid-form>form.panel{scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.table-wrap{background:linear-gradient(90deg,#fff 0%,#fffafd 50%,#fff 100%)}
+.primary,.ghost,.danger,.warning,.menu,.close,.admin-back{min-height:44px}
+.menu,.close{min-width:44px}
+
+@media(max-width:760px){
+  .metric-grid,.customer-overview-strip,.summary-bars{
+    display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(78vw,280px);
+    gap:10px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
+    scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
+  }
+  .metric-grid>*,.customer-overview-strip>*,.summary-bars>*{scroll-snap-align:start;scroll-snap-stop:normal}
+  .toolbar,.panel-head{scroll-margin-top:90px}
+}
+
+@media(max-width:390px){.metric-grid,.customer-overview-strip,.summary-bars{grid-auto-columns:86vw}}
+
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.table-wrap,.customer-directory-scroll,.modal-card,aside nav{scroll-behavior:auto}}

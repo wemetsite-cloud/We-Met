@@ -32,7 +32,10 @@ function notificationPayload(payload = {}) {
     badge: safeText(payload.badge, 300) || 'assets/favicon.png',
     requireInteraction: payload.requireInteraction === true,
     renotify: payload.renotify === true,
-    vibrate: Array.isArray(payload.vibrate)
+    silent: payload.silent === true,
+    vibrate: payload.silent === true
+      ? []
+      : Array.isArray(payload.vibrate)
       ? payload.vibrate.slice(0, 8).map((value) => Math.max(0, Math.min(2000, Number(value) || 0)))
       : [180, 80, 180],
   });

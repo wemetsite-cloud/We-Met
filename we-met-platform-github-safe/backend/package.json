@@ -1,6 +1,6 @@
 {
   "name": "we-met-backend",
-  "version": "5.11.0",
+  "version": "5.14.0",
   "private": true,
   "description": "We Met backend for Malayalam browser calls, verified direct UPI payments, Razorpay talk-time credits, notifications and secure recovery.",
   "main": "server.js",

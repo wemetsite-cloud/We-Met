@@ -80,15 +80,18 @@
       try {
         const registration = await navigator.serviceWorker?.ready;
         if (registration) {
-          await registration.showNotification(title, {
+          const notificationOptions = {
             body,
             icon: 'assets/icon-192.png',
             badge: 'assets/favicon.png',
             tag: options.tag || 'we-met-update',
             renotify: options.renotify === true,
             requireInteraction: options.requireInteraction === true,
+            silent: options.silent === true,
             data: { url: options.url || './' },
-          });
+          };
+          if (!notificationOptions.silent && Array.isArray(options.vibrate)) notificationOptions.vibrate = options.vibrate;
+          await registration.showNotification(title, notificationOptions);
         }
       } catch {}
     }

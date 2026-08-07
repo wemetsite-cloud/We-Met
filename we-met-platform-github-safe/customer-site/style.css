@@ -45,7 +45,7 @@ img{display:block;max-width:100%}
 @media(max-width:720px){.payment-card{padding:25px 18px}.payment-heading h2{font-size:27px}.payment-methods{grid-template-columns:1fr}.payment-qr-card{padding-block:18px}.qr-frame{width:170px}.pending-payment-summary{grid-template-columns:1fr 1fr}.payment-form-actions{flex-direction:column-reverse}.payment-form-actions .button{width:100%;min-width:0}.active-payment-banner{align-items:flex-start;flex-direction:column}.active-payment-banner>.button{width:100%}}
 @media(max-width:480px){.payment-modal{padding:0}.payment-card{width:100%;height:100%;max-height:none;border-radius:0;padding:21px 15px 28px}.payment-heading{padding-right:38px}.payment-heading h2{font-size:24px}.payment-progress{margin-block:19px}.payment-progress li{font-size:8px}.payment-summary{grid-template-columns:repeat(3,1fr);gap:5px}.payment-summary div{padding:10px 8px}.payment-summary strong{font-size:13px}.payment-summary small{font-size:8px}.upi-actions-card,.payment-qr-card{padding:16px}.payment-status-actions{flex-direction:column-reverse}.payment-status-actions .button{width:100%}.payment-step#paymentStepStatus h3{font-size:23px}.pending-payment-summary{gap:5px}.pending-payment-summary div{padding-inline:5px}.payment-item-side{align-items:flex-start}.proof-preview{grid-template-columns:65px 1fr}.proof-preview img{width:65px;height:60px}}
 
-/* V5.3 responsive talk-time pack cards */
+/* Responsive talk-time pack cards */
 .plans-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;overflow:visible;scroll-snap-type:none;padding-bottom:0}
 .plan-card{display:flex;min-width:0;flex-direction:column;padding:20px}
 .plan-card p{flex:1}
@@ -60,7 +60,7 @@ img{display:block;max-width:100%}
 @media(max-width:700px){.install-banner{flex-direction:column;align-items:flex-start}.install-banner .button{width:100%}.install-inline{justify-content:space-between;flex-wrap:wrap}}
 
 
-/* V5.5 payment + listener polish */
+/* Payment and listener polish */
 .plan-card{
   position:relative;
   overflow:hidden;
@@ -162,7 +162,7 @@ img{display:block;max-width:100%}
   .app-back{padding:8px 10px;min-height:38px}.app-back b{font-size:11px}.app-back:not(.hidden)+.brand span{display:none}.app-back:not(.hidden)+.brand img{width:35px;height:35px}.modal-back{margin-top:0}
 }
 
-/* V5.11 QR-first checkout */
+/* QR-first checkout foundations */
 .payment-progress.manual-mode{grid-template-columns:repeat(3,1fr)}
 .payment-progress.manual-mode:before{left:16.66%;right:16.66%}
 .payment-progress.razorpay-mode{grid-template-columns:repeat(2,1fr)}
@@ -177,7 +177,7 @@ img{display:block;max-width:100%}
 .payment-status-icon.pending i{display:block}
 @media(max-width:480px){.manual-safety-banner{padding:12px}.payment-progress.manual-mode li{font-size:7px}}
 
-/* V5.11 QR-only checkout, icon navigation and viewport-fit polish */
+/* QR-only checkout, icon navigation and viewport-fit polish */
 main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.listener-grid>*,.plans-grid>*{min-width:0}
 .modal-card,.payment-card{overscroll-behavior:contain;scrollbar-gutter:stable}
 .list-item>*,.panel p,.payment-step p{overflow-wrap:anywhere}
@@ -185,36 +185,90 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 .app-back svg,.modal-back svg,.call-back svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .modal-back{margin:-5px 0 18px}
 .call-back{width:42px;height:42px;min-width:42px;padding:0!important;border-radius:14px!important;display:grid!important;place-items:center;flex:0 0 auto}
-.qr-only-methods{grid-template-columns:minmax(0,1fr) minmax(280px,.84fr);align-items:stretch}
-.qr-only-methods .upi-actions-card{padding:24px;display:flex;flex-direction:column}
-.upi-id-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px;border:1px solid rgba(201,47,120,.18);border-radius:18px;background:linear-gradient(135deg,#fff0f6,#fff);box-shadow:0 12px 30px rgba(92,27,57,.07)}
-.upi-id-card small,.upi-id-card strong,.payment-detail-grid small,.payment-detail-grid strong{display:block}
-.upi-id-card small,.payment-detail-grid small{color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-.upi-id-card strong{margin-top:5px;color:var(--pink-deep);font-size:clamp(15px,2.5vw,20px);overflow-wrap:anywhere}
-.upi-id-card .button{flex:0 0 auto;padding:10px 13px}
-.payment-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
-.payment-detail-grid>div{min-width:0;padding:12px 13px;border:1px solid var(--line);border-radius:14px;background:#fff}
-.payment-detail-grid strong{font-size:12px;margin-top:4px;overflow-wrap:anywhere}
-.manual-payment-guide{list-style:none;padding:0;margin:17px 0 0;display:grid;gap:8px}
-.manual-payment-guide li{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px;line-height:1.45}
-.manual-payment-guide b{width:25px;height:25px;flex:0 0 auto;display:grid;place-items:center;border-radius:9px;background:var(--pink-soft);color:var(--pink-deep);font-size:10px}
-.qr-only-methods .payment-qr-card{padding:23px;background:linear-gradient(155deg,#fff,#fff6fa)}
-.qr-only-methods .qr-frame{width:min(230px,88%);border-radius:20px;padding:12px;box-shadow:0 18px 40px rgba(67,24,43,.11)}
-.qr-save-button{width:100%;max-width:230px;margin-top:13px}
 .topbar{padding-top:env(safe-area-inset-top);height:calc(78px + env(safe-area-inset-top))}
 .tabs{scroll-behavior:smooth;overscroll-behavior-x:contain}
 @media(max-width:760px){
   .topbar{height:calc(68px + env(safe-area-inset-top));gap:9px;padding-inline:12px}
   .tabs{top:calc(76px + env(safe-area-inset-top))}
   .top-actions{min-width:0}.top-actions .button{max-width:130px;overflow:hidden;text-overflow:ellipsis}
-  .qr-only-methods{grid-template-columns:1fr}.qr-only-methods .upi-actions-card{padding:19px}
-  .qr-only-methods .payment-qr-card{padding:20px}.qr-only-methods .qr-frame{width:min(245px,82vw)}
-  .payment-detail-grid{grid-template-columns:1fr}.payment-card{max-height:calc(100dvh - 20px)}
+  .payment-card{max-height:calc(100dvh - 20px)}
   .panel-head,.section-head{flex-wrap:wrap}.panel-head>*,.section-head>*{min-width:0}
 }
 @media(max-width:480px){
   .payment-card{min-height:100dvh;max-height:100dvh;padding-top:calc(19px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom))}
-  .upi-id-card{align-items:stretch;flex-direction:column}.upi-id-card .button{width:100%}
-  .payment-qr-card>small{line-height:1.45}.top-actions .button{padding-inline:9px;font-size:11px}
+  .top-actions .button{padding-inline:9px;font-size:11px}
   .app-back,.modal-back{width:42px;height:42px;min-width:42px;min-height:42px}
 }
+
+/* Lightweight QR payment */
+.simple-upi-mode{width:min(620px,calc(100% - 24px));padding:24px 26px 26px;background:#fff}
+.simple-upi-mode .payment-progress{display:none}
+.simple-upi-mode>.close{display:none}
+.simple-upi-mode .payment-heading{padding-right:0;margin-bottom:14px}
+.simple-upi-mode .payment-heading .eyebrow{display:none}
+.simple-upi-mode .payment-heading h2{font-size:27px;margin:4px 0}
+.simple-upi-mode .payment-heading>p{font-size:12px}
+.simple-upi-mode .payment-summary{grid-template-columns:1fr 1fr;margin:0 0 12px;border:0;box-shadow:none;background:transparent;gap:8px}
+.simple-upi-mode .payment-summary div{padding:11px 13px;border-radius:13px;background:#fff6fa;border:1px solid rgba(201,47,120,.11)}
+.simple-upi-mode .payment-summary .exact-amount{background:#351522;border-color:#351522}
+.simple-upi-mode .manual-checkout-panel{gap:10px}
+.simple-upi-layout{display:grid;grid-template-columns:minmax(250px,1fr) minmax(0,.86fr);gap:12px;align-items:stretch}
+.simple-upi-layout .payment-qr-card{padding:16px;border:1px solid rgba(201,47,120,.12);border-radius:18px;background:#fffafd;box-shadow:none}
+.simple-upi-layout .qr-frame{width:min(220px,75vw);padding:9px;border-radius:16px;box-shadow:0 8px 22px rgba(67,24,43,.07)}
+.simple-upi-layout .payment-qr-card>strong{font-size:13px;margin-top:9px}
+.qr-save-link{border:0;background:transparent;color:var(--pink-deep);font-weight:800;font-size:11px;padding:7px;cursor:pointer}
+.simple-upi-details{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:17px;border:1px solid var(--line);border-radius:18px;background:#fff}
+.simple-upi-id{display:flex;align-items:center;gap:8px;min-width:0}
+.simple-upi-id strong{flex:1;min-width:0;color:var(--pink-deep);font-size:15px;overflow-wrap:anywhere}
+.simple-upi-id .button{padding:8px 11px;font-size:11px;flex:0 0 auto}
+.simple-upi-details>small{margin-top:10px;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.simple-payment-note{margin:0!important;padding:9px 11px;border-radius:11px;background:#fff8e9;color:#76500c;font-size:10px!important;line-height:1.45}
+.simple-upi-mode .payment-next{min-height:48px;margin-top:0}
+@media(max-width:600px){
+  .simple-upi-mode{width:100%;max-width:none;padding:calc(15px + env(safe-area-inset-top)) 15px calc(18px + env(safe-area-inset-bottom))}
+  .simple-upi-mode .payment-modal-back{margin-bottom:10px}
+  .simple-upi-mode .payment-heading{margin-bottom:10px}.simple-upi-mode .payment-heading h2{font-size:23px}
+  .simple-upi-layout{grid-template-columns:1fr}.simple-upi-layout .payment-qr-card{order:1;padding:13px}
+  .simple-upi-layout .qr-frame{width:min(205px,62vw)}.simple-upi-details{order:2;padding:13px}
+  .simple-upi-mode .payment-summary div{padding:9px 10px}.simple-upi-mode .payment-summary strong{font-size:13px}
+}
+
+/* Themed scrolling and touch-friendly card sliders */
+*{scrollbar-width:thin;scrollbar-color:rgba(201,47,120,.56) rgba(238,220,229,.34)}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:rgba(238,220,229,.26);border-radius:999px}
+*::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#f36da8,#c92f78);border:3px solid transparent;background-clip:padding-box;border-radius:999px;min-height:44px}
+*::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#ef5b9d,#aa225f);border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+.tabs::-webkit-scrollbar{display:block;height:5px}
+.tabs{scrollbar-width:thin;scroll-padding-inline:12px;padding-bottom:8px}
+.modal-card,.payment-card,.chat-messages,.tabs,.plans-grid,.listener-grid,.legal-body{scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.chat-messages{scrollbar-color:rgba(255,255,255,.42) rgba(255,255,255,.08)}
+.chat-messages::-webkit-scrollbar-track{background:rgba(255,255,255,.07)}
+.chat-messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,.46);border:3px solid transparent;background-clip:padding-box}
+.button,.app-back,.modal-back,.close,.favorite-btn,.legal-btn{min-height:44px}
+.close,.favorite-btn{min-width:44px}
+
+@media(max-width:760px){
+  #listenerGrid,#favoritesList,.feature-grid,.steps,.about-grid{
+    display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(84vw,320px);
+    gap:10px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
+    scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
+  }
+  #listenerGrid>*,#favoritesList>*,.feature-grid>*,.steps>*,.about-grid>*{scroll-snap-align:start;scroll-snap-stop:normal}
+  #listenerGrid .empty-state,#favoritesList .empty-state{width:calc(100vw - 34px);max-width:420px}
+  .plans-grid{
+    grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:calc(50% - 5px);
+    max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
+    scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
+  }
+  .plans-grid>*{scroll-snap-align:start;scroll-snap-stop:normal}
+  .section-head .button{min-height:44px}
+}
+
+@media(max-width:390px){
+  #listenerGrid,#favoritesList,.feature-grid,.steps,.about-grid{grid-auto-columns:88vw}
+  .plans-grid{grid-auto-columns:calc(50% - 4px);gap:8px}
+}
+
+@media(prefers-reduced-motion:reduce){.modal-card,.payment-card,.chat-messages,.tabs,.plans-grid,.listener-grid,.legal-body{scroll-behavior:auto}}

@@ -41,3 +41,22 @@ test('uses generic app-safe defaults when optional push fields are missing', () 
   assert.equal(payload.tag, 'we-met-update');
   assert.equal(payload.requireInteraction, false);
 });
+
+test('supports a silent caller-name notification for a closed listener app', () => {
+  const payload = JSON.parse(notificationPayload({
+    title: 'Priya',
+    body: 'is calling you',
+    tag: 'we-met-call-1',
+    silent: true,
+    renotify: false,
+    requireInteraction: false,
+    vibrate: [500, 500],
+  }));
+
+  assert.equal(payload.title, 'Priya');
+  assert.equal(payload.body, 'is calling you');
+  assert.equal(payload.silent, true);
+  assert.equal(payload.renotify, false);
+  assert.equal(payload.requireInteraction, false);
+  assert.deepEqual(payload.vibrate, []);
+});

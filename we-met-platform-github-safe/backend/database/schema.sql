@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   bio text,
   employee_code text UNIQUE,
   upi_id text,
+  listener_availability text NOT NULL DEFAULT 'offline' CHECK (listener_availability IN ('online','break','offline')),
   password_hash text NOT NULL,
   auth_version integer NOT NULL DEFAULT 0,
   balance_seconds integer NOT NULL DEFAULT 0 CHECK (balance_seconds >= 0),
@@ -235,6 +236,7 @@ CREATE TABLE IF NOT EXISTS razorpay_webhook_events (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_availability text NOT NULL DEFAULT 'offline';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
@@ -258,6 +260,9 @@ ALTER TABLE payment_submissions ALTER COLUMN payee_upi_id DROP NOT NULL;
 ALTER TABLE payment_submissions ALTER COLUMN proof_mime DROP NOT NULL;
 ALTER TABLE payment_submissions ALTER COLUMN proof_size DROP NOT NULL;
 ALTER TABLE payment_submissions ALTER COLUMN proof_data DROP NOT NULL;
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_listener_availability_check;
+ALTER TABLE users ADD CONSTRAINT users_listener_availability_check CHECK (listener_availability IN ('online','break','offline'));
 
 UPDATE payment_submissions
 SET payment_method='upi'
@@ -302,6 +307,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_employee ON calls(employee_id) WH
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role,status);
+CREATE INDEX IF NOT EXISTS idx_listener_availability ON users(listener_availability) WHERE role='employee' AND status='active';
 CREATE INDEX IF NOT EXISTS idx_calls_customer ON calls(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_employee ON calls(employee_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
