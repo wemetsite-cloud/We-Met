@@ -201,7 +201,7 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 }
 
 /* Lightweight QR payment */
-.simple-upi-mode{width:min(620px,calc(100% - 24px));padding:24px 26px 26px;background:#fff}
+.simple-upi-mode{width:min(820px,calc(100% - 32px));padding:28px 30px 30px;background:#fff}
 .simple-upi-mode .payment-progress{display:none}
 .simple-upi-mode>.close{display:none}
 .simple-upi-mode .payment-heading{padding-right:0;margin-bottom:14px}
@@ -212,18 +212,25 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 .simple-upi-mode .payment-summary div{padding:11px 13px;border-radius:13px;background:#fff6fa;border:1px solid rgba(201,47,120,.11)}
 .simple-upi-mode .payment-summary .exact-amount{background:#351522;border-color:#351522}
 .simple-upi-mode .manual-checkout-panel{gap:10px}
-.simple-upi-layout{display:grid;grid-template-columns:minmax(250px,1fr) minmax(0,.86fr);gap:12px;align-items:stretch}
-.simple-upi-layout .payment-qr-card{padding:16px;border:1px solid rgba(201,47,120,.12);border-radius:18px;background:#fffafd;box-shadow:none}
+.simple-upi-layout{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(300px,1.1fr);gap:14px;align-items:stretch}
+.simple-upi-layout .payment-qr-card{padding:18px;border:1px solid rgba(201,47,120,.12);border-radius:18px;background:linear-gradient(145deg,#fffafd,#fff);box-shadow:none}
 .simple-upi-layout .qr-frame{width:min(220px,75vw);padding:9px;border-radius:16px;box-shadow:0 8px 22px rgba(67,24,43,.07)}
 .simple-upi-layout .payment-qr-card>strong{font-size:13px;margin-top:9px}
 .qr-save-link{border:0;background:transparent;color:var(--pink-deep);font-weight:800;font-size:11px;padding:7px;cursor:pointer}
-.simple-upi-details{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:17px;border:1px solid var(--line);border-radius:18px;background:#fff}
+.simple-upi-details{display:flex;flex-direction:column;justify-content:flex-start;gap:11px;min-width:0;padding:21px;border:1px solid rgba(201,47,120,.12);border-radius:18px;background:linear-gradient(145deg,#fff,#fff8fb)}
 .simple-upi-id{display:flex;align-items:center;gap:8px;min-width:0}
 .simple-upi-id strong{flex:1;min-width:0;color:var(--pink-deep);font-size:15px;overflow-wrap:anywhere}
 .simple-upi-id .button{padding:8px 11px;font-size:11px;flex:0 0 auto}
-.simple-upi-details>small{margin-top:10px;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.simple-upi-details>small{color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.upi-payment-checklist{display:grid;gap:8px;list-style:none;padding:0;margin:2px 0}
+.upi-payment-checklist li{display:grid;grid-template-columns:27px minmax(0,1fr);align-items:center;gap:9px;color:var(--muted);font-size:11px;line-height:1.4}
+.upi-payment-checklist b{width:27px;height:27px;border-radius:9px;display:grid;place-items:center;background:#ffeaf3;color:var(--pink-deep);font-size:10px}
 .simple-payment-note{margin:0!important;padding:9px 11px;border-radius:11px;background:#fff8e9;color:#76500c;font-size:10px!important;line-height:1.45}
 .simple-upi-mode .payment-next{min-height:48px;margin-top:0}
+@media(min-width:721px){
+  .payment-card:not(.simple-upi-mode){width:min(760px,calc(100vw - 48px))}
+  .razorpay-checkout-panel{padding:28px 34px}
+}
 @media(max-width:600px){
   .simple-upi-mode{width:100%;max-width:none;padding:calc(15px + env(safe-area-inset-top)) 15px calc(18px + env(safe-area-inset-bottom))}
   .simple-upi-mode .payment-modal-back{margin-bottom:10px}
@@ -233,7 +240,7 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
   .simple-upi-mode .payment-summary div{padding:9px 10px}.simple-upi-mode .payment-summary strong{font-size:13px}
 }
 
-/* Themed scrolling and touch-friendly card sliders */
+/* Themed scrolling and the main listener card slider */
 *{scrollbar-width:thin;scrollbar-color:rgba(201,47,120,.56) rgba(238,220,229,.34)}
 *::-webkit-scrollbar{width:10px;height:10px}
 *::-webkit-scrollbar-track{background:rgba(238,220,229,.26);border-radius:999px}
@@ -250,25 +257,18 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 .close,.favorite-btn{min-width:44px}
 
 @media(max-width:760px){
-  #listenerGrid,#favoritesList,.feature-grid,.steps,.about-grid{
+  #listenerGrid{
     display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(84vw,320px);
     gap:10px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
     scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
   }
-  #listenerGrid>*,#favoritesList>*,.feature-grid>*,.steps>*,.about-grid>*{scroll-snap-align:start;scroll-snap-stop:normal}
-  #listenerGrid .empty-state,#favoritesList .empty-state{width:calc(100vw - 34px);max-width:420px}
-  .plans-grid{
-    grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:calc(50% - 5px);
-    max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
-    scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
-  }
-  .plans-grid>*{scroll-snap-align:start;scroll-snap-stop:normal}
+  #listenerGrid>*{scroll-snap-align:start;scroll-snap-stop:normal}
+  #listenerGrid .empty-state{width:calc(100vw - 34px);max-width:420px}
   .section-head .button{min-height:44px}
 }
 
 @media(max-width:390px){
-  #listenerGrid,#favoritesList,.feature-grid,.steps,.about-grid{grid-auto-columns:88vw}
-  .plans-grid{grid-auto-columns:calc(50% - 4px);gap:8px}
+  #listenerGrid{grid-auto-columns:88vw}
 }
 
 @media(prefers-reduced-motion:reduce){.modal-card,.payment-card,.chat-messages,.tabs,.plans-grid,.listener-grid,.legal-body{scroll-behavior:auto}}

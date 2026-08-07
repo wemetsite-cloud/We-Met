@@ -41,7 +41,7 @@ main,.tab,.panel,.desk-grid>*,.grid-two>*,.list-item>*{min-width:0}
 }
 @media(max-width:430px){.brand span{display:none}.header-actions .button{padding-inline:10px;font-size:11px}.app-back,.modal-back{width:42px;height:42px;min-width:42px;min-height:42px}}
 
-/* Themed scrolling and compact mobile sliders */
+/* Themed scrolling and fitted mobile cards */
 *{scrollbar-width:thin;scrollbar-color:rgba(201,47,120,.56) rgba(238,220,229,.34)}
 *::-webkit-scrollbar{width:10px;height:10px}
 *::-webkit-scrollbar-track{background:rgba(238,220,229,.26);border-radius:999px}
@@ -58,15 +58,11 @@ main,.tab,.panel,.desk-grid>*,.grid-two>*,.list-item>*{min-width:0}
 .recovery-close{min-width:44px}
 
 @media(max-width:700px){
-  .stats{
-    display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(72vw,260px);
-    gap:10px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
-    scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
-  }
-  .stats article,.stats article:last-child{grid-column:auto;scroll-snap-align:start;scroll-snap-stop:normal}
+  .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:100%;overflow:visible;padding:0;margin-inline:0}
+  .stats article{min-width:0}.stats article:last-child{grid-column:1/-1}
   .section-head{flex-wrap:wrap}.section-head>*{min-width:0}
 }
 
-@media(max-width:390px){.stats{grid-auto-columns:84vw}}
+@media(max-width:430px){.stats{grid-template-columns:1fr}.stats article:last-child{grid-column:auto}}
 
 @media(prefers-reduced-motion:reduce){.tabs,.messages,.recovery-card,aside nav{scroll-behavior:auto}}

@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.14.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.15.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}

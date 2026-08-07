@@ -12,7 +12,7 @@
         if (!('serviceWorker' in navigator))
             return;
         try {
-            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.14.0', { updateViaCache: 'none' });
+            const registration = await navigator.serviceWorker.register('service-worker.js?v=5.15.0', { updateViaCache: 'none' });
             await registration.update();
         }
         catch { }

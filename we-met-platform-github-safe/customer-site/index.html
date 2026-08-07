@@ -8,8 +8,8 @@
   <title>We Met — Talk freely. Feel lighter.</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=5.14.0">
-  <link rel="stylesheet" href="style.css?v=5.14.0">
+  <link rel="manifest" href="manifest.webmanifest?v=5.15.0">
+  <link rel="stylesheet" href="style.css?v=5.15.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -233,10 +233,15 @@
                 <span class="payment-kicker">OR USE UPI ID</span>
                 <div class="simple-upi-id"><strong id="manualUpiId">—</strong><button class="button button-soft" type="button" data-copy-payment="manualUpiId">Copy</button></div>
                 <small>Payee: <b id="manualPayeeName">—</b></small>
+                <ol class="upi-payment-checklist" aria-label="UPI payment steps">
+                  <li><b>1</b><span>Open any trusted UPI app or scan the QR.</span></li>
+                  <li><b>2</b><span>Pay the exact amount shown above.</span></li>
+                  <li><b>3</b><span>Keep the successful transaction screen.</span></li>
+                </ol>
+                <p class="simple-payment-note">Check the payee and amount before paying. Never share your UPI PIN or OTP.</p>
+                <button id="manualTransferContinue" class="button button-primary button-large payment-next" type="button">I have paid</button>
               </section>
             </div>
-            <p class="simple-payment-note">Check the payee and amount before paying. Never share your UPI PIN or OTP.</p>
-            <button id="manualTransferContinue" class="button button-primary button-large payment-next" type="button">I have paid</button>
           </div>
         </div>
       </section>
@@ -277,6 +282,6 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=5.14.0"></script><script src="socket-loader.js?v=5.14.0"></script><script src="api.js?v=5.14.0"></script><script src="webrtc.js?v=5.14.0"></script><script src="app.js?v=5.14.0"></script>
+  <script src="config.js?v=5.15.0"></script><script src="socket-loader.js?v=5.15.0"></script><script src="api.js?v=5.15.0"></script><script src="webrtc.js?v=5.15.0"></script><script src="app.js?v=5.15.0"></script>
 </body>
 </html>

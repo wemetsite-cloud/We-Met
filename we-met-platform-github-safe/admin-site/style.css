@@ -110,7 +110,7 @@ main{min-width:0;padding:28px clamp(18px,2.4vw,36px)}
 @media(max-width:760px){.customer-directory-grid{max-height:none!important;overflow:visible!important;grid-template-columns:1fr}.customer-overview-strip{grid-template-columns:1fr 1fr}.payment-review-actions{width:100%;justify-content:stretch}.payment-review-actions button{flex:1}.customer-card-actions{grid-template-columns:1fr 1fr}}
 @media(max-width:430px){.customer-overview-strip{gap:7px}.customer-overview-strip article{padding:12px}.customer-overview-strip strong{font-size:18px}.customer-card{padding:14px}.customer-contact-grid{grid-template-columns:1fr}.customer-card-actions{grid-template-columns:1fr 1fr}.customer-card-actions button:last-child{grid-column:1/-1}.customer-card header{grid-template-columns:auto minmax(0,1fr)}.customer-card header>.pill{grid-column:2;justify-self:start}}
 
-/* Themed scroll surfaces and swipeable mobile summaries */
+/* Themed scroll surfaces and fitted mobile summaries */
 *{scrollbar-width:thin;scrollbar-color:rgba(201,47,120,.56) rgba(236,220,228,.36)}
 *::-webkit-scrollbar{width:10px;height:10px}
 *::-webkit-scrollbar-track{background:rgba(236,220,228,.28);border-radius:999px}
@@ -126,15 +126,16 @@ aside nav::-webkit-scrollbar-thumb{background:rgba(255,145,192,.58);border:3px s
 .menu,.close{min-width:44px}
 
 @media(max-width:760px){
-  .metric-grid,.customer-overview-strip,.summary-bars{
-    display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(78vw,280px);
-    gap:10px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:3px 3px 14px;margin-inline:-3px;
-    scroll-snap-type:x mandatory;scroll-padding-inline:3px;overscroll-behavior-x:contain;touch-action:pan-x pan-y;
-  }
-  .metric-grid>*,.customer-overview-strip>*,.summary-bars>*{scroll-snap-align:start;scroll-snap-stop:normal}
+  .metric-grid,.customer-overview-strip,.summary-bars{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:100%;overflow:visible;padding:0;margin-inline:0}
+  .employee-cards{grid-template-columns:minmax(0,1fr)}
+  .employee-cards .mini-card{width:100%;min-width:0;align-items:flex-start;flex-direction:column}
+  .employee-cards .mini-card>div{width:100%;min-width:0}
+  .employee-cards .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .employee-cards .actions button{width:100%;min-width:0;white-space:normal}
+  .employee-cards .actions button:last-child:nth-child(odd){grid-column:1/-1}
   .toolbar,.panel-head{scroll-margin-top:90px}
 }
 
-@media(max-width:390px){.metric-grid,.customer-overview-strip,.summary-bars{grid-auto-columns:86vw}}
+@media(max-width:470px){.metric-grid,.summary-bars{grid-template-columns:1fr}.customer-overview-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.table-wrap,.customer-directory-scroll,.modal-card,aside nav{scroll-behavior:auto}}
