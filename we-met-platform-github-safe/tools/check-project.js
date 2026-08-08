@@ -37,7 +37,9 @@ for (const htmlFile of htmlFiles) {
   }
 
   const appFile = path.join(path.dirname(htmlFile), 'app.js');
-  if (fs.existsSync(appFile)) {
+  // Only a portal's index.html is expected to contain every app.js selector.
+  // Standalone public legal/business pages intentionally share the folder without loading app.js.
+  if (path.basename(htmlFile) === 'index.html' && fs.existsSync(appFile)) {
     const js = fs.readFileSync(appFile, 'utf8');
     const selectors = [...js.matchAll(/\$\(["'](#[A-Za-z][\w:-]*)["']\)/g)].map((m) => m[1].slice(1));
     const dynamicIds = [...js.matchAll(/\bid=[\\"']([A-Za-z][\w:-]*)[\\"']/g)].map((m) => m[1]);

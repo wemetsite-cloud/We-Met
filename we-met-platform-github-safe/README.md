@@ -1,4 +1,4 @@
-# We Met V5.11 — QR-only publish-ready application
+# We Met V5.17 — payment-verification-ready application
 
 We Met is a responsive platform for private Malayalam browser voice conversations. The interface is English. Customer, listener and admin portals remain separate frontends with their own HTML, JavaScript, CSS and assets.
 
@@ -24,6 +24,17 @@ MAKE_SAFE_GITHUB_COPY_WINDOWS.bat
 - `employee-site/` — listener login, availability, incoming calls, voice call, reliable chat, recovery and installable PWA
 - `admin-site/` — users, listeners, calls, plans, UPI verification, Razorpay history, recovery approvals, coupons, safety, support and installable PWA
 - `backend/` — Express, PostgreSQL/Supabase, Socket.IO and WebRTC signalling
+
+## V5.17 verification-readiness improvements
+
+- public About, Contact, Pricing, Service Delivery, Terms, Privacy, Refund & Cancellation, and Community Guidelines pages
+- server-controlled talk-time prices visible before sign-in
+- clear 18+ digital-service description, no physical shipping, billing and refund disclosures
+- public footer with verification-relevant business and policy links
+- customer directory now shows only real connected listener accounts; demo/test profiles stay private in admin
+- removed stale nested copies of backend/admin/employee/customer projects from inside `customer-site/`, preventing them from being accidentally served as public static files
+- added `robots.txt`, `sitemap.xml`, and a fresh 5.17 cache version
+- added `PAYU_VERIFICATION_READINESS.md` explaining the remaining PayU category-risk issue
 
 ## V5.11 QR-only checkout and interface polish
 
