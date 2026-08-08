@@ -1,6 +1,6 @@
 {
   "name": "we-met-backend",
-  "version": "6.0.0",
+  "version": "6.0.1",
   "private": true,
   "description": "We Met backend for multi-language browser calls, verified direct UPI payments, listener work analytics, notifications and secure recovery.",
   "main": "server.js",

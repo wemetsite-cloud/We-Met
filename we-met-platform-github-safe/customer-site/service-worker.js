@@ -1,4 +1,4 @@
-const VERSION = '6.0.0';
+const VERSION = '6.0.1';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [

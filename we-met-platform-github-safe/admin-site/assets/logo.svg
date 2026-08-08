@@ -1,17 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="We Met">
   <defs>
-    <linearGradient id="surface" x1="7" y1="6" x2="57" y2="59" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#174853"/>
-      <stop offset="1" stop-color="#0f5f63"/>
+    <linearGradient id="g" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff6aa9"/>
+      <stop offset="1" stop-color="#d93483"/>
     </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0b3c43" flood-opacity=".22"/>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#8f1d58" flood-opacity=".22"/>
     </filter>
   </defs>
-  <rect x="4" y="4" width="56" height="56" rx="19" fill="url(#surface)" filter="url(#shadow)"/>
-  <path d="M15 20.5A6.5 6.5 0 0 1 21.5 14h21a6.5 6.5 0 0 1 6.5 6.5v13a6.5 6.5 0 0 1-6.5 6.5h-8.2l-8.6 7a1.7 1.7 0 0 1-2.7-1.32V40h-1.5a6.5 6.5 0 0 1-6.5-6.5v-13Z" fill="#fff"/>
-  <circle cx="25" cy="27" r="2.5" fill="#167d79"/>
-  <circle cx="32" cy="27" r="2.5" fill="#ee7d65"/>
-  <circle cx="39" cy="27" r="2.5" fill="#167d79"/>
-  <path d="M39.5 42H43a8 8 0 0 0 8-8v-8.3c2.45 1.05 4 3.28 4 5.8v7a6.5 6.5 0 0 1-6.5 6.5H47v4.25a1.3 1.3 0 0 1-2.08 1.04L39.5 46V42Z" fill="#ee7d65"/>
+  <rect x="4" y="4" width="56" height="56" rx="19" fill="url(#g)" filter="url(#s)"/>
+  <path d="M17.5 21.5c0-3.04 2.46-5.5 5.5-5.5h18c3.04 0 5.5 2.46 5.5 5.5v12c0 3.04-2.46 5.5-5.5 5.5h-8.2l-8.85 7.1c-.99.79-2.45.09-2.45-1.18V39H23c-3.04 0-5.5-2.46-5.5-5.5v-12Z" fill="#fff"/>
+  <path d="M24.15 25.7c0-2.21 1.77-4 3.96-4 1.69 0 3.14 1.06 3.73 2.55.58-1.49 2.03-2.55 3.72-2.55 2.19 0 3.96 1.79 3.96 4 0 4.18-4.13 6.87-7.68 9.42-3.56-2.55-7.69-5.24-7.69-9.42Z" fill="url(#g)"/>
 </svg>
