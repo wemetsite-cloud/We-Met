@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.16.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.17.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -850,6 +850,16 @@
 
   function renderPlans(plans = []) {
     paymentPlans = plans;
+    const publicGrid = $('#publicPricingGrid');
+    if (publicGrid) {
+      publicGrid.innerHTML = plans.length ? plans.map((plan) => `
+        <article class="public-plan-card">
+          <span>PREPAID TALK-TIME</span>
+          <h3>${Math.round(plan.seconds / 60)} minutes</h3>
+          <strong>${P.money(plan.price_paise)}</strong>
+          <p>One-time purchase. No recurring subscription. Billing is based on connected call time.</p>
+        </article>`).join('') : '<div class="public-plan-loading">No talk-time packs are currently available.</div>';
+    }
     const directUpiMode = publicConfig?.directUpiEnabled;
     const planDescription = directUpiMode
       ? 'Simple QR payment · verified wallet credit · private conversations.'

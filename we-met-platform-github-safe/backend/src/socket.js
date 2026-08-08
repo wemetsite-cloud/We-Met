@@ -46,9 +46,10 @@ function createSocketServer(io) {
   }
   function publicListeners() {
     const priority = { available: 0, ringing: 1, busy: 2, break: 3 };
+    // Only real, connected listener accounts are exposed to customers.
+    // Admin demo/test profiles stay private and are never presented as real availability.
     return [...employees.entries()]
       .map(([id, employee]) => ({ id, name: employee.name, bio: employee.bio || '', avatar: employee.avatar || '', status: employee.state, demo:false }))
-      .concat(demoCache)
       .sort((a, b) => (priority[a.status] ?? 9) - (priority[b.status] ?? 9) || a.name.localeCompare(b.name));
   }
 
@@ -90,8 +91,8 @@ function createSocketServer(io) {
 
   refreshDemoListeners();
 
-  // Placeholder listeners behave like normal listener cards. Their availability is
-  // rotated on a five-minute cadence so the directory feels naturally active.
+  // Demo/test profiles may be randomized for administrator testing only.
+  // They are intentionally excluded from the customer-facing listener directory.
   setInterval(async () => {
     if (!demoCache.length) return;
     let changed = false;
@@ -200,9 +201,7 @@ function createSocketServer(io) {
       return;
     }
 
-    // These directory profiles are intentionally presented exactly like all other
-    // listeners, but they are not live accounts. If selected while visible, respond
-    // naturally as an occupied listener rather than exposing implementation details.
+    // Defensive guard: demo/test IDs are not public and cannot receive customer calls.
     if (preferredEmployeeId && String(preferredEmployeeId).startsWith('demo-')) {
       const placeholder = demoCache.find((item) => item.id === preferredEmployeeId);
       if (placeholder?.status === 'available') {
