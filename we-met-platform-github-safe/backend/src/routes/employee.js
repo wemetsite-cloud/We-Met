@@ -17,14 +17,40 @@ router.get('/history', asyncHandler(async (req, res) => {
 }));
 
 router.get('/stats', asyncHandler(async (req, res) => {
-  const result = await db.query(
-    `SELECT COUNT(*) FILTER (WHERE status='ended')::int total_calls,
-            COALESCE(SUM(billed_seconds) FILTER (WHERE status='ended'),0)::int total_seconds,
-            COALESCE(SUM(billed_seconds) FILTER (WHERE status='ended' AND started_at::date=CURRENT_DATE),0)::int today_seconds
-     FROM calls WHERE employee_id=$1`,
-    [req.user.id],
-  );
-  res.json({ stats: result.rows[0] });
+  const [calls, activity] = await Promise.all([
+    db.query(
+      `SELECT COUNT(*) FILTER (WHERE started_at IS NOT NULL)::int total_calls,
+              COALESCE(SUM(billed_seconds),0)::bigint total_seconds,
+              COALESCE(SUM(billed_seconds) FILTER (WHERE created_at>=date_trunc('day',now())),0)::bigint today_seconds,
+              COALESCE(SUM(billed_seconds) FILTER (WHERE created_at>=now()-interval '7 days'),0)::bigint week_seconds
+       FROM calls WHERE employee_id=$1`,
+      [req.user.id],
+    ),
+    db.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN state='online' THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-started_at))) ELSE 0 END),0)::bigint AS total_work_seconds,
+        COALESCE(SUM(CASE WHEN state='online' AND COALESCE(ended_at,now())>date_trunc('day',now()) THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-GREATEST(started_at,date_trunc('day',now()))))) ELSE 0 END),0)::bigint AS today_work_seconds,
+        COALESCE(SUM(CASE WHEN state='online' AND COALESCE(ended_at,now())>now()-interval '7 days' THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-GREATEST(started_at,now()-interval '7 days')))) ELSE 0 END),0)::bigint AS week_work_seconds,
+        COALESCE(SUM(CASE WHEN state='break' AND COALESCE(ended_at,now())>date_trunc('day',now()) THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-GREATEST(started_at,date_trunc('day',now()))))) ELSE 0 END),0)::bigint AS today_break_seconds,
+        MAX(started_at) FILTER (WHERE ended_at IS NULL) AS current_activity_started_at
+      FROM listener_activity_sessions
+      WHERE employee_id=$1
+    `, [req.user.id]),
+  ]);
+  res.json({ stats: { ...calls.rows[0], ...activity.rows[0] } });
+}));
+
+router.get('/activity', asyncHandler(async (req, res) => {
+  const result = await db.query(`
+    SELECT id,state,started_at,ended_at,
+           CASE WHEN ended_at IS NULL THEN GREATEST(0,EXTRACT(EPOCH FROM (now()-started_at))::int) ELSE duration_seconds END AS duration_seconds,
+           end_reason
+    FROM listener_activity_sessions
+    WHERE employee_id=$1
+    ORDER BY started_at DESC
+    LIMIT 50
+  `, [req.user.id]);
+  res.json({ sessions: result.rows });
 }));
 
 router.patch('/profile', asyncHandler(async (req, res) => {
@@ -38,7 +64,7 @@ router.patch('/profile', asyncHandler(async (req, res) => {
   try {
     const result = await db.query(
       `UPDATE users SET name=$2,username=$3,phone=$4,upi_id=$5,bio=$6,updated_at=now()
-       WHERE id=$1 RETURNING id,name,username,email,phone,upi_id,bio,employee_code`,
+       WHERE id=$1 RETURNING id,name,username,email,phone,upi_id,bio,employee_code,listener_language`,
       [req.user.id, name, username, phone, upiId, bio],
     );
     res.json({ user: result.rows[0] });

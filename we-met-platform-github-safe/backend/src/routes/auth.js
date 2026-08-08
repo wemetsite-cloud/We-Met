@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { authenticate, asyncHandler, unavailable, activateExpiredSuspension } = require('../middleware');
+const createRateLimit = require('../request-limit');
 
 const router = express.Router();
 const loginAttempts = new Map();
@@ -11,6 +12,32 @@ const LOGIN_LIMIT = 8;
 const resetAttempts = new Map();
 const RESET_WINDOW_MS = 60 * 60 * 1000;
 const RESET_LIMIT = 5;
+const loginIpLimit = createRateLimit({
+  windowMs: LOGIN_WINDOW_MS,
+  max: 60,
+  message: 'Too many sign-in attempts from this connection. Try again later.',
+});
+const registrationLimit = createRateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many accounts were created from this connection. Try again later.',
+});
+const recoveryLimit = createRateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 12,
+  message: 'Too many recovery checks. Try again later.',
+});
+
+const cleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of loginAttempts) {
+    if (now - value.startedAt > LOGIN_WINDOW_MS) loginAttempts.delete(key);
+  }
+  for (const [key, value] of resetAttempts) {
+    if (now - value.startedAt > RESET_WINDOW_MS) resetAttempts.delete(key);
+  }
+}, 15 * 60 * 1000);
+cleanupTimer.unref();
 
 function publicUser(user) {
   return {
@@ -24,6 +51,7 @@ function publicUser(user) {
     employeeCode: user.employee_code,
     upiId: user.upi_id,
     listenerAvailability: user.listener_availability,
+    listenerLanguage: user.listener_language || 'Malayalam',
     balanceSeconds: user.balance_seconds,
     status: user.status,
     suspendedUntil: user.suspended_until,
@@ -68,6 +96,11 @@ function recoveryHash(value) {
   return crypto.createHash('sha256').update(String(value || '')).digest('hex');
 }
 
+function validRecoveryCredentials(requestId, recoveryKey) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)
+    && /^[A-Za-z0-9_-]{32}$/.test(recoveryKey);
+}
+
 function canRequestReset(req, identifier) {
   const key = `${req.ip}:${identifier}`;
   const now = Date.now();
@@ -81,7 +114,7 @@ function canRequestReset(req, identifier) {
   return true;
 }
 
-router.post('/register', asyncHandler(async (req, res) => {
+router.post('/register', registrationLimit, asyncHandler(async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 80);
   const email = String(req.body.email || '').trim().toLowerCase();
   const phone = normalisePhone(req.body.phone);
@@ -94,7 +127,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   if (password.length < 8) return res.status(400).json({ error: 'Use a password with at least 8 characters.' });
   if (!termsAccepted) {
     return res.status(400).json({
-      error: 'Confirm that you are at least 18 and accept the Terms and Privacy Policy to continue.',
+      error: 'Accept the Terms and Privacy Policy to continue.',
     });
   }
 
@@ -113,7 +146,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/login', asyncHandler(async (req, res) => {
+router.post('/login', loginIpLimit, asyncHandler(async (req, res) => {
   const identifier = String(req.body.identifier || '').trim().toLowerCase();
   const password = String(req.body.password || '');
   if (!identifier || !password) return res.status(400).json({ error: 'Enter your login and password.' });
@@ -144,6 +177,10 @@ router.post('/login', asyncHandler(async (req, res) => {
     });
   }
 
+  await db.query('UPDATE users SET last_login_at=now(),last_seen_at=now(),updated_at=now() WHERE id=$1', [user.id]);
+  user.last_login_at = new Date();
+  user.last_seen_at = user.last_login_at;
+
   res.json({ token: signToken(user), user: publicUser(user) });
 }));
 
@@ -159,8 +196,8 @@ router.post('/change-password', authenticate, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'The current password is incorrect.' });
   }
 
-  await db.query('UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1', [req.user.id, await hashPassword(newPassword)]);
-  res.json({ ok: true });
+  await db.query('UPDATE users SET password_hash=$2,auth_version=auth_version+1,updated_at=now() WHERE id=$1', [req.user.id, await hashPassword(newPassword)]);
+  res.json({ ok: true, signedOut: true });
 }));
 
 router.post('/change-login', authenticate, asyncHandler(async (req, res) => {
@@ -176,17 +213,17 @@ router.post('/change-login', authenticate, asyncHandler(async (req, res) => {
   try {
     if (result.rows[0].role === 'admin') {
       if (!newUsername || newUsername.length < 3) return res.status(400).json({ error: 'Use an admin username with at least 3 characters.' });
-      await db.query('UPDATE users SET username=$2,updated_at=now() WHERE id=$1', [req.user.id, newUsername]);
+      await db.query('UPDATE users SET username=$2,auth_version=auth_version+1,updated_at=now() WHERE id=$1', [req.user.id, newUsername]);
     } else {
       if (!newEmail || !validEmail(newEmail)) return res.status(400).json({ error: 'Enter a valid email address.' });
-      await db.query('UPDATE users SET email=$2,updated_at=now() WHERE id=$1', [req.user.id, newEmail]);
+      await db.query('UPDATE users SET email=$2,auth_version=auth_version+1,updated_at=now() WHERE id=$1', [req.user.id, newEmail]);
     }
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That email or username is already in use.' });
     throw error;
   }
 
-  res.json({ ok: true });
+  res.json({ ok: true, signedOut: true });
 }));
 
 router.post('/change-phone', authenticate, asyncHandler(async (req, res) => {
@@ -204,7 +241,7 @@ router.post('/change-phone', authenticate, asyncHandler(async (req, res) => {
   res.json({ ok: true, phone });
 }));
 
-router.post('/forgot-password', asyncHandler(async (req, res) => {
+router.post('/forgot-password', recoveryLimit, asyncHandler(async (req, res) => {
   const identifier = String(req.body.identifier || '').trim().toLowerCase();
   if (!identifier) return res.status(400).json({ error: 'Enter your account email or username.' });
   if (!canRequestReset(req, identifier)) {
@@ -251,13 +288,18 @@ router.post('/forgot-password', asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/password-reset/status', asyncHandler(async (req, res) => {
-  const keyHash = recoveryHash(req.body.recoveryKey);
+router.post('/password-reset/status', recoveryLimit, asyncHandler(async (req, res) => {
+  const requestId = String(req.body.requestId || '').trim();
+  const recoveryKey = String(req.body.recoveryKey || '').trim();
+  if (!validRecoveryCredentials(requestId, recoveryKey)) {
+    return res.status(400).json({ error: 'Enter the complete recovery request ID and recovery key.' });
+  }
+  const keyHash = recoveryHash(recoveryKey);
   const result = await db.query(`
     SELECT id,status,admin_message,expires_at,reviewed_at
     FROM password_reset_requests
-    WHERE recovery_key_hash=$1
-  `, [keyHash]);
+    WHERE recovery_key_hash=$1 AND id=$2
+  `, [keyHash, requestId]);
   const request = result.rows[0];
   if (!request) return res.status(404).json({ error: 'Recovery request not found. Check your recovery details.' });
 
@@ -282,8 +324,13 @@ router.post('/password-reset/status', asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/password-reset/complete', asyncHandler(async (req, res) => {
-  const keyHash = recoveryHash(req.body.recoveryKey);
+router.post('/password-reset/complete', recoveryLimit, asyncHandler(async (req, res) => {
+  const requestId = String(req.body.requestId || '').trim();
+  const recoveryKey = String(req.body.recoveryKey || '').trim();
+  if (!validRecoveryCredentials(requestId, recoveryKey)) {
+    return res.status(400).json({ error: 'Enter the complete recovery request ID and recovery key.' });
+  }
+  const keyHash = recoveryHash(recoveryKey);
   const newPassword = String(req.body.newPassword || '');
   if (newPassword.length < 8) return res.status(400).json({ error: 'Use a new password with at least 8 characters.' });
   const passwordHash = await hashPassword(newPassword);
@@ -292,9 +339,9 @@ router.post('/password-reset/complete', asyncHandler(async (req, res) => {
     const result = await client.query(`
       SELECT id,user_id,status,expires_at
       FROM password_reset_requests
-      WHERE recovery_key_hash=$1
+      WHERE recovery_key_hash=$1 AND id=$2
       FOR UPDATE
-    `, [keyHash]);
+    `, [keyHash, requestId]);
     const request = result.rows[0];
     if (!request) throw Object.assign(new Error('Recovery request not found.'), { status: 404 });
     if (new Date(request.expires_at) <= new Date()) throw Object.assign(new Error('This recovery request has expired.'), { status: 410 });

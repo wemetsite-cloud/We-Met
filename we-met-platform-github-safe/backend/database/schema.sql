@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   employee_code text UNIQUE,
   upi_id text,
   listener_availability text NOT NULL DEFAULT 'offline' CHECK (listener_availability IN ('online','break','offline')),
+  listener_language text NOT NULL DEFAULT 'Malayalam',
   password_hash text NOT NULL,
   auth_version integer NOT NULL DEFAULT 0,
   balance_seconds integer NOT NULL DEFAULT 0 CHECK (balance_seconds >= 0),
@@ -18,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
   suspended_until timestamptz,
   suspension_reason text,
   terms_accepted_at timestamptz,
+  last_login_at timestamptz,
+  last_seen_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -57,18 +60,6 @@ CREATE TABLE IF NOT EXISTS coupon_redemptions (
 );
 
 
-CREATE TABLE IF NOT EXISTS demo_listeners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  bio text,
-  avatar text,
-  activity text NOT NULL DEFAULT 'available' CHECK (activity IN ('available','break','busy','offline')),
-  randomize boolean NOT NULL DEFAULT false,
-  enabled boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS calls (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES users(id),
@@ -79,6 +70,18 @@ CREATE TABLE IF NOT EXISTS calls (
   billed_seconds integer NOT NULL DEFAULT 0,
   end_reason text,
   created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS listener_activity_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  state text NOT NULL CHECK (state IN ('online','break')),
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz,
+  duration_seconds integer NOT NULL DEFAULT 0 CHECK (duration_seconds >= 0),
+  end_reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (ended_at IS NULL OR ended_at >= started_at)
 );
 
 CREATE TABLE IF NOT EXISTS wallet_transactions (
@@ -137,6 +140,19 @@ CREATE TABLE IF NOT EXISTS notifications (
   title text NOT NULL,
   body text NOT NULL,
   read_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  action text NOT NULL,
+  target_type text,
+  target_id text,
+  route text NOT NULL,
+  ip_address text,
+  user_agent text,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -203,44 +219,18 @@ CREATE TABLE IF NOT EXISTS payment_submissions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS razorpay_orders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  plan_id uuid REFERENCES plans(id) ON DELETE SET NULL,
-  plan_name text NOT NULL,
-  amount_paise integer NOT NULL CHECK (amount_paise > 0),
-  seconds integer NOT NULL CHECK (seconds > 0),
-  currency text NOT NULL DEFAULT 'INR',
-  receipt text NOT NULL UNIQUE,
-  razorpay_order_id text NOT NULL UNIQUE,
-  razorpay_payment_id text UNIQUE,
-  last_payment_id text,
-  payment_method text,
-  status text NOT NULL DEFAULT 'created' CHECK (status IN ('created','attempted','authorized','paid','failed','refunded')),
-  failure_code text,
-  failure_description text,
-  captured_at timestamptz,
-  credited_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS razorpay_webhook_events (
-  event_id text PRIMARY KEY,
-  event_type text NOT NULL,
-  received_at timestamptz NOT NULL DEFAULT now(),
-  processed_at timestamptz NOT NULL DEFAULT now()
-);
-
 -- Safe upgrades from earlier packages.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_availability text NOT NULL DEFAULT 'offline';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_language text NOT NULL DEFAULT 'Malayalam';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version integer NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS popular boolean NOT NULL DEFAULT false;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_id uuid REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal';
@@ -304,6 +294,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_users_employee_code ON users(employee_code)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_name ON plans(name);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_customer ON calls(customer_id) WHERE status IN ('ringing','connecting','active');
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_employee ON calls(employee_id) WHERE status IN ('ringing','connecting','active');
+CREATE UNIQUE INDEX IF NOT EXISTS uq_open_listener_activity ON listener_activity_sessions(employee_id) WHERE ended_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role,status);
@@ -311,30 +302,33 @@ CREATE INDEX IF NOT EXISTS idx_listener_availability ON users(listener_availabil
 CREATE INDEX IF NOT EXISTS idx_calls_customer ON calls(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_employee ON calls(employee_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
+CREATE INDEX IF NOT EXISTS idx_listener_activity_employee ON listener_activity_sessions(employee_id,started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_activity_started ON listener_activity_sessions(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wallet_customer ON wallet_transactions(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_log(target_type,target_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_password_resets_status ON password_reset_requests(status,created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_recovery_key ON password_reset_requests(recovery_key_hash) WHERE recovery_key_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_manual_payment_intents_customer ON manual_payment_intents(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_manual_payment_intents_expiry ON manual_payment_intents(expires_at) WHERE submitted_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_submission_manual_intent ON payment_submissions(manual_intent_id) WHERE manual_intent_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_payment_utr_normalized ON payment_submissions((lower(regexp_replace(utr_reference, '\s+', '', 'g')))) WHERE utr_reference IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_utr_live ON payment_submissions((lower(regexp_replace(utr_reference, '\s+', '', 'g')))) WHERE utr_reference IS NOT NULL AND status<>'declined';
 CREATE INDEX IF NOT EXISTS idx_payments_customer ON payment_submissions(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payment_submissions(status,created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_razorpay_orders_customer ON razorpay_orders(customer_id,created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_razorpay_orders_status ON razorpay_orders(status,created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_razorpay_orders_payment ON razorpay_orders(razorpay_payment_id) WHERE razorpay_payment_id IS NOT NULL;
+UPDATE plans SET active=false,updated_at=now()
+WHERE name IN ('Starter','Value','Silver','Gold','Queen','King');
 
 INSERT INTO plans (name,price_paise,seconds,popular,active,sort_order) VALUES
-('Starter',4900,300,false,true,10),
-('Value',9900,600,false,true,20),
-('Silver',19900,1200,true,true,30),
-('Gold',24900,1800,false,true,40),
-('Queen',49900,3600,false,true,50),
-('King',199900,12000,false,true,60)
+('Quick Connect',4900,300,false,true,10),
+('Easy Talk',9900,600,false,true,20),
+('Open Talk',19900,1200,true,true,30),
+('More Time',24900,1800,false,true,40),
+('One Hour',49900,3600,false,true,50),
+('Long Connect',199900,12000,false,true,60)
 ON CONFLICT (name) DO UPDATE SET
   price_paise=EXCLUDED.price_paise,
   seconds=EXCLUDED.seconds,

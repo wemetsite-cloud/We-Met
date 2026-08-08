@@ -7,6 +7,32 @@ const { authenticate, requireRole, asyncHandler } = require('../middleware');
 const router = express.Router();
 router.use(authenticate, requireRole('admin'));
 
+router.use((req, res, next) => {
+  if (!['POST', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const originalPath = String(req.originalUrl || '').split('?')[0];
+  const requestIp = req.ip;
+  const userAgent = text(req.headers['user-agent'], 500) || null;
+  res.on('finish', () => {
+    if (res.statusCode >= 400) return;
+    const uuidMatch = originalPath.match(/[0-9a-f]{8}-[0-9a-f-]{27}/i);
+    const targetType = originalPath.split('/').filter(Boolean).at(2) || null;
+    db.query(`
+      INSERT INTO admin_audit_log(admin_id,action,target_type,target_id,route,ip_address,user_agent,metadata)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+    `, [
+      req.user.id,
+      `${req.method} ${originalPath}`,
+      targetType,
+      uuidMatch?.[0] || null,
+      originalPath,
+      requestIp,
+      userAgent,
+      JSON.stringify({ statusCode: res.statusCode }),
+    ]).catch((error) => console.error('Admin audit log failed:', error));
+  });
+  return next();
+});
+
 const VALID_USER_STATUSES = new Set(['active', 'blocked', 'suspended']);
 const VALID_REPORT_STATUSES = new Set(['open', 'reviewing', 'closed']);
 const VALID_SUPPORT_STATUSES = new Set(['open', 'replied', 'closed']);
@@ -54,16 +80,44 @@ router.get('/users', asyncHandler(async (req, res) => {
 
   if (['customer', 'employee', 'admin'].includes(role)) {
     params.push(role);
-    where = 'WHERE role = $1';
+    where = 'WHERE u.role = $1';
   }
 
   const result = await db.query(`
-    SELECT id, role, name, username, email, phone, bio,
-           employee_code, upi_id, listener_availability, balance_seconds, status, suspended_until,
-           suspension_reason, created_at
-    FROM users
+    SELECT u.id, u.role, u.name, u.username, u.email, u.phone, u.bio,
+           u.employee_code, u.upi_id, u.listener_availability, u.listener_language,
+           u.balance_seconds, u.status, u.suspended_until, u.suspension_reason,
+           u.last_login_at, u.last_seen_at, u.created_at,
+           COALESCE(call_stats.total_calls,0)::int AS total_calls,
+           COALESCE(call_stats.connected_calls,0)::int AS connected_calls,
+           COALESCE(call_stats.today_calls,0)::int AS today_calls,
+           COALESCE(call_stats.total_talk_seconds,0)::bigint AS total_talk_seconds,
+           COALESCE(call_stats.today_talk_seconds,0)::bigint AS today_talk_seconds,
+           COALESCE(activity_stats.total_work_seconds,0)::bigint AS total_work_seconds,
+           COALESCE(activity_stats.today_work_seconds,0)::bigint AS today_work_seconds,
+           COALESCE(activity_stats.today_break_seconds,0)::bigint AS today_break_seconds,
+           activity_stats.current_activity_started_at
+    FROM users u
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS total_calls,
+             COUNT(*) FILTER (WHERE c.started_at IS NOT NULL)::int AS connected_calls,
+             COUNT(*) FILTER (WHERE c.created_at>=date_trunc('day',now()))::int AS today_calls,
+             COALESCE(SUM(c.billed_seconds),0)::bigint AS total_talk_seconds,
+             COALESCE(SUM(c.billed_seconds) FILTER (WHERE c.created_at>=date_trunc('day',now())),0)::bigint AS today_talk_seconds
+      FROM calls c
+      WHERE c.employee_id=u.id
+    ) call_stats ON u.role='employee'
+    LEFT JOIN LATERAL (
+      SELECT
+        COALESCE(SUM(CASE WHEN s.state='online' THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(s.ended_at,now())-s.started_at))) ELSE 0 END),0)::bigint AS total_work_seconds,
+        COALESCE(SUM(CASE WHEN s.state='online' AND COALESCE(s.ended_at,now())>date_trunc('day',now()) THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(s.ended_at,now())-GREATEST(s.started_at,date_trunc('day',now()))))) ELSE 0 END),0)::bigint AS today_work_seconds,
+        COALESCE(SUM(CASE WHEN s.state='break' AND COALESCE(s.ended_at,now())>date_trunc('day',now()) THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(s.ended_at,now())-GREATEST(s.started_at,date_trunc('day',now()))))) ELSE 0 END),0)::bigint AS today_break_seconds,
+        MAX(s.started_at) FILTER (WHERE s.ended_at IS NULL) AS current_activity_started_at
+      FROM listener_activity_sessions s
+      WHERE s.employee_id=u.id
+    ) activity_stats ON u.role='employee'
     ${where}
-    ORDER BY created_at DESC
+    ORDER BY u.created_at DESC
     LIMIT 1000
   `, params);
 
@@ -78,6 +132,7 @@ router.post('/employees', asyncHandler(async (req, res) => {
   const phone = text(req.body.phone, 30) || null;
   const upiId = text(req.body.upiId, 120) || null;
   const bio = text(req.body.bio, 500) || null;
+  const language = text(req.body.language, 60) || 'Malayalam';
   const employeeCode = (text(req.body.employeeCode, 40) || `WM-L${Date.now().toString().slice(-6)}`)
     .toUpperCase()
     .replace(/[^A-Z0-9-]/g, '');
@@ -97,11 +152,11 @@ router.post('/employees', asyncHandler(async (req, res) => {
   try {
     const result = await db.query(`
       INSERT INTO users (
-        role, name, username, email, phone, upi_id, bio, employee_code, password_hash
+        role, name, username, email, phone, upi_id, bio, employee_code, listener_language, password_hash
       )
-      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id, role, name, username, email, phone, upi_id, bio,
-                employee_code, listener_availability, status, created_at
+                employee_code, listener_availability, listener_language, status, created_at
     `, [
       name,
       username,
@@ -110,6 +165,7 @@ router.post('/employees', asyncHandler(async (req, res) => {
       upiId,
       bio,
       employeeCode,
+      language,
       await hashPassword(password),
     ]);
 
@@ -120,6 +176,38 @@ router.post('/employees', asyncHandler(async (req, res) => {
         error: 'That email address, username, or employee ID is already in use.',
       });
     }
+    throw error;
+  }
+}));
+
+router.patch('/employees/:id', asyncHandler(async (req, res) => {
+  const name = text(req.body.name, 100);
+  const username = text(req.body.username, 80).toLowerCase() || null;
+  const email = text(req.body.email, 180).toLowerCase();
+  const phone = text(req.body.phone, 30) || null;
+  const upiId = text(req.body.upiId, 120) || null;
+  const bio = text(req.body.bio, 500) || null;
+  const language = text(req.body.language, 60) || 'Malayalam';
+
+  if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'Enter a valid name and email address.' });
+  }
+  if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
+    return res.status(400).json({ error: 'Username may contain only letters, numbers, dots, underscores, and hyphens.' });
+  }
+
+  try {
+    const result = await db.query(`
+      UPDATE users
+      SET name=$2,username=$3,email=$4,phone=$5,upi_id=$6,bio=$7,listener_language=$8,updated_at=now()
+      WHERE id=$1 AND role='employee'
+      RETURNING id,role,name,username,email,phone,upi_id,bio,employee_code,listener_availability,listener_language,status,created_at
+    `, [req.params.id, name, username, email, phone, upiId, bio, language]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
+    await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(req.params.id);
+    res.json({ employee: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'That email address or username is already in use.' });
     throw error;
   }
 }));
@@ -167,7 +255,7 @@ router.patch('/users/:id', asyncHandler(async (req, res) => {
         ELSE NULL
       END,
       updated_at = now()
-    WHERE id = $1
+    WHERE id = $1 AND role <> 'admin'
     RETURNING id, role, name, username, email, phone, balance_seconds, status,
               suspended_until, suspension_reason, updated_at
   `, [req.params.id, status ?? null, normalizedBalance, suspendedUntil ?? null, reason]);
@@ -222,7 +310,7 @@ router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
 
   const result = await db.query(`
     UPDATE users SET password_hash = $2, auth_version=auth_version+1, updated_at = now()
-    WHERE id = $1
+    WHERE id = $1 AND role <> 'admin'
     RETURNING id
   `, [req.params.id, await hashPassword(password)]);
 
@@ -242,11 +330,12 @@ router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
 }));
 
 router.get('/users/:id/details', asyncHandler(async (req, res) => {
-  const [user, calls, wallet, reports, support] = await Promise.all([
+  const [user, calls, wallet, reports, support, callAnalytics, workAnalytics, activitySessions, audits] = await Promise.all([
     db.query(`
       SELECT id, role, name, username, email, phone, bio,
-             employee_code, upi_id, balance_seconds, status, suspended_until,
-             suspension_reason, created_at
+             employee_code, upi_id, listener_availability, listener_language,
+             balance_seconds, status, suspended_until, suspension_reason,
+             last_login_at, last_seen_at, created_at, updated_at
       FROM users WHERE id = $1
     `, [req.params.id]),
     db.query(`
@@ -279,6 +368,46 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
       ORDER BY created_at DESC
       LIMIT 100
     `, [req.params.id]),
+    db.query(`
+      SELECT COUNT(*)::int AS total_calls,
+             COUNT(*) FILTER (WHERE started_at IS NOT NULL)::int AS connected_calls,
+             COUNT(*) FILTER (WHERE created_at>=date_trunc('day',now()))::int AS today_calls,
+             COUNT(*) FILTER (WHERE created_at>=now()-interval '7 days')::int AS week_calls,
+             COUNT(*) FILTER (WHERE status IN ('rejected','cancelled','failed'))::int AS missed_calls,
+             COALESCE(SUM(billed_seconds),0)::bigint AS total_talk_seconds,
+             COALESCE(SUM(billed_seconds) FILTER (WHERE created_at>=date_trunc('day',now())),0)::bigint AS today_talk_seconds,
+             COALESCE(SUM(billed_seconds) FILTER (WHERE created_at>=now()-interval '7 days'),0)::bigint AS week_talk_seconds,
+             COALESCE(AVG(NULLIF(billed_seconds,0)),0)::int AS average_talk_seconds
+      FROM calls
+      WHERE employee_id=$1
+    `, [req.params.id]),
+    db.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN state='online' THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-started_at))) ELSE 0 END),0)::bigint AS total_work_seconds,
+        COALESCE(SUM(CASE WHEN state='online' AND COALESCE(ended_at,now())>date_trunc('day',now()) THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-GREATEST(started_at,date_trunc('day',now()))))) ELSE 0 END),0)::bigint AS today_work_seconds,
+        COALESCE(SUM(CASE WHEN state='online' AND COALESCE(ended_at,now())>now()-interval '7 days' THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-GREATEST(started_at,now()-interval '7 days')))) ELSE 0 END),0)::bigint AS week_work_seconds,
+        COALESCE(SUM(CASE WHEN state='break' THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-started_at))) ELSE 0 END),0)::bigint AS total_break_seconds,
+        COALESCE(SUM(CASE WHEN state='break' AND COALESCE(ended_at,now())>date_trunc('day',now()) THEN GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-GREATEST(started_at,date_trunc('day',now()))))) ELSE 0 END),0)::bigint AS today_break_seconds
+      FROM listener_activity_sessions
+      WHERE employee_id=$1
+    `, [req.params.id]),
+    db.query(`
+      SELECT id,state,started_at,ended_at,
+             CASE WHEN ended_at IS NULL THEN GREATEST(0,EXTRACT(EPOCH FROM (now()-started_at))::int) ELSE duration_seconds END AS duration_seconds,
+             end_reason
+      FROM listener_activity_sessions
+      WHERE employee_id=$1
+      ORDER BY started_at DESC
+      LIMIT 100
+    `, [req.params.id]),
+    db.query(`
+      SELECT log.*,admin.name AS admin_name
+      FROM admin_audit_log log
+      LEFT JOIN users admin ON admin.id=log.admin_id
+      WHERE log.target_id=$1::text
+      ORDER BY log.created_at DESC
+      LIMIT 100
+    `, [req.params.id]),
   ]);
 
   if (!user.rows[0]) {
@@ -291,7 +420,22 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     wallet: wallet.rows,
     reports: reports.rows,
     support: support.rows,
+    callAnalytics: callAnalytics.rows[0],
+    workAnalytics: workAnalytics.rows[0],
+    activitySessions: activitySessions.rows,
+    audits: audits.rows,
   });
+}));
+
+router.get('/audit-log', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT log.*,admin.name AS admin_name
+    FROM admin_audit_log log
+    LEFT JOIN users admin ON admin.id=log.admin_id
+    ORDER BY log.created_at DESC
+    LIMIT 500
+  `);
+  res.json({ entries: result.rows });
 }));
 
 router.get('/plans', asyncHandler(async (_req, res) => {
@@ -539,8 +683,7 @@ router.patch('/password-resets/:id', asyncHandler(async (req, res) => {
 }));
 
 router.get('/payments', asyncHandler(async (_req, res) => {
-  const [manual, razorpay] = await Promise.all([
-    db.query(`
+  const manual = await db.query(`
       SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
              payment.amount_paise,payment.seconds,payment.payee_upi_id,
              payment.payment_method,payment.checkout_reference,payment.destination_last4,
@@ -553,22 +696,8 @@ router.get('/payments', asyncHandler(async (_req, res) => {
       ORDER BY CASE payment.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
                payment.created_at DESC
       LIMIT 1000
-    `),
-    db.query(`
-      SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
-             payment.amount_paise,payment.seconds,payment.currency,
-             payment.razorpay_order_id,payment.razorpay_payment_id,
-             payment.payment_method,payment.status,payment.failure_description,
-             payment.captured_at,payment.credited_at,payment.created_at,
-             customer.name AS customer_name,customer.email AS customer_email,
-             customer.phone AS customer_phone
-      FROM razorpay_orders payment
-      JOIN users customer ON customer.id=payment.customer_id
-      ORDER BY payment.created_at DESC
-      LIMIT 1000
-    `),
-  ]);
-  res.json({ payments: manual.rows, razorpayOrders: razorpay.rows });
+  `);
+  res.json({ payments: manual.rows });
 }));
 
 router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
@@ -687,43 +816,6 @@ router.post('/notifications', asyncHandler(async (req, res) => {
   }
 
   res.json({ sent: userIds.length });
-}));
-
-router.get('/demo-listeners', asyncHandler(async (_req, res) => {
-  const result = await db.query(`SELECT id,name,bio,avatar,activity,randomize,enabled,created_at,updated_at FROM demo_listeners ORDER BY created_at DESC`);
-  res.json({ listeners: result.rows });
-}));
-
-router.post('/demo-listeners', asyncHandler(async (req, res) => {
-  const name = text(req.body.name, 100);
-  const bio = text(req.body.bio, 500) || null;
-  const avatar = text(req.body.avatar, 300) || null;
-  const activity = ['available','break','busy','offline'].includes(req.body.activity) ? req.body.activity : 'available';
-  const randomize = Boolean(req.body.randomize);
-  if (name.length < 2) return res.status(400).json({ error: 'Enter a display name.' });
-  const result = await db.query(`INSERT INTO demo_listeners(name,bio,avatar,activity,randomize) VALUES($1,$2,$3,$4,$5) RETURNING *`, [name,bio,avatar,activity,randomize]);
-  res.status(201).json({ listener: result.rows[0] });
-}));
-
-router.patch('/demo-listeners/:id', asyncHandler(async (req, res) => {
-  const name = text(req.body.name, 100);
-  const bio = text(req.body.bio, 500) || null;
-  const avatar = text(req.body.avatar, 300) || null;
-  const activity = ['available','break','busy','offline'].includes(req.body.activity) ? req.body.activity : 'offline';
-  const randomize = Boolean(req.body.randomize);
-  const enabled = req.body.enabled !== false;
-  if (name.length < 2) return res.status(400).json({ error: 'Enter a display name.' });
-  const result = await db.query(`UPDATE demo_listeners SET name=$2,bio=$3,avatar=$4,activity=$5,randomize=$6,enabled=$7,updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id,name,bio,avatar,activity,randomize,enabled]);
-  if (!result.rows[0]) return res.status(404).json({ error: 'Demo listener not found.' });
-  req.app.locals.socketRuntime?.refreshDemoListeners?.();
-  res.json({ listener: result.rows[0] });
-}));
-
-router.delete('/demo-listeners/:id', asyncHandler(async (req, res) => {
-  const result = await db.query('DELETE FROM demo_listeners WHERE id=$1 RETURNING id', [req.params.id]);
-  if (!result.rows[0]) return res.status(404).json({ error: 'Demo listener not found.' });
-  req.app.locals.socketRuntime?.refreshDemoListeners?.();
-  res.json({ ok: true });
 }));
 
 module.exports = router;

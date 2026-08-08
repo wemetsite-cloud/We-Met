@@ -17,13 +17,13 @@
   let paymentSubmissions = [];
   let currentCheckout = null;
   let paymentPollTimer = null;
-  let razorpayScriptPromise = null;
   let proofPreviewUrl = '';
   const paymentStatusSeen = new Map();
   let favoriteIds = new Set();
   let activeTab = 'home';
   let serviceWorkerRegistration = null;
   let pushSubscriptionActive = false;
+  let otherLanguagesEnabled = localStorage.getItem('we_met_other_languages') === '1';
 
   const ACTIVE_PAYMENT_KEY = 'we_met_active_payment';
   const NAVIGATION_MARKER = 'we-met-customer-navigation';
@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=5.17.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.0.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -153,7 +153,7 @@
     $$('.auth-switch button').forEach((button) => button.classList.toggle('active', button.dataset.mode === mode));
     $('#authTitle').textContent = mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Recover your account' : 'Welcome back';
     $('#authSubtitle').textContent = mode === 'register'
-      ? 'For people aged 18 and above.'
+      ? 'Create your private We Met account.'
       : mode === 'forgot'
         ? 'The administrator will review your request.'
         : 'Sign in to continue.';
@@ -168,12 +168,7 @@
     syncInstallControls();
     await registerFreshServiceWorker();
     try {
-      const [configResponse, plansResponse] = await Promise.all([
-        P.api('/api/public/config'),
-        P.api('/api/public/plans'),
-      ]);
-      publicConfig = configResponse;
-      renderPlans(plansResponse.plans);
+      publicConfig = await P.api('/api/public/config');
     } catch (error) {
       P.toast(error.message, 'error');
     }
@@ -207,11 +202,13 @@
       if (button) selectTab(button.dataset.tab, button);
     });
     $$('[data-jump]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.jump)));
+    $$('[data-purchase]').forEach((button) => button.addEventListener('click', openPurchaseSection));
+    $('#otherLanguageToggle').checked = otherLanguagesEnabled;
+    $('#otherLanguageToggle').addEventListener('change', (event) => { otherLanguagesEnabled = event.target.checked; localStorage.setItem('we_met_other_languages', otherLanguagesEnabled ? '1' : '0'); renderListeners(); });
     $('#callNow').addEventListener('click', () => requestCall());
     $('#refreshListeners').addEventListener('click', () => socket?.emit('listeners:get'));
     $('#couponForm').addEventListener('submit', redeem);
     $('#refreshPayments').addEventListener('click', loadPayments);
-    $('#payWithRazorpay').addEventListener('click', startRazorpayCheckout);
     $('#downloadUpiQr').addEventListener('click', saveUpiQr);
     $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
     $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
@@ -335,6 +332,11 @@
     } catch {}
   }
 
+  function openPurchaseSection() {
+    selectTab('wallet');
+    requestAnimationFrame(() => $('#plansGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
   function selectTab(tab, button = null, { historyMode = 'push' } = {}) {
     if (!VALID_TABS.has(tab)) tab = 'home';
     const changed = activeTab !== tab;
@@ -346,7 +348,10 @@
     targetButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
     if (tab === 'history' || tab === 'wallet') loadHistory();
-    if (tab === 'wallet') loadPayments();
+    if (tab === 'wallet') {
+      loadPlans();
+      loadPayments();
+    }
     if (tab === 'favorites') loadFavorites();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'support') loadSupport();
@@ -453,6 +458,7 @@
     loadSupport();
     loadFavorites();
     loadNotifications();
+    loadPlans();
     loadPayments();
     startPaymentPolling();
     syncAlertControls();
@@ -567,11 +573,12 @@
     socket.on('call:unavailable', (data) => {
       closeCall();
       P.toast(data.message || 'No listener is available right now.', 'error');
+      if (data.otherLanguagesAvailable && !otherLanguagesEnabled) $('#otherLanguageToggle')?.focus();
     });
     socket.on('call:error', (data) => {
       closeCall();
       P.toast(data.message || 'The call could not be started.', 'error');
-      if (data.needsTopup) selectTab('wallet');
+      if (data.needsTopup) openPurchaseSection();
     });
     socket.on('call:accepted', async (data) => {
       if (!currentCall) currentCall = { id: data.callId };
@@ -601,7 +608,7 @@
       if (!currentCall) return;
       currentCall.status = 'active';
       $('#callState').textContent = 'Connected · billing is active';
-      P.notify('We Met', 'Your Malayalam listener is connected.');
+      P.notify('We Met', `Your ${currentCall.employee?.language || 'listener'} conversation is connected.`);
     });
     socket.on('call:audio-paused', () => {
       if (currentCall) $('#callState').textContent = 'Audio paused · talk-time is not being charged';
@@ -623,7 +630,7 @@
       closeCall();
       loadMe();
       loadHistory();
-      if (needsTopup) selectTab('wallet');
+      if (needsTopup) openPurchaseSection();
     });
     socket.on('chat:message', addChat);
     socket.on('notification:new', (notification) => {
@@ -657,23 +664,47 @@
     return `assets/avatar-${String((n % 20) + 1).padStart(2,'0')}.svg`;
   }
 
-  function renderListeners() {
-    const available = listeners.filter((listener) => listener.status === 'available').length;
-    $('#availabilityText').textContent = available
-      ? `${available} listener${available === 1 ? '' : 's'} available now`
-      : 'No listener is available right now';
+  function listenerLanguage(listener) {
+    return String(listener?.language || listener?.listener_language || 'Malayalam').trim() || 'Malayalam';
+  }
 
-    $('#listenerGrid').innerHTML = listeners.length
-      ? listeners.map((listener) => `
+  function listenerCardsMarkup(items, emptyTitle, emptyMessage) {
+    return items.length
+      ? items.map((listener) => `
         <article class="listener-card">
           <div class="abstract-avatar tone-${listenerTone(listener.id)}"><img src="${P.esc(avatarFor(listener))}" alt="" loading="lazy"></div>
           <button class="favorite-btn" data-favorite="${listener.id}" title="${favoriteIds.has(listener.id) ? 'Remove favourite' : 'Add favourite'}" aria-label="Favourite listener">${favoriteIds.has(listener.id) ? '♥' : '♡'}</button>
           <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge ${listener.status}">${statusText(listener.status)}</span></div>
-          <div class="language-line">● Malayalam conversations</div>
+          <div class="language-line">● ${P.esc(listenerLanguage(listener))} conversations</div>
           <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
           <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' ? 'disabled' : ''}>${listener.status === 'available' ? 'Call this listener' : statusText(listener.status)}</button>
         </article>`).join('')
-      : emptyState('No listeners online', 'Ask a listener to go online, then refresh this page.');
+      : emptyState(emptyTitle, emptyMessage);
+  }
+
+  function renderListeners() {
+    const malayalam = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() === 'malayalam');
+    const others = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() !== 'malayalam');
+    const malayalamAvailable = malayalam.filter((listener) => listener.status === 'available').length;
+    const otherAvailable = others.filter((listener) => listener.status === 'available').length;
+
+    $('#availabilityText').textContent = malayalamAvailable
+      ? `${malayalamAvailable} Malayalam listener${malayalamAvailable === 1 ? '' : 's'} available now`
+      : otherLanguagesEnabled && otherAvailable
+        ? `No Malayalam listener right now · ${otherAvailable} other-language listener${otherAvailable === 1 ? '' : 's'} available`
+        : otherAvailable
+          ? 'No Malayalam listener right now · other languages are available'
+          : 'No listener is available right now';
+
+    $('#listenerGrid').innerHTML = listenerCardsMarkup(
+      malayalam,
+      'No Malayalam listeners online',
+      otherAvailable ? 'Turn on “Suggest other languages” to see other available listeners.' : 'Please refresh or try again shortly.',
+    );
+    show('#otherLanguageSection', otherLanguagesEnabled);
+    if (otherLanguagesEnabled) {
+      $('#otherLanguageGrid').innerHTML = listenerCardsMarkup(others, 'No other-language listeners online', 'Other language listeners will appear here when they are available.');
+    }
 
     $$('[data-call]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.call)));
     $$('[data-favorite]').forEach((button) => button.addEventListener('click', () => toggleFavorite(button.dataset.favorite)));
@@ -687,17 +718,17 @@
     if (!socket?.connected) return P.toast('The calling server is not connected yet. Please try again.', 'error');
     if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 120)) {
       P.toast('You need at least two minutes of talk-time to start a call.', 'error');
-      return selectTab('wallet');
+      return openPurchaseSection();
     }
     if (currentCall) return P.toast('You already have a call in progress.', 'error');
-    socket.emit('call:request', { employeeId });
+    socket.emit('call:request', { employeeId, allowOtherLanguages: otherLanguagesEnabled });
   }
 
   function openCall() {
     openManagedOverlay('#callModal', 'callModal');
     show('#restoreCall', false);
     $('#callPerson').textContent = currentCall.employee?.name || 'Listener';
-    $('#callBio').textContent = currentCall.employee?.bio || 'A private Malayalam conversation';
+    $('#callBio').textContent = currentCall.employee?.bio || `A private ${currentCall.employee?.language || ''} conversation`.replace('  ', ' ');
     $('#callTimer').textContent = '0:00';
     $('#restoreTimer').textContent = '0:00';
     $('#chatMessages').innerHTML = '<div class="bubble">Your private text chat starts here.</div>';
@@ -770,7 +801,7 @@
           <article class="listener-card">
             <div class="abstract-avatar tone-${listenerTone(listener.employee_id)}">${P.esc(initials(listener.name))}</div>
             <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge">Favourite</span></div>
-            <div class="language-line">● Malayalam conversations</div>
+            <div class="language-line">● ${P.esc(listener.listener_language || 'Malayalam')} conversations</div>
             <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
             <div class="list-actions"><button class="button button-primary" data-fav-call="${listener.employee_id}">Call</button><button class="button button-quiet" data-fav-remove="${listener.employee_id}">Remove</button></div>
           </article>`).join('')
@@ -848,32 +879,25 @@
     }
   }
 
+  async function loadPlans() {
+    if (!me) return;
+    try {
+      const response = await P.api('/api/customer/plans');
+      renderPlans(response.plans || []);
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
   function renderPlans(plans = []) {
     paymentPlans = plans;
-    const publicGrid = $('#publicPricingGrid');
-    if (publicGrid) {
-      publicGrid.innerHTML = plans.length ? plans.map((plan) => `
-        <article class="public-plan-card">
-          <span>PREPAID TALK-TIME</span>
-          <h3>${Math.round(plan.seconds / 60)} minutes</h3>
-          <strong>${P.money(plan.price_paise)}</strong>
-          <p>One-time purchase. No recurring subscription. Billing is based on connected call time.</p>
-        </article>`).join('') : '<div class="public-plan-loading">No talk-time packs are currently available.</div>';
-    }
-    const directUpiMode = publicConfig?.directUpiEnabled;
-    const planDescription = directUpiMode
-      ? 'Simple QR payment · verified wallet credit · private conversations.'
-      : 'Secure Razorpay checkout · automatic wallet credit · private conversations.';
-    $('#walletPaymentIntro').textContent = directUpiMode
-      ? 'Scan the QR or copy the UPI ID, pay the exact amount, then submit the successful UTR and payment screenshot.'
-      : 'Pay through Razorpay and receive your minutes automatically after the payment is captured.';
-    $('#paymentHistoryIntro').textContent = directUpiMode
-      ? 'Direct UPI payments remain pending until an administrator reviews the submitted UTR and screenshot.'
-      : 'Razorpay payment status and wallet credit update automatically.';
+    const planDescription = 'Exact-amount UPI · verified once · billed by connected second.';
+    $('#walletPaymentIntro').textContent = 'Scan the QR or copy the UPI ID, pay the exact amount, then submit the successful UTR and payment screenshot.';
+    $('#paymentHistoryIntro').textContent = 'UPI submissions remain pending until an administrator verifies the UTR and screenshot.';
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
-        ${plan.popular ? '<span class="popular-tag">MOST LOVED</span>' : ''}
-        <span class="plan-kicker">PRIVATE TALK-TIME</span>
+        ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
+        <span class="plan-kicker">TALK-TIME</span>
         <h3>${Math.round(plan.seconds / 60)} <small>min</small></h3>
         <strong>${P.money(plan.price_paise)}</strong>
         <p>${P.esc(planDescription)}</p>
@@ -904,8 +928,7 @@
   }
 
   function currentPaymentMode() {
-    if (currentCheckout?.mode) return currentCheckout.mode;
-    return publicConfig?.directUpiEnabled ? 'upi_direct' : 'razorpay';
+    return currentCheckout?.mode || 'upi_direct';
   }
 
   function isDirectPaymentMode(mode) {
@@ -913,13 +936,11 @@
   }
 
   function setPaymentStep(step) {
-    const directMode = isDirectPaymentMode(currentPaymentMode());
-    const order = directMode ? ['pay', 'submit', 'status'] : ['pay', 'status'];
+    const order = ['pay', 'submit', 'status'];
     const activeIndex = order.indexOf(step);
-    $('#paymentProgress').classList.toggle('manual-mode', directMode);
-    $('#paymentProgress').classList.toggle('razorpay-mode', !directMode);
-    $('[data-payment-progress="submit"]').classList.toggle('hidden', !directMode);
-    $('[data-payment-progress="status"] b').textContent = directMode ? '3' : '2';
+    $('#paymentProgress').classList.add('manual-mode');
+    $('[data-payment-progress="submit"]').classList.remove('hidden');
+    $('[data-payment-progress="status"] b').textContent = '3';
     $$('[data-payment-step]').forEach((section) => section.classList.toggle('hidden', section.dataset.paymentStep !== step));
     $$('[data-payment-progress]').forEach((item) => {
       const index = order.indexOf(item.dataset.paymentProgress);
@@ -937,7 +958,6 @@
     $('#manualPaymentForm')?.reset();
     show('#manualProofPreview', false);
     show('#manualCheckoutPanel', false);
-    show('#razorpayCheckoutPanel', false);
     show('#paymentPayContent', false);
     show('#paymentLoading');
     if (mode) currentCheckout = { mode };
@@ -966,38 +986,24 @@
       P.toast('Sign in before starting a payment.', 'info');
       return setAuth('login');
     }
-    const mode = publicConfig?.directUpiEnabled
-      ? 'upi_direct'
-      : publicConfig?.razorpayEnabled ? 'razorpay' : '';
-    if (!mode) return P.toast('Payments are not configured yet.', 'error');
+    const mode = 'upi_direct';
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
     resetPaymentCheckout(mode);
     currentCheckout = { mode, plan };
-    $('#paymentTitle').textContent = mode === 'upi_direct' ? 'Scan to pay' : `${plan.name} checkout`;
-    $('#paymentEyebrow').textContent = mode === 'upi_direct' ? 'DIRECT UPI' : 'SECURE CHECKOUT';
-    $('#paymentSubtitle').textContent = mode === 'upi_direct'
-      ? 'Pay the exact amount shown below.'
-      : 'Complete payment through Razorpay. No screenshot or manual approval is required.';
+    $('#paymentTitle').textContent = 'Scan to pay';
+    $('#paymentEyebrow').textContent = 'DIRECT UPI';
+    $('#paymentSubtitle').textContent = 'Pay the exact amount shown below.';
     openManagedOverlay('#paymentModal', 'paymentModal');
     setPaymentStep('pay');
     try {
-      const checkout = await P.api(mode === 'upi_direct'
-        ? '/api/customer/manual-payments/intents'
-        : '/api/customer/razorpay/orders', {
+      const checkout = await P.api('/api/customer/manual-payments/intents', {
         method: 'POST',
         body: JSON.stringify({ planId: plan.id }),
       });
       if (!currentCheckout || currentCheckout.plan.id !== plan.id) return;
-      if (mode === 'upi_direct') {
-        currentCheckout = { mode, plan, intent: checkout.intent };
-        renderDirectUpiIntent(checkout.intent);
-      } else {
-        currentCheckout = { ...checkout, mode, plan, payment: checkout.order };
-        const order = checkout.order;
-        $('#paymentSummary').innerHTML = `<div><small>Pack</small><strong>${P.esc(order.plan_name)}</strong></div><div><small>Talk-time</small><strong>${Math.round(order.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(order.amount_paise)}</strong></div>`;
-        show('#razorpayCheckoutPanel');
-      }
+      currentCheckout = { mode, plan, intent: checkout.intent };
+      renderDirectUpiIntent(checkout.intent);
       show('#paymentLoading', false);
       show('#paymentPayContent');
     } catch (error) {
@@ -1066,7 +1072,7 @@
       paymentStatusSeen.set(payment.id, payment.status);
       saveActivePayment(payment.id);
       renderPaymentStatus(payment);
-      P.toast(response.message || 'Transfer submitted for verification.', 'success');
+      P.toast(response.message || 'UPI payment submitted for verification.', 'success');
       await loadPayments({ silent: true });
     } catch (error) {
       P.toast(error.message || 'The UPI transaction ID could not be submitted.', 'error');
@@ -1075,100 +1081,13 @@
     }
   }
 
-  function ensureRazorpayCheckout() {
-    if (typeof window.Razorpay === 'function') return Promise.resolve();
-    if (razorpayScriptPromise) return razorpayScriptPromise;
-    razorpayScriptPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Razorpay Checkout could not load.'));
-      document.head.appendChild(script);
-    }).catch((error) => {
-      razorpayScriptPromise = null;
-      throw error;
-    });
-    return razorpayScriptPromise;
-  }
-
-  async function startRazorpayCheckout(event) {
-    const button = event.currentTarget;
-    const checkout = currentCheckout;
-    if (!checkout?.order) return P.toast('Prepare the payment again.', 'error');
-    button.setAttribute('disabled', '');
-    try {
-      await ensureRazorpayCheckout();
-    } catch (error) {
-      button.removeAttribute('disabled');
-      return P.toast(`${error.message} Check your connection and try again.`, 'error');
-    }
-    const instance = new window.Razorpay({
-      key: checkout.keyId,
-      amount: checkout.order.amount_paise,
-      currency: checkout.order.currency,
-      name: checkout.businessName,
-      description: checkout.description,
-      image: checkout.image,
-      order_id: checkout.order.razorpay_order_id,
-      prefill: checkout.prefill,
-      theme: { color: '#f0448f', backdrop_color: '#2a1822' },
-      retry: { enabled: true },
-      timeout: 900,
-      modal: {
-        backdropclose: false,
-        handleback: true,
-        confirm_close: true,
-        ondismiss: () => {
-          button.removeAttribute('disabled');
-          P.toast('Payment checkout closed. No minutes were added.', 'info');
-        },
-      },
-      handler: async (response) => {
-        const waiting = { ...checkout.order, status: 'authorized' };
-        currentCheckout = { ...checkout, activePaymentId: waiting.id, payment: waiting };
-        saveActivePayment(waiting.id);
-        renderPaymentStatus(waiting);
-        try {
-          const verified = await P.api('/api/customer/razorpay/verify', {
-            method: 'POST',
-            body: JSON.stringify(response),
-            timeout: 60000,
-          });
-          currentCheckout = { ...currentCheckout, payment: verified.order };
-          paymentStatusSeen.set(verified.order.id, verified.order.status);
-          renderPaymentStatus(verified.order);
-          P.toast(verified.message || 'Payment status updated.', verified.order.status === 'paid' ? 'success' : 'info');
-          await loadPayments({ silent: true });
-          if (verified.order.status === 'paid') await refreshCustomerBalance();
-        } catch (error) {
-          P.toast(error.message || 'Confirmation is delayed. The payment status will update automatically.', 'error');
-          loadPayments({ silent: true });
-        } finally {
-          button.removeAttribute('disabled');
-        }
-      },
-    });
-
-    instance.on('payment.failed', (response) => {
-      button.removeAttribute('disabled');
-      const description = response?.error?.description || 'The payment was not completed.';
-      P.toast(description, 'error');
-      setTimeout(() => loadPayments({ silent: true }), 1200);
-    });
-    instance.open();
-  }
-
   function renderPaymentStatus(payment) {
     if (!payment) return;
     currentCheckout = { ...(currentCheckout || {}), activePaymentId: payment.id, payment };
     const status = payment.status || 'created';
     const minutes = Math.round(Number(payment.seconds) / 60);
-    const directMode = payment.gateway
-      ? isDirectPaymentMode(payment.gateway)
-      : isDirectPaymentMode(currentPaymentMode());
-    currentCheckout.mode = directMode ? (payment.gateway || 'upi_direct') : 'razorpay';
-    const details = (directMode ? {
+    currentCheckout.mode = 'upi_direct';
+    const details = ({
       pending: {
         title: 'UPI payment submitted — review pending',
         text: 'The administrator will review your submitted UTR and payment screenshot before adding talk-time.',
@@ -1187,62 +1106,25 @@
         note: 'Check the administrator message. If money was debited, contact support with the correct transaction ID.',
         icon: '!',
       },
-    } : {
-      created: {
-        title: 'Checkout was not completed',
-        text: 'This payment order was created, but Razorpay has not confirmed a payment.',
-        note: 'No minutes were added. Choose the pack again whenever you are ready to pay.',
-        icon: '<i></i>',
-      },
-      attempted: {
-        title: 'Payment attempt in progress',
-        text: 'Razorpay has received a payment attempt and is checking its final status.',
-        note: 'You can safely leave this screen. It will update automatically.',
-        icon: '<i></i>',
-      },
-      authorized: {
-        title: 'Payment received — confirming capture',
-        text: 'Your bank authorised the payment. Talk-time is added only after Razorpay confirms it as captured.',
-        note: 'This normally updates quickly. Do not pay again while confirmation is pending.',
-        icon: '<i></i>',
-      },
-      paid: {
-        title: 'Payment successful — minutes added',
-        text: `${minutes} minutes have been added to your wallet. You can start a call whenever a listener is available.`,
-        note: 'Your wallet has been refreshed. Each captured Razorpay order can be credited only once.',
-        icon: '✓',
-      },
-      failed: {
-        title: 'Payment was not completed',
-        text: payment.failure_description || 'Razorpay reported that this payment attempt failed.',
-        note: 'No minutes were added. You can choose the pack and try again.',
-        icon: '!',
-      },
-      refunded: {
-        title: 'Payment refunded',
-        text: 'Razorpay marked this payment as refunded. Contact support if you need help with your wallet.',
-        note: 'Refund timing depends on the bank or payment method.',
-        icon: '!',
-      },
     })[status] || null;
     $('#paymentStatusIcon').className = `payment-status-icon ${status}`;
     $('#paymentStatusIcon').innerHTML = details?.icon || '!';
-    const waiting = directMode ? status === 'pending' : ['created', 'attempted', 'authorized'].includes(status);
+    const waiting = status === 'pending';
     $('#paymentLiveLabel').innerHTML = waiting ? '<i></i> PAYMENT STATUS' : status.toUpperCase();
     $('#paymentStatusTitle').textContent = details?.title || 'Payment status updated';
     $('#paymentStatusText').textContent = details?.text || status;
     $('#paymentWaitNote').textContent = details?.note || '';
-    const reference = payment.utr_reference || payment.razorpay_payment_id || payment.razorpay_order_id || payment.checkout_reference || `#${String(payment.id).slice(0, 8).toUpperCase()}`;
+    const reference = payment.utr_reference || payment.checkout_reference || `#${String(payment.id).slice(0, 8).toUpperCase()}`;
     $('#pendingPaymentSummary').innerHTML = `<div><small>Pack</small><strong>${P.esc(payment.plan_name || currentCheckout.plan?.name || 'Talk-time pack')}</strong></div><div><small>Minutes</small><strong>${minutes}</strong></div><div><small>Amount</small><strong>${P.money(payment.amount_paise ?? currentCheckout.plan?.price_paise)}</strong></div><div><small>Reference</small><strong>${P.esc(reference)}</strong></div>`;
-    const statusMessage = directMode ? payment.admin_message : payment.failure_description;
+    const statusMessage = payment.admin_message;
     if (statusMessage) {
-      $('#paymentAdminMessage').innerHTML = `<strong>${directMode ? 'Administrator message' : 'Razorpay message'}</strong><p>${P.esc(statusMessage)}</p>`;
+      $('#paymentAdminMessage').innerHTML = `<strong>Administrator message</strong><p>${P.esc(statusMessage)}</p>`;
       show('#paymentAdminMessage');
     } else {
       show('#paymentAdminMessage', false);
     }
     show('#checkPaymentNow', waiting);
-    show('#paymentEnableAlerts', ['paid', 'approved'].includes(status)
+    show('#paymentEnableAlerts', status === 'approved'
       && publicConfig?.pushEnabled
       && 'Notification' in window
       && Notification.permission === 'default');
@@ -1251,16 +1133,14 @@
 
   function openPaymentStatus(payment) {
     if (!payment) return;
-    const mode = isDirectPaymentMode(payment.gateway) ? payment.gateway : 'razorpay';
+    const mode = 'upi_direct';
     resetPaymentCheckout(mode);
     currentCheckout = { mode, activePaymentId: payment.id, payment };
-    if (['pending', 'attempted', 'authorized'].includes(payment.status)) saveActivePayment(payment.id);
+    if (payment.status === 'pending') saveActivePayment(payment.id);
     renderPaymentStatus(payment);
     $('#paymentTitle').textContent = 'Payment status';
-    $('#paymentEyebrow').textContent = isDirectPaymentMode(mode) ? 'UPI VERIFICATION' : 'SECURE CONFIRMATION';
-    $('#paymentSubtitle').textContent = isDirectPaymentMode(mode)
-      ? 'Your submitted UTR and payment screenshot are shown here.'
-      : 'Razorpay confirmation and wallet credit update here.';
+    $('#paymentEyebrow').textContent = 'UPI VERIFICATION';
+    $('#paymentSubtitle').textContent = 'Your submitted UTR and payment screenshot are shown here.';
     openManagedOverlay('#paymentModal', 'paymentModal');
   }
 
@@ -1276,31 +1156,22 @@
   }
 
   function paymentHistoryMarkup(payment) {
-    const manual = isDirectPaymentMode(payment.gateway);
-    const reference = payment.utr_reference || payment.razorpay_payment_id || payment.razorpay_order_id || payment.checkout_reference || '';
-    const message = manual ? payment.admin_message : payment.failure_description;
-    const method = manual
-      ? (payment.payment_method === 'bank_transfer' ? 'Older bank transfer' : 'Direct UPI')
-      : `Razorpay${payment.payment_method ? ` · ${payment.payment_method}` : ''}`;
-    return `<article class="list-item payment-item"><div><strong>${P.esc(payment.plan_name)} · ${P.money(payment.amount_paise)}</strong><p>${Math.round(payment.seconds / 60)} minutes · ${P.esc(method)} · ${P.date(payment.created_at)}</p>${reference ? `<small>Reference: ${P.esc(reference)}</small>` : ''}${message ? `<p><b>${manual ? 'Admin' : 'Razorpay'}:</b> ${P.esc(message)}</p>` : ''}</div><div class="payment-item-side"><span class="badge ${payment.status}">${P.esc(payment.status)}</span><button class="button button-quiet" type="button" data-view-payment="${payment.id}">View status</button></div></article>`;
+    const reference = payment.utr_reference || payment.checkout_reference || '';
+    const method = payment.payment_method === 'bank_transfer' ? 'Previous bank transfer' : 'Direct UPI';
+    return `<article class="list-item payment-item"><div><strong>${P.esc(payment.plan_name)} · ${P.money(payment.amount_paise)}</strong><p>${Math.round(payment.seconds / 60)} minutes · ${P.esc(method)} · ${P.date(payment.created_at)}</p>${reference ? `<small>Reference: ${P.esc(reference)}</small>` : ''}${payment.admin_message ? `<p><b>Admin:</b> ${P.esc(payment.admin_message)}</p>` : ''}</div><div class="payment-item-side"><span class="badge ${payment.status}">${P.esc(payment.status)}</span><button class="button button-quiet" type="button" data-view-payment="${payment.id}">View status</button></div></article>`;
   }
 
   async function loadPayments(options = {}) {
     if (!me) return;
     try {
-      const [manualResponse, razorpayResponse] = await Promise.all([
-        P.api('/api/customer/manual-payments/submissions'),
-        P.api('/api/customer/razorpay/orders'),
-      ]);
-      paymentSubmissions = [
-        ...(manualResponse.submissions || []),
-        ...(razorpayResponse.orders || []),
-      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const manualResponse = await P.api('/api/customer/manual-payments/submissions');
+      paymentSubmissions = (manualResponse.submissions || [])
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       let balanceNeedsRefresh = false;
       paymentSubmissions.forEach((payment) => {
         const previous = paymentStatusSeen.get(payment.id);
         if (previous && previous !== payment.status) {
-          const paid = ['paid', 'approved'].includes(payment.status);
+          const paid = payment.status === 'approved';
           P.notify(paid ? 'Payment successful' : 'Payment status updated', paid
             ? `${Math.round(payment.seconds / 60)} minutes were added to your wallet.`
             : `Your ${payment.plan_name} payment was ${payment.status}.`);
@@ -1311,17 +1182,14 @@
 
       $('#paymentHistory').innerHTML = paymentSubmissions.length
         ? paymentSubmissions.map(paymentHistoryMarkup).join('')
-        : emptyState('No payments yet', publicConfig?.directUpiEnabled
-          ? 'Choose a talk-time pack, pay in a UPI app, and submit its transaction ID.'
-          : 'Choose a talk-time pack and complete the secure Razorpay checkout.');
+        : emptyState('No payments yet', 'Choose a talk-time pack, pay in a UPI app, and submit its transaction ID.');
       $$('[data-view-payment]').forEach((button) => button.addEventListener('click', () => {
         openPaymentStatus(paymentSubmissions.find((payment) => payment.id === button.dataset.viewPayment));
       }));
 
-      const pending = paymentSubmissions.find((payment) => ['pending', 'attempted', 'authorized'].includes(payment.status));
+      const pending = paymentSubmissions.find((payment) => payment.status === 'pending');
       if (pending) {
-        const manual = isDirectPaymentMode(pending.gateway);
-        $('#activePaymentBanner').innerHTML = `<div><span class="payment-review-dot"><i></i></span><div><strong>${manual ? 'UPI verification pending' : 'Razorpay confirmation in progress'}</strong><p>${P.esc(pending.plan_name)} · ${P.money(pending.amount_paise)} · ${P.date(pending.created_at)}</p></div></div><button id="viewActivePayment" class="button button-soft" type="button">View status</button>`;
+        $('#activePaymentBanner').innerHTML = `<div><span class="payment-review-dot"><i></i></span><div><strong>UPI verification pending</strong><p>${P.esc(pending.plan_name)} · ${P.money(pending.amount_paise)} · ${P.date(pending.created_at)}</p></div></div><button id="viewActivePayment" class="button button-soft" type="button">View status</button>`;
         show('#activePaymentBanner');
         $('#viewActivePayment').addEventListener('click', () => openPaymentStatus(pending));
       } else {
@@ -1331,9 +1199,9 @@
       const activeId = storedActivePayment();
       const activePayment = paymentSubmissions.find((payment) => payment.id === activeId);
       if (activePayment && currentCheckout?.activePaymentId === activePayment.id) renderPaymentStatus(activePayment);
-      if (activePayment && !['pending', 'attempted', 'authorized'].includes(activePayment.status)) {
+      if (activePayment && activePayment.status !== 'pending') {
         saveActivePayment('');
-        if (['paid', 'approved'].includes(activePayment.status)) balanceNeedsRefresh = true;
+        if (activePayment.status === 'approved') balanceNeedsRefresh = true;
       }
       if (balanceNeedsRefresh) await refreshCustomerBalance();
     } catch (error) {
@@ -1494,7 +1362,8 @@
         body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }),
       });
       event.target.reset();
-      P.toast('Password updated.', 'success');
+      P.toast('Password updated. All sessions were signed out.', 'success');
+      setTimeout(() => logout(), 900);
     } catch (error) {
       P.toast(error.message, 'error');
     }

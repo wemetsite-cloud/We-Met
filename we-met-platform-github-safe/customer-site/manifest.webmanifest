@@ -1,12 +1,12 @@
 {
   "name": "We Met",
   "short_name": "We Met",
-  "description": "Private Malayalam voice conversations with an English interface, browser calling and per-second billing.",
+  "description": "Private browser voice conversations with language choice and connected-second billing.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#fff8fb",
-  "theme_color": "#f0448f",
+  "background_color": "#f6faf9",
+  "theme_color": "#0f5f63",
   "orientation": "portrait-primary",
   "icons": [
     {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},

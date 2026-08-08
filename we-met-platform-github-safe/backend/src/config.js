@@ -30,7 +30,6 @@ const number = (value, fallback) => {
 };
 
 const nodeEnv = process.env.NODE_ENV || 'development';
-const paymentGatewayMode = process.env.PAYMENT_GATEWAY_MODE || 'upi_direct';
 const supportEmail = process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com';
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
@@ -56,18 +55,11 @@ const config = {
   publicUrl,
   serveFrontends: bool(process.env.SERVE_FRONTENDS, true),
   supportEmail,
-  paymentPayeeName: process.env.PAYMENT_PAYEE_NAME || 'We Met',
-  paymentGatewayMode,
   upiPayment: {
-    enabled: paymentGatewayMode === 'upi_direct',
+    enabled: true,
     payeeName: upiPaymentPayeeName,
     upiId: upiPaymentId,
     intentMinutes: number(process.env.UPI_PAYMENT_INTENT_MINUTES, 1440),
-  },
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID || '',
-    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
-    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
   },
   webPush: {
     enabled: Boolean(vapidPublicKey && vapidPrivateKey),
@@ -85,6 +77,7 @@ const config = {
   minimumStartSeconds: number(process.env.MINIMUM_START_SECONDS, 120),
   lowBalanceSeconds: number(process.env.LOW_BALANCE_SECONDS, 60),
   mediaReconnectSeconds: number(process.env.MEDIA_RECONNECT_SECONDS, 45),
+  listenerDisconnectGraceSeconds: number(process.env.LISTENER_DISCONNECT_GRACE_SECONDS, 45),
   maxCallSeconds: number(process.env.MAX_CALL_SECONDS, 0),
 
   resetSeededPasswords: bool(process.env.RESET_SEEDED_PASSWORDS, false),
@@ -93,11 +86,11 @@ const config = {
     password: process.env.ADMIN_PASSWORD || '',
     name: process.env.ADMIN_NAME || 'Sabith Salah Kp',
   },
-  demoEmployee: {
-    email: process.env.DEMO_EMPLOYEE_EMAIL || 'gentle8x@gmail.com',
-    password: process.env.DEMO_EMPLOYEE_PASSWORD || '',
-    name: process.env.DEMO_EMPLOYEE_NAME || 'Salah',
-    employeeCode: process.env.DEMO_EMPLOYEE_CODE || 'WM-L001',
+  initialListener: {
+    email: process.env.INITIAL_LISTENER_EMAIL || '',
+    password: process.env.INITIAL_LISTENER_PASSWORD || '',
+    name: process.env.INITIAL_LISTENER_NAME || 'First Listener',
+    employeeCode: process.env.INITIAL_LISTENER_CODE || 'WM-L001',
   },
 
   iceServers: [
@@ -122,31 +115,25 @@ function validateConfig() {
   if (!config.admin.password || config.admin.password.length < 10) {
     problems.push('ADMIN_PASSWORD must contain at least 10 characters.');
   }
-  if (!config.demoEmployee.password || config.demoEmployee.password.length < 10) {
-    problems.push('DEMO_EMPLOYEE_PASSWORD must contain at least 10 characters.');
+  if (config.initialListener.password && config.initialListener.password.length < 10) {
+    problems.push('INITIAL_LISTENER_PASSWORD must contain at least 10 characters when an initial listener is configured.');
   }
-  if (!['upi_direct', 'razorpay'].includes(config.paymentGatewayMode)) {
-    problems.push('PAYMENT_GATEWAY_MODE must be upi_direct or razorpay.');
+  if (config.initialListener.password && !/^\S+@\S+\.\S+$/.test(config.initialListener.email)) {
+    problems.push('INITIAL_LISTENER_EMAIL is required when an initial listener password is configured.');
   }
-  if (config.paymentGatewayMode === 'upi_direct') {
-    if (config.upiPayment.payeeName.length < 2) {
-      problems.push('UPI_PAYMENT_PAYEE_NAME must exactly match the receiving UPI account name.');
-    }
-    if (!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(config.upiPayment.upiId)) {
-      problems.push('UPI_PAYMENT_ID must be a valid receiving UPI ID.');
-    }
-    if (!Number.isInteger(config.upiPayment.intentMinutes) || config.upiPayment.intentMinutes < 15 || config.upiPayment.intentMinutes > 10080) {
-      problems.push('UPI_PAYMENT_INTENT_MINUTES must be between 15 and 10080.');
-    }
+  if (config.upiPayment.payeeName.length < 2) {
+    problems.push('UPI_PAYMENT_PAYEE_NAME must exactly match the receiving UPI account name.');
   }
-  if (config.paymentGatewayMode === 'razorpay') {
-    if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(config.razorpay.keyId)) {
-      problems.push('RAZORPAY_KEY_ID must be a valid Test or Live Key ID.');
-    }
-    if (config.razorpay.keySecret.length < 8) problems.push('RAZORPAY_KEY_SECRET is required when Razorpay is enabled.');
-    if (!config.razorpay.webhookSecret || config.razorpay.webhookSecret.length < 16) {
-      problems.push('RAZORPAY_WEBHOOK_SECRET must be a private value of at least 16 characters.');
-    }
+  if (!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(config.upiPayment.upiId)) {
+    problems.push('UPI_PAYMENT_ID must be a valid receiving UPI ID.');
+  }
+  if (!Number.isInteger(config.upiPayment.intentMinutes) || config.upiPayment.intentMinutes < 15 || config.upiPayment.intentMinutes > 10080) {
+    problems.push('UPI_PAYMENT_INTENT_MINUTES must be between 15 and 10080.');
+  }
+  if (!Number.isInteger(config.listenerDisconnectGraceSeconds)
+      || config.listenerDisconnectGraceSeconds < 10
+      || config.listenerDisconnectGraceSeconds > 300) {
+    problems.push('LISTENER_DISCONNECT_GRACE_SECONDS must be between 10 and 300.');
   }
   if (Boolean(config.webPush.publicKey) !== Boolean(config.webPush.privateKey)) {
     problems.push('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be configured together.');

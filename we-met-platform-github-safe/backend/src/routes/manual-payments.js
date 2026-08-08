@@ -136,7 +136,7 @@ router.post('/intents', requireDirectUpi, asyncHandler(async (req, res) => {
       errorCorrectionLevel: 'M',
       margin: 1,
       width: 420,
-      color: { dark: '#351522', light: '#FFFFFFFF' },
+      color: { dark: '#0F5F63', light: '#FFFFFFFF' },
     })
     : '';
 
@@ -155,7 +155,7 @@ router.post('/submissions', requireDirectUpi, paymentProof, asyncHandler(async (
   if (!intentId) return res.status(400).json({ error: 'The payment checkout has expired. Start again.' });
   if (!ALLOWED_METHODS.has(paymentMethod)) return res.status(400).json({ error: 'Only direct UPI payments are accepted in this checkout.' });
   if (!transferReference) {
-    return res.status(400).json({ error: 'Enter the 6–64 character UTR, UPI transaction ID, or bank reference.' });
+    return res.status(400).json({ error: 'Enter the 6–64 character UTR or UPI transaction ID.' });
   }
 
   if (!req.file) {

@@ -62,7 +62,7 @@ test('customer submission output excludes stored image bytes and payee details',
     payee_upi_id: 'private@example',
     status: 'pending',
   });
-  assert.equal(output.gateway, 'upi_direct');
+  assert.equal(output.method, 'upi_direct');
   assert.equal(output.proof_available, true);
   assert.equal('proof_data' in output, false);
   assert.equal('payee_upi_id' in output, false);

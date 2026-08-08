@@ -56,7 +56,7 @@ function detectImageMime(buffer) {
 
 function publicSubmission(row) {
   return {
-    gateway: row.payment_method === 'upi' ? 'upi_direct' : 'manual_transfer',
+    method: row.payment_method === 'upi' ? 'upi_direct' : 'manual_transfer',
     id: row.id,
     plan_id: row.plan_id,
     plan_name: row.plan_name,

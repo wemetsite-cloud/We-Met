@@ -5,6 +5,16 @@ const { authenticate, requireRole, asyncHandler } = require('../middleware');
 const router = express.Router();
 router.use(authenticate, requireRole('customer'));
 
+router.get('/plans', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT id,name,price_paise,seconds,popular
+    FROM plans
+    WHERE active=true
+    ORDER BY sort_order,price_paise
+  `);
+  res.json({ plans: result.rows });
+}));
+
 router.get('/history', asyncHandler(async (req, res) => {
   const [calls, wallet] = await Promise.all([
     db.query(
@@ -81,7 +91,7 @@ router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
 
 router.get('/favorites', asyncHandler(async (req, res) => {
   const result = await db.query(
-    `SELECT f.employee_id,f.created_at,u.name,u.bio,u.status
+    `SELECT f.employee_id,f.created_at,u.name,u.bio,u.status,u.listener_language
      FROM favorites f JOIN users u ON u.id=f.employee_id
      WHERE f.customer_id=$1 ORDER BY f.created_at DESC`,
     [req.user.id],

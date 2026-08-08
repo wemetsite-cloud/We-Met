@@ -6,11 +6,8 @@ Object.assign(process.env, {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   JWT_SECRET: 'test-jwt-secret-that-is-longer-than-forty-eight-characters-123456789',
   ADMIN_PASSWORD: 'test-admin-password',
-  DEMO_EMPLOYEE_PASSWORD: 'test-listener-password',
-  PAYMENT_GATEWAY_MODE: 'razorpay',
-  RAZORPAY_KEY_ID: 'rzp_test_example',
-  RAZORPAY_KEY_SECRET: 'test_key_secret_123456789',
-  RAZORPAY_WEBHOOK_SECRET: 'test_webhook_secret_123456789',
+  UPI_PAYMENT_PAYEE_NAME: 'We Met Test',
+  UPI_PAYMENT_ID: 'test@upi',
 });
 
 const { notificationPayload } = require('../src/push');

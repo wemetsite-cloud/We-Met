@@ -45,16 +45,11 @@ app.use((req, res, next) => {
   }
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' https://checkout.razorpay.com; connect-src 'self' https: wss: ws:; img-src 'self' data: blob: https://*.razorpay.com; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; frame-src https://api.razorpay.com https://*.razorpay.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    `default-src 'self'; script-src 'self'; connect-src 'self' https: wss:${config.isProduction ? '' : ' ws:'}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'${config.isProduction ? '; upgrade-insecure-requests' : ''}`,
   );
   next();
 });
 
-app.use(
-  '/api/webhooks/razorpay',
-  express.raw({ type: 'application/json', limit: '1mb' }),
-  require('./src/routes/razorpay-webhook'),
-);
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', async (_req, res) => {
@@ -69,7 +64,6 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
-app.use('/api/customer/razorpay', require('./src/routes/razorpay'));
 app.use('/api/customer/manual-payments', require('./src/routes/manual-payments'));
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/employee', require('./src/routes/employee'));
@@ -184,7 +178,7 @@ app.use((error, _req, res, _next) => {
 async function reconcileInterruptedCalls() {
   await db.query(`
     INSERT INTO wallet_transactions (customer_id, seconds_delta, type, note, reference_id)
-    SELECT customer_id, -billed_seconds, 'call_debit', 'Malayalam voice call', id
+    SELECT customer_id, -billed_seconds, 'call_debit', 'Voice call', id
     FROM calls
     WHERE billed_seconds > 0
     ON CONFLICT DO NOTHING
@@ -200,10 +194,26 @@ async function reconcileInterruptedCalls() {
   `);
 }
 
+async function reconcileInterruptedListenerActivity() {
+  await db.query(`
+    UPDATE listener_activity_sessions
+    SET ended_at=now(),
+        duration_seconds=GREATEST(0,EXTRACT(EPOCH FROM (now()-started_at))::int),
+        end_reason='Server restarted'
+    WHERE ended_at IS NULL
+  `);
+  await db.query(`
+    UPDATE users
+    SET listener_availability='offline',updated_at=now()
+    WHERE role='employee' AND listener_availability<>'offline'
+  `);
+}
+
 (async () => {
   if (!config.databaseUrl) throw new Error('DATABASE_URL is required.');
   await db.query('SELECT 1');
   await reconcileInterruptedCalls();
+  await reconcileInterruptedListenerActivity();
   server.listen(config.port, () => {
     console.log(`We Met running at ${config.publicUrl}`);
     if (config.serveFrontends) {

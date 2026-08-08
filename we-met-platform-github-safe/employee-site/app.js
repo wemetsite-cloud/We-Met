@@ -17,6 +17,7 @@
   let ringSecondsLeft = 30;
   let publicConfig = null;
   let activeTab = 'desk';
+  let statsRefreshTimer = null;
 
   const NAVIGATION_MARKER = 'we-met-listener-navigation';
   const VALID_TABS = new Set(['desk', 'history', 'profile', 'notifications']);
@@ -104,7 +105,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=5.16.0', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.0.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
   }
@@ -134,6 +135,7 @@
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#employeeEmailForm').addEventListener('submit', changeEmail);
     $('#refreshHistory').addEventListener('click', loadHistory);
+    $('#refreshActivity').addEventListener('click', () => { loadStats(); loadActivity(); });
     $('#minimizeListenerCall').addEventListener('click', () => minimizeListenerCall());
     $('#restoreListenerCall').addEventListener('click', restoreListenerCall);
   }
@@ -157,6 +159,7 @@
     button?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     if (tab === 'history') loadHistory();
     if (tab === 'notifications') loadNotifications();
+    if (tab === 'desk') { loadStats(); loadActivity(); }
     syncBackButton();
   }
 
@@ -311,10 +314,17 @@
     $('#profileUpi').value = me.upiId || '';
     $('#profileBio').value = me.bio || '';
     $('#profileCode').value = me.employeeCode || '';
+    $('#profileLanguage').value = me.listenerLanguage || 'Malayalam';
+    $('#deskLanguage').textContent = `${me.listenerLanguage || 'Malayalam'} calls`;
     connect();
     loadStats();
+    loadActivity();
     loadHistory();
     loadNotifications();
+    clearInterval(statsRefreshTimer);
+    statsRefreshTimer = setInterval(() => {
+      if (document.visibilityState === 'visible' && activeTab === 'desk') loadStats();
+    }, 30_000);
     syncBackButton();
   }
 
@@ -337,6 +347,7 @@
     ringContext?.close().catch(() => {});
     ringContext = null;
     P.Store.clear();
+    clearInterval(statsRefreshTimer);
     location.reload();
   }
 
@@ -371,9 +382,13 @@
     });
 
     socket.on('connect', () => {
+      $('#connectionBadge').textContent = 'Connected';
+      $('#connectionBadge').className = 'status online';
       $('#connectionBadge').title = 'Calling server connected';
     });
     socket.on('disconnect', () => {
+      $('#connectionBadge').textContent = 'Reconnecting…';
+      $('#connectionBadge').className = 'status break';
       $('#connectionBadge').title = 'Reconnecting to the calling server';
       $('#onlineBtn').disabled = true;
       $('#offlineBtn').disabled = true;
@@ -392,7 +407,11 @@
       }
     });
     socket.on('connect_error', (error) => console.warn('Calling server reconnecting:', error?.message || error));
-    socket.on('employee:status', (data) => setStatus(data.status));
+    socket.on('employee:status', (data) => {
+      setStatus(data.status);
+      loadStats();
+      loadActivity();
+    });
     socket.on('call:incoming', incoming);
     socket.on('call:accepted', async (data) => {
       stopRing();
@@ -447,6 +466,7 @@
       }
       P.toast(data.reason || 'The call ended.');
       loadStats();
+      loadActivity();
       loadHistory();
     });
     socket.on('chat:message', addChat);
@@ -460,8 +480,6 @@
   function setStatus(nextStatus) {
     status = nextStatus;
     const label = nextStatus === 'online' ? 'Online' : nextStatus === 'break' ? 'On break' : 'Offline';
-    $('#connectionBadge').textContent = label;
-    $('#connectionBadge').className = `status ${nextStatus}`;
     $('#shiftStatus').textContent = label;
     $('#onlineBtn').disabled = nextStatus === 'online';
     $('#offlineBtn').disabled = nextStatus === 'offline';
@@ -476,7 +494,7 @@
       ? 'You are online and available for calls.'
       : nextStatus === 'break'
         ? 'End your break when you are ready to receive calls again.'
-        : 'Go online when you are ready to receive Malayalam calls.';
+        : `Go online when you are ready to receive ${me?.listenerLanguage || 'your language'} calls.`;
   }
 
   function initials(name = 'Customer') {
@@ -490,12 +508,13 @@
       socket?.emit('call:reject', { callId: data.callId });
       return;
     }
-    currentCall = { id: data.callId, customer: data.customer, mediaConnected: false };
+    currentCall = { id: data.callId, customer: data.customer, mediaConnected: false, language: me?.listenerLanguage || 'Malayalam' };
     $('#acceptBtn').disabled = false;
     $('#rejectBtn').disabled = false;
     $('#incomingName').textContent = data.customer.name;
     $('#incomingInitials').textContent = initials(data.customer.name);
     $('#incomingBalance').textContent = P.duration(data.balanceSeconds);
+    $('#activeCallLanguage').textContent = `${me?.listenerLanguage || 'Malayalam'} conversation`;
     openManagedOverlay('#incomingModal', 'incomingModal');
     startRing();
   }
@@ -589,9 +608,26 @@
   async function loadStats() {
     try {
       const response = await P.api('/api/employee/stats');
+      $('#todayWork').textContent = P.duration(response.stats.today_work_seconds);
       $('#todayTime').textContent = P.duration(response.stats.today_seconds);
+      $('#todayBreak').textContent = P.duration(response.stats.today_break_seconds);
+      $('#weekWork').textContent = P.duration(response.stats.week_work_seconds);
       $('#totalCalls').textContent = response.stats.total_calls;
       $('#totalTime').textContent = P.duration(response.stats.total_seconds);
+      $('#currentShiftSince').textContent = response.stats.current_activity_started_at
+        ? `${status === 'break' ? 'Break' : 'Work'} session started ${P.date(response.stats.current_activity_started_at)}`
+        : 'No active work session';
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  async function loadActivity() {
+    try {
+      const response = await P.api('/api/employee/activity');
+      $('#activityList').innerHTML = response.sessions?.length
+        ? response.sessions.map((session) => `<article><span class="activity-state ${P.esc(session.state)}">${P.esc(session.state)}</span><div><strong>${P.duration(session.duration_seconds)}</strong><p>${P.date(session.started_at)} → ${session.ended_at ? P.date(session.ended_at) : 'Now'}</p></div><small>${P.esc(session.end_reason || (session.ended_at ? 'Status changed' : 'Current session'))}</small></article>`).join('')
+        : emptyState('No work sessions yet', 'Go online to begin recording connected work time.');
     } catch (error) {
       P.toast(error.message, 'error');
     }
@@ -676,7 +712,8 @@
         body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }),
       });
       event.target.reset();
-      P.toast('Password updated.', 'success');
+      P.toast('Password updated. All sessions were signed out.', 'success');
+      setTimeout(logout, 900);
     } catch (error) {
       P.toast(error.message, 'error');
     }

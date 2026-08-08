@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f0448f">
-  <meta name="description" content="18+ online Malayalam conversation platform with prepaid talk-time, browser audio calls, clear pricing and customer support.">
-  <title>We Met — Talk freely. Feel lighter.</title>
+  <meta name="theme-color" content="#0f5f63">
+  <meta name="description" content="Private, real-time voice conversations with verified listeners, language choice, transparent connected-second billing and no phone-number sharing.">
+  <meta name="robots" content="index,follow">
+  <meta property="og:title" content="We Met — Real conversations, when you need one">
+  <meta property="og:description" content="Choose an available listener and talk privately from your browser.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://wemet.xyz/">
+  <link rel="canonical" href="https://wemet.xyz/">
+  <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=5.17.0">
-  <link rel="stylesheet" href="style.css?v=5.17.0">
+  <link rel="manifest" href="manifest.webmanifest?v=6.0.0">
+  <link rel="stylesheet" href="style.css?v=6.0.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -20,7 +26,7 @@
     <button id="appBackButton" class="app-back hidden" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <a class="brand" href="#" aria-label="We Met home">
       <img src="assets/logo.svg" alt="">
-      <span><strong>We Met</strong><small>Malayalam conversations</small></span>
+      <span><strong>We Met</strong><small>Real conversations</small></span>
     </a>
     <div class="top-actions">
       <button data-install-app class="button button-soft button-small hidden" type="button">Install We Met</button><button id="notificationPermission" class="button button-quiet button-small hidden" type="button">Enable alerts</button>
@@ -34,17 +40,17 @@
       <section id="landing" class="landing">
       <div class="hero shell">
         <div class="hero-copy">
-          <span class="eyebrow"><i></i> Malayalam voice conversations, on your time</span>
+          <span class="eyebrow"><i></i> Real conversations, on your time</span>
           <h1>A real conversation,<br><em>whenever you need one.</em></h1>
-          <p class="hero-lead">Purchase prepaid talk-time, choose an available Malayalam listener and start a one-to-one browser audio conversation. Billing begins only after the live audio connection starts.</p>
+          <p class="hero-lead">Talk freely. Feel lighter. Create an account, choose an available listener and start a private browser voice call in seconds.</p>
           <div class="hero-buttons">
             <button class="button button-primary button-large" data-auth="register" type="button">Create free account</button>
             <button class="button button-soft button-large" data-auth="login" type="button">Sign in</button>
           </div>
           <div class="trust-row" aria-label="Platform benefits">
-            <span><b>18+ only</b>Adult users only</span>
-            <span><b>Transparent</b>Prices shown before payment</span>
             <span><b>Private</b>No phone number shown</span>
+            <span><b>Fair</b>Charged per connected second</span>
+            <span><b>Simple</b>No app required</span>
           </div>
         </div>
 
@@ -58,7 +64,7 @@
             </div>
             <div class="preview-person">
               <div class="listener-art avatar-rose"><span>SM</span></div>
-              <span class="language-chip">Malayalam listener</span>
+              <span class="language-chip">Choose your language</span>
               <h3>Someone is ready to listen</h3>
               <p>Your identity stays private throughout the call.</p>
             </div>
@@ -66,7 +72,7 @@
             <div class="preview-note"><span>00:00</span><small>Timer begins after audio connects</small></div>
           </article>
           <div class="floating-note note-one">Private by design</div>
-          <div class="floating-note note-two">Malayalam only</div>
+          <div class="floating-note note-two">More languages available</div>
         </div>
       </div>
 
@@ -77,36 +83,18 @@
       </div>
 
       <section class="how-it-works shell">
-        <div class="section-copy"><span class="eyebrow">HOW IT WORKS</span><h2>From sign-in to a Malayalam conversation in three steps.</h2></div>
+        <div class="section-copy"><span class="eyebrow">HOW IT WORKS</span><h2>From sign-in to a real conversation in three steps.</h2></div>
         <div class="steps">
-          <article><b>1</b><h3>Add talk-time</h3><p>Choose a pack and use the payment option currently enabled by We Met, or redeem a code from the team.</p></article>
+          <article><b>1</b><h3>Add talk-time</h3><p>After signing in, choose a talk-time option and pay securely by direct UPI, or redeem a code from the team.</p></article>
           <article><b>2</b><h3>Choose a listener</h3><p>Pick an available listener or let We Met find one automatically.</p></article>
           <article><b>3</b><h3>Talk and chat</h3><p>Use clear voice calling and live text chat in the same private session.</p></article>
         </div>
       </section>
-
-      <section class="public-pricing shell" id="pricing">
-        <div class="section-copy"><span class="eyebrow">CLEAR PRICING</span><h2>Talk-time prices before you pay.</h2><p>Talk-time is prepaid. There is no recurring subscription and no physical product or shipping.</p></div>
-        <div id="publicPricingGrid" class="public-plan-grid" aria-live="polite"><div class="public-plan-loading">Loading current talk-time packs…</div></div>
-        <p class="pricing-note">Your exact pack, amount and talk-time are shown again at checkout. Wallet balance is reduced only for connected call time.</p>
-      </section>
-
-      <section class="merchant-disclosure shell" id="about-service">
-        <div class="merchant-disclosure-copy">
-          <span class="eyebrow">SERVICE DISCLOSURE</span>
-          <h2>What We Met provides</h2>
-          <p>We Met is an online, 18+ conversation service. Customers purchase prepaid talk-time and use it for one-to-one browser audio calls and in-session text chat with available Malayalam listeners.</p>
-          <p>We Met does not arrange offline meetings and does not permit escort services, sexual services, sexual requests, harassment, fraud or requests for passwords, OTPs or banking credentials. We Met is not a medical, counselling or emergency service.</p>
-        </div>
-        <div class="merchant-disclosure-card">
-          <strong>Customer support</strong>
-          <a href="mailto:wemetsite@gmail.com">wemetsite@gmail.com</a>
-          <small>For payment, account, refund and service questions.</small>
-          <div class="disclosure-links">
-            <a href="about.html">About</a><a href="contact.html">Contact</a><a href="pricing.html">Pricing</a><a href="delivery.html">Service delivery</a>
-          </div>
-        </div>
-      </section>
+      <footer class="public-footer shell">
+        <div><a class="brand footer-brand" href="#"><img src="assets/logo.svg" alt=""><span><strong>We Met</strong><small>Conversation with care</small></span></a><p>A private browser-based voice conversation service with transparent billing and clear safety standards.</p></div>
+        <nav aria-label="Company and policy links"><a href="about.html">About</a><a href="contact.html">Contact</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund.html">Refunds</a><a href="safety.html">Safety</a></nav>
+        <small>© 2026 We Met. Support: <a href="mailto:wemetsite@gmail.com">wemetsite@gmail.com</a></small>
+      </footer>
     </section>
 
     <section id="dashboard" class="dashboard hidden shell">
@@ -114,9 +102,9 @@
         <div>
           <span class="eyebrow">YOUR SPACE</span>
           <h1 id="helloName">Hello</h1>
-          <p>Choose a listener and start a Malayalam conversation whenever you feel like talking.</p>
+          <p>Choose a listener and start a private conversation whenever you feel like talking.</p>
         </div>
-        <div class="wallet-pill"><small>Talk-time available</small><strong id="balanceTop">0:00</strong><button type="button" data-jump="wallet">Add minutes</button></div>
+        <div class="wallet-pill"><small>Talk-time available</small><strong id="balanceTop">0:00</strong><button type="button" data-purchase>Add minutes</button></div>
       </div>
 
       <nav class="tabs" id="tabs" aria-label="Customer navigation">
@@ -135,14 +123,14 @@
             <span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking listener availability…</span></span>
             <h2>Ready to talk?</h2>
             <p>Choose a listener yourself, reconnect with your previous listener, or let We Met find the next available person.</p>
-            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button">Call an available listener</button><button class="button button-quiet" type="button" data-jump="wallet">Add minutes</button></div>
+            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button">Call an available listener</button><button class="button button-quiet" type="button" data-purchase>Add minutes</button></div>
           </div>
           <div class="balance-ring"><span>Talk-time</span><strong id="balanceRing">0:00</strong><small>Minimum 2 minutes to call</small></div>
         </section>
 
         <div id="previousBox" class="previous-box hidden"></div>
-        <div class="section-head"><div><span class="eyebrow">AVAILABLE NOW</span><h2>Choose your Malayalam listener</h2><p>All listeners on We Met are women.</p></div><button id="refreshListeners" class="button button-quiet" type="button">Refresh</button></div>
-        <div id="listenerGrid" class="listener-grid" aria-live="polite"></div>
+        <div class="section-head listener-heading"><div><span class="eyebrow">AVAILABLE NOW</span><h2>Choose your Malayalam listener</h2><p>Listener language is shown on every profile.</p></div><button id="refreshListeners" class="button button-quiet" type="button">Refresh</button></div><label class="language-fallback-toggle"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>If no Malayalam listener is available, We Met can try another language listener.</small></span></label>
+        <div id="listenerGrid" class="listener-grid" aria-live="polite"></div><section id="otherLanguageSection" class="other-language-section hidden"><div class="section-head compact"><div><span class="eyebrow">OTHER LANGUAGES</span><h2>Other language listeners</h2><p>Turn this option off anytime to keep automatic matching Malayalam-only.</p></div></div><div id="otherLanguageGrid" class="listener-grid other-language-grid" aria-live="polite"></div></section>
       </div>
 
       <div class="tab" id="tab-wallet">
@@ -157,7 +145,7 @@
           <section class="panel coupon-panel">
             <span class="eyebrow">REDEEM TALK-TIME</span>
             <h2>Enter your We Met code</h2>
-            <p>Radeem your valuable coupons here.</p>
+            <p>Redeem a valid code to add talk-time to your wallet.</p>
             <form id="couponForm" class="inline-form"><label class="sr-only" for="couponCode">Redeem code</label><input id="couponCode" autocomplete="off" placeholder="Example: WEMET-LOVE" required><button class="button button-primary">Redeem</button></form>
           </section>
           
@@ -182,7 +170,7 @@
           <section class="panel safety-panel"><span class="eyebrow">STAY SAFE</span><h2>Keep personal information private</h2><p>Never share your phone number, OTP, bank details, passwords or private images during a conversation.</p><button class="button button-soft legal-btn" data-legal="safety" type="button">Read safety policy</button></section>
         </div>
         <div class="about-grid">
-          <section class="panel"><h3>About We Met</h3><p>An English-interface platform built for private Malayalam voice conversations, text chat and connected-second billing.</p></section>
+          <section class="panel"><h3>About We Met</h3><p>A private voice-conversation platform with Malayalam as the default and optional listeners in other languages, plus text chat and connected-second billing.</p></section>
           <section class="panel"><h3>Frequently asked</h3><p><b>Do I need an app?</b> No, a supported browser is enough.</p><p><b>Can the listener see my number?</b> No.</p><p><b>When does billing start?</b> After live audio connects.</p></section>
           <section class="panel"><h3>Account help</h3><p>Use the support form for password recovery, account changes or an account-deletion request.</p></section>
         </div>
@@ -205,16 +193,6 @@
     </section>
   </main>
 
-
-  <footer class="public-footer">
-    <div class="shell footer-grid">
-      <div><a class="footer-brand" href="./"><img src="assets/logo.svg" alt=""><span><strong>We Met</strong><small>18+ online conversation service</small></span></a><p>Prepaid Malayalam browser conversations with clear pricing, safety rules and customer support.</p></div>
-      <nav aria-label="Business information"><strong>Business</strong><a href="about.html">About Us</a><a href="contact.html">Contact Us</a><a href="pricing.html">Pricing</a><a href="delivery.html">Service Delivery</a></nav>
-      <nav aria-label="Policies"><strong>Policies</strong><a href="terms.html">Terms &amp; Conditions</a><a href="privacy.html">Privacy Policy</a><a href="refund.html">Refund &amp; Cancellation</a><a href="community-guidelines.html">Community Guidelines</a></nav>
-    </div>
-    <div class="shell footer-bottom"><span>© 2026 We Met. All rights reserved.</span><span>Support: <a href="mailto:wemetsite@gmail.com">wemetsite@gmail.com</a></span></div>
-  </footer>
-
   <div id="authModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <div class="modal-card auth-card">
       <button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -225,7 +203,7 @@
       <p id="authSubtitle">Sign in to continue.</p>
       <div class="auth-switch"><button data-mode="login" class="active" type="button">Sign in</button><button data-mode="register" type="button">Create account</button></div>
       <form id="loginForm" class="stack"><label>Email<input id="loginIdentifier" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password"></label><button class="button button-primary button-large">Sign in</button><button type="button" id="forgotOpen" class="link-button">Forgot password?</button></form>
-      <form id="registerForm" class="stack hidden"><label>Full name<input id="regName" autocomplete="name" required></label><label>Email<input id="regEmail" type="email" autocomplete="email" required></label><label>Phone number<input id="regPhone" type="tel" autocomplete="tel" inputmode="tel" minlength="10" maxlength="24" placeholder="+91 98765 43210" required><small>Used for payment prefill and private account support. It is never shown to listeners.</small></label><label>Password<input id="regPassword" type="password" minlength="8" autocomplete="new-password" required><small>Use at least 8 characters.</small></label><label class="check"><input id="regTerms" type="checkbox" required><span>I am at least 18 and accept the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label><button class="button button-primary button-large">Create account</button></form>
+      <form id="registerForm" class="stack hidden"><label>Full name<input id="regName" autocomplete="name" required></label><label>Email<input id="regEmail" type="email" autocomplete="email" required></label><label>Phone number<input id="regPhone" type="tel" autocomplete="tel" inputmode="tel" minlength="10" maxlength="24" placeholder="+91 98765 43210" required><small>Used for payment confirmation and private account support. It is never shown to listeners.</small></label><label>Password<input id="regPassword" type="password" minlength="8" autocomplete="new-password" required><small>Use at least 8 characters.</small></label><label class="check"><input id="regTerms" type="checkbox" required><span>I accept the Terms and Privacy Policy and confirm that I am eligible to use We Met.</span></label><button class="button button-primary button-large">Create account</button></form>
       <form id="forgotForm" class="stack hidden"><p>Enter your account email. Save the recovery key shown after submission, then wait for administrator approval.</p><label>Email<input id="forgotIdentifier" type="email" autocomplete="email" required></label><button class="button button-primary">Send recovery request</button><button type="button" id="backLogin" class="link-button">Back to sign in</button></form>
       <section id="recoveryPanel" class="recovery-panel hidden"><span class="eyebrow">RECOVERY STATUS</span><p id="recoveryStatus">Waiting for administrator review.</p><label>Recovery key<input id="recoveryKey" autocomplete="off" spellcheck="false"></label><input id="recoveryRequestId" type="hidden"><div class="recovery-actions"><button id="copyRecoveryKey" class="button button-quiet" type="button">Copy key</button><button id="checkRecovery" class="button button-soft" type="button">Check status</button></div><form id="resetCompleteForm" class="stack hidden"><label>New password<input id="recoveryNewPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm new password<input id="recoveryConfirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Set new password</button></form></section>
     </div>
@@ -246,14 +224,6 @@
         <div id="paymentLoading" class="checkout-loading"><i></i><strong>Preparing your exact payment…</strong></div>
         <div id="paymentPayContent" class="hidden">
           <div id="paymentSummary" class="payment-summary"></div>
-          <div id="razorpayCheckoutPanel" class="razorpay-checkout-panel hidden">
-            <span class="payment-kicker">PAYMENT SECURED BY RAZORPAY</span>
-            <h3>Choose UPI, card, netbanking or wallet</h3>
-            <p>Razorpay opens a secure checkout and returns you here after payment.</p>
-            <div class="payment-trust-row"><span>✓ Amount locked</span><span>✓ Server verified</span><span>✓ Automatic minutes</span></div>
-            <button id="payWithRazorpay" class="button button-primary button-large payment-next" type="button">Continue to secure payment</button>
-            <small>We Met never receives or stores your UPI PIN, OTP or card number.</small>
-          </div>
           <div id="manualCheckoutPanel" class="manual-checkout-panel hidden">
             <div id="manualUpiDetails" class="simple-upi-layout">
               <section class="payment-qr-card">
@@ -315,6 +285,6 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=5.17.0"></script><script src="socket-loader.js?v=5.17.0"></script><script src="api.js?v=5.17.0"></script><script src="webrtc.js?v=5.17.0"></script><script src="app.js?v=5.17.0"></script>
+  <script src="config.js?v=6.0.0"></script><script src="socket-loader.js?v=6.0.0"></script><script src="api.js?v=6.0.0"></script><script src="webrtc.js?v=6.0.0"></script><script src="app.js?v=6.0.0"></script>
 </body>
 </html>

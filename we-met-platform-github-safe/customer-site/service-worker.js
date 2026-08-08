@@ -1,4 +1,4 @@
-const VERSION = '5.17.0';
+const VERSION = '6.0.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -11,17 +11,13 @@ const STATIC = [
   'webrtc.js',
   'config.js',
   'manifest.webmanifest',
+  'legal.css',
   'about.html',
   'contact.html',
-  'pricing.html',
-  'delivery.html',
   'terms.html',
   'privacy.html',
   'refund.html',
-  'community-guidelines.html',
-  'legal.css',
-  'robots.txt',
-  'sitemap.xml',
+  'safety.html',
   'assets/logo.svg',
   'assets/favicon.png',
   'assets/icon-192.png',
