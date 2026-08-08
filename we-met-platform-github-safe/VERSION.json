@@ -1,5 +1,5 @@
 {
-  "version": "5.11.0",
-  "updated": "2026-08-07",
-  "notes": "QR-only direct UPI checkout with a copyable UPI ID and saved-QR option, no payment-app redirects, icon-only in-app navigation, a rose professional admin workspace, improved mobile scrolling, and cleaned deployment files."
+  "version": "6.0.0",
+  "updated": "2026-08-08",
+  "notes": "Professional real-conversation release with a consolidated project tree, direct-UPI-only checkout, listener work sessions and analytics, linked admin profiles, improved availability controls, public policy access, security hardening and a calm communication-first design."
 }
