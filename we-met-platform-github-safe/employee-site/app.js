@@ -20,7 +20,7 @@
   let statsRefreshTimer = null;
 
   const NAVIGATION_MARKER = 'we-met-listener-navigation';
-  const VALID_TABS = new Set(['desk', 'history', 'profile', 'notifications']);
+  const VALID_TABS = new Set(['desk', 'wallet', 'history', 'profile', 'notifications']);
 
   function navigationState(tab = activeTab, overlay = null) {
     return { marker: NAVIGATION_MARKER, tab: VALID_TABS.has(tab) ? tab : 'desk', overlay };
@@ -105,7 +105,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.0.1', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.1.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
   }
@@ -132,9 +132,11 @@
     $('#reportBtn').addEventListener('click', reportCurrent);
     $('#chatForm').addEventListener('submit', sendChat);
     $('#profileForm').addEventListener('submit', saveProfile);
+    $('#payoutDetailsForm').addEventListener('submit', savePayoutDetails);
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#employeeEmailForm').addEventListener('submit', changeEmail);
     $('#refreshHistory').addEventListener('click', loadHistory);
+    $('#refreshWallet').addEventListener('click', loadWallet);
     $('#refreshActivity').addEventListener('click', () => { loadStats(); loadActivity(); });
     $('#minimizeListenerCall').addEventListener('click', () => minimizeListenerCall());
     $('#restoreListenerCall').addEventListener('click', restoreListenerCall);
@@ -158,6 +160,7 @@
     $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
     button?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     if (tab === 'history') loadHistory();
+    if (tab === 'wallet') loadWallet();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'desk') { loadStats(); loadActivity(); }
     syncBackButton();
@@ -311,7 +314,6 @@
     $('#profileUsername').value = me.username || '';
     $('#profileEmail').value = me.email || '';
     $('#profilePhone').value = me.phone || '';
-    $('#profileUpi').value = me.upiId || '';
     $('#profileBio').value = me.bio || '';
     $('#profileCode').value = me.employeeCode || '';
     $('#profileLanguage').value = me.listenerLanguage || 'Malayalam';
@@ -319,11 +321,14 @@
     connect();
     loadStats();
     loadActivity();
+    loadWallet();
     loadHistory();
     loadNotifications();
     clearInterval(statsRefreshTimer);
     statsRefreshTimer = setInterval(() => {
-      if (document.visibilityState === 'visible' && activeTab === 'desk') loadStats();
+      if (document.visibilityState !== 'visible') return;
+      if (activeTab === 'desk') loadStats();
+      if (activeTab === 'wallet') loadWallet();
     }, 30_000);
     syncBackButton();
   }
@@ -468,9 +473,13 @@
       loadStats();
       loadActivity();
       loadHistory();
+      loadWallet();
     });
     socket.on('chat:message', addChat);
-    socket.on('notification:new', (notification) => P.toast(`${notification.title}: ${notification.body}`, 'info'));
+    socket.on('notification:new', (notification) => {
+      P.toast(`${notification.title}: ${notification.body}`, 'info');
+      if (/wallet|payout/i.test(`${notification.title} ${notification.body}`)) loadWallet();
+    });
     socket.on('account:restricted', (data) => {
       P.toast(data.reason || 'Your account has been restricted.', 'error');
       logout();
@@ -608,10 +617,8 @@
   async function loadStats() {
     try {
       const response = await P.api('/api/employee/stats');
-      $('#todayWork').textContent = P.duration(response.stats.today_work_seconds);
       $('#todayTime').textContent = P.duration(response.stats.today_seconds);
-      $('#todayBreak').textContent = P.duration(response.stats.today_break_seconds);
-      $('#weekWork').textContent = P.duration(response.stats.week_work_seconds);
+      $('#weekTime').textContent = P.duration(response.stats.week_seconds);
       $('#totalCalls').textContent = response.stats.total_calls;
       $('#totalTime').textContent = P.duration(response.stats.total_seconds);
       $('#currentShiftSince').textContent = response.stats.current_activity_started_at
@@ -619,6 +626,70 @@
         : 'No active work session';
     } catch (error) {
       P.toast(error.message, 'error');
+    }
+  }
+
+  async function loadWallet() {
+    try {
+      const response = await P.api('/api/employee/wallet');
+      const summary = response.summary || {};
+      $('#walletBalance').textContent = P.moneyExact(summary.balancePaise);
+      $('#walletRate').textContent = `${P.moneyExact(summary.ratePaisePerMinute)}/min`;
+      $('#walletToday').textContent = P.moneyExact(summary.todayEarningsPaise);
+      $('#walletWeek').textContent = P.moneyExact(summary.weekEarningsPaise);
+      $('#walletLifetime').textContent = P.moneyExact(summary.lifetimeEarningsPaise);
+      $('#walletPaid').textContent = P.moneyExact(summary.lifetimePaidPaise);
+      if (!$('#payoutDetailsForm').contains(document.activeElement)) {
+        $('#walletUpiId').value = summary.upiId || '';
+        $('#walletUpiPhone').value = summary.upiPhone || '';
+      }
+
+      const hasPayoutDetails = Boolean(summary.upiId || summary.upiPhone);
+      $('#walletPayoutStatus').textContent = Number(summary.ratePaisePerMinute || 0) <= 0
+        ? 'Your rate has not been set yet. Ask the administrator to set it before taking paid calls.'
+        : Number(summary.balancePaise || 0) > 0
+          ? (hasPayoutDetails ? 'This exact amount is ready for the administrator to mark paid.' : 'Add payout details so the administrator can pay this balance.')
+          : 'Call earnings are credited automatically after each connected call.';
+
+      const labels = {
+        call_credit: 'Call earnings',
+        payout: 'Paid withdrawal',
+        admin_adjustment: 'Administrator adjustment',
+      };
+      $('#walletHistory').innerHTML = response.transactions?.length
+        ? response.transactions.map((entry) => {
+          const amount = Number(entry.amount_paise || 0);
+          const callDetail = entry.type === 'call_credit'
+            ? `${P.duration(entry.billed_seconds)} at ${P.moneyExact(entry.rate_paise_per_minute)}/min`
+            : '';
+          const payoutDestination = entry.type === 'payout'
+            ? `${entry.payout_upi_id || entry.payout_upi_phone || 'Saved payout method'}${entry.payment_reference ? ` · Ref ${entry.payment_reference}` : ''}`
+            : '';
+          const detail = [callDetail || payoutDestination, entry.note].filter(Boolean).join(' · ');
+          return `<article class="wallet-entry ${amount < 0 ? 'debit' : 'credit'}"><div><strong>${P.esc(labels[entry.type] || entry.type)}</strong><p>${P.esc(detail || 'Wallet entry')}</p><small>${P.date(entry.created_at)}</small></div><b>${amount >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(amount))}</b></article>`;
+        }).join('')
+        : emptyState('No wallet activity', 'Connected-call earnings and paid withdrawals will appear here.');
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  async function savePayoutDetails(event) {
+    event.preventDefault();
+    const button = event.submitter;
+    button?.setAttribute('disabled', '');
+    try {
+      const response = await P.api('/api/employee/wallet/payout-details', {
+        method: 'PATCH',
+        body: JSON.stringify({ upiId: $('#walletUpiId').value, upiPhone: $('#walletUpiPhone').value }),
+      });
+      me = { ...me, upiId: response.upiId, upiPhone: response.upiPhone };
+      P.toast('Payout details saved.', 'success');
+      await loadWallet();
+    } catch (error) {
+      P.toast(error.message, 'error');
+    } finally {
+      button?.removeAttribute('disabled');
     }
   }
 
@@ -642,7 +713,7 @@
       const response = await P.api('/api/employee/history');
       $('#historyList').innerHTML = response.calls.length
         ? response.calls.map((call) => `
-          <article class="list-item"><div><strong>${P.esc(call.customer_name)}</strong><p>${P.date(call.created_at)} · ${P.duration(call.billed_seconds)}</p><small>${P.esc(call.end_reason || call.status)}</small></div><div class="list-actions"><button class="button button-quiet" data-report="${call.id}">Report</button><button class="button button-soft" data-block="${call.id}">Request restriction</button></div></article>`).join('')
+          <article class="list-item"><div><strong>${P.esc(call.customer_name)}</strong><p>${P.date(call.created_at)} · ${P.duration(call.billed_seconds)} · Earned ${P.moneyExact(call.listener_earnings_paise)}</p><small>${P.esc(call.end_reason || call.status)}</small></div><div class="list-actions"><button class="button button-quiet" data-report="${call.id}">Report</button><button class="button button-soft" data-block="${call.id}">Request restriction</button></div></article>`).join('')
         : emptyState('No call history', 'Completed and missed calls will appear here.');
       $$('[data-report]').forEach((button) => button.addEventListener('click', () => reportId(button.dataset.report, false)));
       $$('[data-block]').forEach((button) => button.addEventListener('click', () => reportId(button.dataset.block, true)));
@@ -678,7 +749,6 @@
           name: $('#profileName').value,
           username: $('#profileUsername').value,
           phone: $('#profilePhone').value,
-          upiId: $('#profileUpi').value,
           bio: $('#profileBio').value,
         }),
       });

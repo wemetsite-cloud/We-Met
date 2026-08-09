@@ -1,7 +1,7 @@
 {
   "name": "We Met Listener",
   "short_name": "WM Listener",
-  "description": "We Met listener workspace for availability, private calls, chat and work-session activity.",
+  "description": "We Met listener workspace for private calls, talk-time analytics, earnings, payouts and profile management.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
