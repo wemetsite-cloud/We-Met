@@ -6,6 +6,7 @@ const config = require('./src/config');
 const db = require('./src/db');
 const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
+const { settleCall } = require('./src/call-settlement');
 
 const app = express();
 const server = http.createServer(app);
@@ -177,14 +178,6 @@ app.use((error, _req, res, _next) => {
 
 async function reconcileInterruptedCalls() {
   await db.query(`
-    INSERT INTO wallet_transactions (customer_id, seconds_delta, type, note, reference_id)
-    SELECT customer_id, -billed_seconds, 'call_debit', 'Voice call', id
-    FROM calls
-    WHERE billed_seconds > 0
-    ON CONFLICT DO NOTHING
-  `);
-
-  await db.query(`
     UPDATE calls
     SET
       status = CASE WHEN status = 'ringing' THEN 'cancelled' ELSE 'ended' END,
@@ -192,6 +185,16 @@ async function reconcileInterruptedCalls() {
       end_reason = 'Server restarted during the call'
     WHERE status IN ('ringing', 'connecting', 'active')
   `);
+
+  const unsettled = await db.query(`
+    SELECT id FROM calls
+    WHERE earnings_settled_at IS NULL
+      AND status IN ('ended','rejected','cancelled','failed')
+    ORDER BY created_at
+  `);
+  for (const call of unsettled.rows) {
+    await settleCall(call.id);
+  }
 }
 
 async function reconcileInterruptedListenerActivity() {

@@ -3,6 +3,7 @@ const config = require('./config');
 const { verifyToken } = require('./auth');
 const { activateExpiredSuspension } = require('./middleware');
 const listenerActivity = require('./listener-activity');
+const { settleCall } = require('./call-settlement');
 
 function createSocketServer(io) {
   const employees = new Map();
@@ -137,29 +138,6 @@ function createSocketServer(io) {
       .sort((a, b) => a[1].lastAssigned - b[1].lastAssigned)[0]?.[0] || null;
   }
 
-  async function writeCallDebit(callRuntime) {
-    const callResult = await db.query(`
-      SELECT billed_seconds FROM calls WHERE id = $1
-    `, [callRuntime.id]);
-    const billedSeconds = Number(callResult.rows[0]?.billed_seconds || callRuntime.billedSeconds || 0);
-    callRuntime.billedSeconds = billedSeconds;
-
-    if (billedSeconds <= 0) return;
-
-    await db.query(`
-      INSERT INTO wallet_transactions (
-        customer_id, seconds_delta, type, note, reference_id
-      )
-      VALUES ($1, $2, 'call_debit', $3, $4)
-      ON CONFLICT DO NOTHING
-    `, [
-      callRuntime.customerId,
-      -billedSeconds,
-      `${callRuntime.language || 'Voice'} voice call`,
-      callRuntime.id,
-    ]);
-  }
-
   async function ringCustomer(customerId, preferredEmployeeId = null, triedEmployees = [], options = {}) {
     if (userCall.has(customerId)) {
       emitToUser(customerId, 'call:error', { message: 'You already have a call in progress.' });
@@ -219,9 +197,14 @@ function createSocketServer(io) {
     let callRow;
     try {
       const callResult = await db.query(`
-        INSERT INTO calls (customer_id, employee_id, status)
-        VALUES ($1, $2, 'ringing')
-        RETURNING id
+        INSERT INTO calls (customer_id, employee_id, status, listener_rate_paise)
+        VALUES (
+          $1,
+          $2,
+          'ringing',
+          COALESCE((SELECT listener_rate_paise FROM users WHERE id=$2 AND role='employee'),0)
+        )
+        RETURNING id,listener_rate_paise
       `, [customerId, employeeId]);
       callRow = callResult.rows[0];
     } catch (error) {
@@ -257,6 +240,7 @@ function createSocketServer(io) {
       employeeId,
       status: 'ringing',
       billedSeconds: 0,
+      listenerRatePaise: Number(callRow.listener_rate_paise || 0),
       tried: [...triedEmployees, employeeId],
       language: employee.language || primaryLanguage,
       primaryLanguage,
@@ -347,9 +331,14 @@ function createSocketServer(io) {
     `, [callId, finalStatus, reason]);
 
     try {
-      await writeCallDebit(runtime);
+      const settlement = await settleCall(runtime.id);
+      if (settlement) runtime.billedSeconds = settlement.billedSeconds;
     } catch (error) {
-      console.error('Could not save call wallet transaction:', error);
+      console.error('Could not settle call wallets:', error);
+      const retryTimer = setTimeout(() => {
+        settleCall(runtime.id).catch((retryError) => console.error('Call settlement retry failed:', retryError));
+      }, 5000);
+      retryTimer.unref();
     }
 
     calls.delete(callId);

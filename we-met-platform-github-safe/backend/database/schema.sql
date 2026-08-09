@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   bio text,
   employee_code text UNIQUE,
   upi_id text,
+  upi_phone text,
+  listener_rate_paise integer NOT NULL DEFAULT 0 CONSTRAINT users_listener_rate_nonnegative CHECK (listener_rate_paise >= 0),
   listener_availability text NOT NULL DEFAULT 'offline' CHECK (listener_availability IN ('online','break','offline')),
   listener_language text NOT NULL DEFAULT 'Malayalam',
   password_hash text NOT NULL,
@@ -68,6 +70,9 @@ CREATE TABLE IF NOT EXISTS calls (
   started_at timestamptz,
   ended_at timestamptz,
   billed_seconds integer NOT NULL DEFAULT 0,
+  listener_rate_paise integer NOT NULL DEFAULT 0 CONSTRAINT calls_listener_rate_nonnegative CHECK (listener_rate_paise >= 0),
+  listener_earnings_paise bigint NOT NULL DEFAULT 0 CONSTRAINT calls_listener_earnings_nonnegative CHECK (listener_earnings_paise >= 0),
+  earnings_settled_at timestamptz,
   end_reason text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -91,6 +96,22 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   type text NOT NULL CHECK (type IN ('coupon','admin_adjustment','call_debit','payment')),
   note text,
   reference_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS listener_wallet_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type text NOT NULL CHECK (type IN ('call_credit','payout','admin_adjustment')),
+  amount_paise bigint NOT NULL CHECK (amount_paise <> 0),
+  reference_id uuid,
+  billed_seconds integer CHECK (billed_seconds IS NULL OR billed_seconds >= 0),
+  rate_paise_per_minute integer CHECK (rate_paise_per_minute IS NULL OR rate_paise_per_minute >= 0),
+  payout_upi_id text,
+  payout_upi_phone text,
+  payment_reference text,
+  note text,
+  created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -223,6 +244,8 @@ CREATE TABLE IF NOT EXISTS payment_submissions (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_phone text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_rate_paise integer NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_availability text NOT NULL DEFAULT 'offline';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_language text NOT NULL DEFAULT 'Malayalam';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until timestamptz;
@@ -236,6 +259,31 @@ ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_id uuid REFERENCES users(id)
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal';
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS admin_note text;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS listener_rate_paise integer NOT NULL DEFAULT 0;
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS listener_earnings_paise bigint NOT NULL DEFAULT 0;
+-- On an upgrade, mark only the calls that pre-date the earnings feature as
+-- historical. Keeping this inside the column-add migration is important:
+-- completed calls created after v6.1.0 must remain recoverable if settlement
+-- is interrupted and the server restarts.
+DO $$
+DECLARE
+  earnings_column_exists boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema=current_schema()
+      AND table_name='calls'
+      AND column_name='earnings_settled_at'
+  ) INTO earnings_column_exists;
+
+  IF NOT earnings_column_exists THEN
+    ALTER TABLE calls ADD COLUMN earnings_settled_at timestamptz;
+    UPDATE calls
+    SET earnings_settled_at=COALESCE(ended_at,created_at)
+    WHERE status IN ('ended','rejected','cancelled','failed');
+  END IF;
+END $$;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS recovery_key_hash text;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS admin_message text;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '72 hours');
@@ -253,6 +301,18 @@ ALTER TABLE payment_submissions ALTER COLUMN proof_data DROP NOT NULL;
 
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_listener_availability_check;
 ALTER TABLE users ADD CONSTRAINT users_listener_availability_check CHECK (listener_availability IN ('online','break','offline'));
+
+DO $$ BEGIN
+  ALTER TABLE users ADD CONSTRAINT users_listener_rate_nonnegative CHECK (listener_rate_paise >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE calls ADD CONSTRAINT calls_listener_rate_nonnegative CHECK (listener_rate_paise >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE calls ADD CONSTRAINT calls_listener_earnings_nonnegative CHECK (listener_earnings_paise >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 UPDATE payment_submissions
 SET payment_method='upi'
@@ -297,6 +357,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_employee ON calls(employee_id) WH
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_listener_activity ON listener_activity_sessions(employee_id) WHERE ended_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_call_credit ON listener_wallet_transactions(reference_id) WHERE type='call_credit' AND reference_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role,status);
 CREATE INDEX IF NOT EXISTS idx_listener_availability ON users(listener_availability) WHERE role='employee' AND status='active';
 CREATE INDEX IF NOT EXISTS idx_calls_customer ON calls(customer_id,created_at DESC);
@@ -305,6 +366,8 @@ CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
 CREATE INDEX IF NOT EXISTS idx_listener_activity_employee ON listener_activity_sessions(employee_id,started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_activity_started ON listener_activity_sessions(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wallet_customer ON wallet_transactions(customer_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_wallet_employee ON listener_wallet_transactions(employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_wallet_type ON listener_wallet_transactions(type,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);

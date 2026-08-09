@@ -51,3 +51,15 @@ test('the public sitemap only points to shipped customer pages', () => {
     assert.equal(fs.existsSync(path.join(siteRoot, name)), true, `sitemap page ${name} is missing`);
   }
 });
+
+test('every admin page and listener tab navigation target exists', () => {
+  const admin = fs.readFileSync(path.join(projectRoot, 'admin-site', 'index.html'), 'utf8');
+  for (const match of admin.matchAll(/data-page="([^"]+)"/g)) {
+    assert.match(admin, new RegExp(`id="page-${match[1]}"`), `admin page ${match[1]} is missing`);
+  }
+
+  const listener = fs.readFileSync(path.join(projectRoot, 'employee-site', 'index.html'), 'utf8');
+  for (const match of listener.matchAll(/data-tab="([^"]+)"/g)) {
+    assert.match(listener, new RegExp(`id="tab-${match[1]}"`), `listener tab ${match[1]} is missing`);
+  }
+});

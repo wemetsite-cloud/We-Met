@@ -34,14 +34,36 @@ test('keeps talk-time plans behind customer authentication', () => {
   assert.doesNotMatch(landing, /id="plansGrid"|class="plans-grid"/);
 });
 
-test('ships listener work-session tracking across database, API and both staff interfaces', () => {
+test('keeps listener work-session analytics private to admin while listener sees talk-time only', () => {
   assert.match(read('backend', 'database', 'schema.sql'), /listener_activity_sessions/);
   assert.match(read('backend', 'src', 'routes', 'employee.js'), /router\.get\(['"]\/activity/);
   assert.match(read('backend', 'src', 'routes', 'admin.js'), /today_work_seconds/);
-  assert.match(read('employee-site', 'index.html'), /id="todayWork"/);
+  assert.doesNotMatch(read('employee-site', 'index.html'), /id="(?:todayWork|weekWork|todayBreak)"/);
+  assert.match(read('employee-site', 'index.html'), /id="weekTime"/);
   assert.match(read('employee-site', 'index.html'), /id="activityList"/);
   assert.match(read('admin-site', 'index.html'), /id="listenerTodayWork"/);
   assert.match(read('backend', 'src', 'socket.js'), /currentRuntime\s*\?\s*\(currentRuntime\.status === 'ringing' \? 'ringing' : 'busy'\)/);
+});
+
+test('ships listener earnings, individual rates, exact payouts and immutable wallet history', () => {
+  const schema = read('backend', 'database', 'schema.sql');
+  const adminRoutes = read('backend', 'src', 'routes', 'admin.js');
+  const employeeRoutes = read('backend', 'src', 'routes', 'employee.js');
+  const listenerHtml = read('employee-site', 'index.html');
+  const adminHtml = read('admin-site', 'index.html');
+  assert.match(schema, /listener_wallet_transactions/);
+  assert.match(schema, /uq_listener_wallet_call_credit/);
+  assert.match(schema, /listener_rate_paise/);
+  assert.match(schema, /IF NOT earnings_column_exists THEN/);
+  assert.doesNotMatch(schema, /WHERE earnings_settled_at IS NULL\s+AND status IN/);
+  assert.match(adminRoutes, /\/listener-wallets\/:id\/mark-paid/);
+  assert.match(adminRoutes, /FOR UPDATE/);
+  assert.match(employeeRoutes, /router\.get\(['"]\/wallet/);
+  assert.match(employeeRoutes, /\/wallet\/payout-details/);
+  assert.match(listenerHtml, /id="tab-wallet"/);
+  assert.match(listenerHtml, /id="walletBalance"/);
+  assert.match(adminHtml, /id="page-payouts"/);
+  assert.match(adminHtml, /id="payoutDueTotal"/);
 });
 
 test('provides full clickable admin profiles and administrator audit history', () => {

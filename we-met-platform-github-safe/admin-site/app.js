@@ -14,6 +14,7 @@
   let tickets = [];
   let resets = [];
   let payments = [];
+  let listenerWallets = [];
   let auditEntries = [];
   let activePage = 'overview';
   let liveRefreshTimer = null;
@@ -22,6 +23,7 @@
     overview: ['Overview', 'Live service health and operational summary'],
     customers: ['Customers', 'Accounts, contact records and wallet controls'],
     employees: ['Listeners', 'Presence, connected work time and call performance'],
+    payouts: ['Listener payouts', 'Individual rates, exact unpaid balances and withdrawal history'],
     plans: ['Plans', 'Talk-time pricing available after customer sign-in'],
     payments: ['UPI payments', 'Verify direct UPI references and proof before wallet credit'],
     coupons: ['Coupons', 'Create and control wallet redeem codes'],
@@ -62,7 +64,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.0.1', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.1.0', { updateViaCache: 'none' });
       await registration.update();
     } catch { }
   }
@@ -110,6 +112,7 @@
     $('#refreshLive').onclick = () => loadLive();
     $('#reloadCustomers').onclick = () => loadUsers();
     $('#reloadEmployees').onclick = () => loadUsers();
+    $('#reloadPayouts').onclick = loadListenerWallets;
     $('#reloadPayments').onclick = loadPayments;
     $('#reloadCoupons').onclick = loadCoupons;
     $('#reloadCalls').onclick = loadCalls;
@@ -121,6 +124,7 @@
     $('#customerSearch').oninput = renderCustomers;
     $('#listenerSearch').oninput = renderEmployees;
     $('#listenerStatusFilter').onchange = renderEmployees;
+    $('#payoutSearch').oninput = renderListenerWallets;
     $('#callSearch').oninput = renderCalls;
 
     document.addEventListener('click', handleActionClick);
@@ -138,6 +142,9 @@
     if (!target) return;
     const d = target.dataset;
     if (d.editListener) return editListener(d.editListener);
+    if (d.walletRate) return listenerRateModal(d.walletRate);
+    if (d.walletPaid) return markListenerPaid(d.walletPaid);
+    if (d.walletAdjust) return adjustListenerWallet(d.walletAdjust);
     if (d.minutes) return minutesModal(d.minutes);
     if (d.suspend) return suspendModal(d.suspend);
     if (d.block) return setUserStatus(d.block, d.status === 'blocked' ? 'active' : 'blocked');
@@ -223,6 +230,7 @@
       overview: () => { loadDashboard(); loadLive(); },
       customers: loadUsers,
       employees: loadUsers,
+      payouts: loadListenerWallets,
       plans: loadPlans,
       payments: loadPayments,
       coupons: loadCoupons,
@@ -289,7 +297,13 @@
     $('#listenerOnlineCount').textContent = all.filter(user => user.listener_availability === 'online').length;
     $('#listenerTodayWork').textContent = P.duration(all.reduce((total, user) => total + Number(user.today_work_seconds || 0), 0));
     $('#listenerTodayTalk').textContent = P.duration(all.reduce((total, user) => total + Number(user.today_talk_seconds || 0), 0));
-    $('#employeeCards').innerHTML = list.length ? list.map(user => `<article class="listener-admin-card clickable-card" tabindex="0" data-user-profile="${user.id}"><header><span class="customer-avatar listener-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, `${user.employee_code || 'No ID'} • ${user.listener_language || 'Malayalam'}`)}</div><div class="listener-statuses"><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span><span class="pill ${user.listener_availability === 'online' ? 'available' : P.esc(user.listener_availability || 'offline')}">${P.esc(user.listener_availability || 'offline')}</span></div></header><div class="listener-performance"><div><small>Work today</small><strong>${P.duration(user.today_work_seconds)}</strong></div><div><small>Talk today</small><strong>${P.duration(user.today_talk_seconds)}</strong></div><div><small>Break today</small><strong>${P.duration(user.today_break_seconds)}</strong></div><div><small>Calls today</small><strong>${Number(user.today_calls || 0)}</strong></div><div><small>Total work</small><strong>${P.duration(user.total_work_seconds)}</strong></div><div><small>Total talk</small><strong>${P.duration(user.total_talk_seconds)}</strong></div></div><p class="listener-contact">${P.esc(user.email || '')}${user.phone ? ` • ${P.esc(user.phone)}` : ''} • Last seen ${user.last_seen_at ? P.date(user.last_seen_at) : 'not recorded'}</p><div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div></article>`).join('') : '<p class="empty-copy">No listeners match this filter.</p>';
+    $('#employeeCards').innerHTML = list.length ? list.map(user => `
+      <article class="listener-admin-card clickable-card" tabindex="0" data-user-profile="${user.id}">
+        <header><span class="customer-avatar listener-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, `${user.employee_code || 'No ID'} • ${user.listener_language || 'Malayalam'}`)}</div><div class="listener-statuses"><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span><span class="pill ${user.listener_availability === 'online' ? 'available' : P.esc(user.listener_availability || 'offline')}">${P.esc(user.listener_availability || 'offline')}</span></div></header>
+        <div class="listener-performance"><div><small>Work today</small><strong>${P.duration(user.today_work_seconds)}</strong></div><div><small>Talk today</small><strong>${P.duration(user.today_talk_seconds)}</strong></div><div><small>Break today</small><strong>${P.duration(user.today_break_seconds)}</strong></div><div><small>Calls today</small><strong>${Number(user.today_calls || 0)}</strong></div><div><small>Rate / min</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div><div><small>Unpaid wallet</small><strong>${P.moneyExact(user.listener_wallet_balance_paise)}</strong></div></div>
+        <p class="listener-contact">${P.esc(user.email || '')}${user.phone ? ` • ${P.esc(user.phone)}` : ''} • Last seen ${user.last_seen_at ? P.date(user.last_seen_at) : 'not recorded'}</p>
+        <div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="ghost" data-wallet-rate="${user.id}">Set rate</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div>
+      </article>`).join('') : '<p class="empty-copy">No listeners match this filter.</p>';
   }
 
   async function showDetails(id) {
@@ -298,24 +312,113 @@
       const user = data.user;
       const callStats = data.callAnalytics || {};
       const workStats = data.workAnalytics || {};
+      const listenerWalletSummary = data.listenerWalletSummary || {};
       const employeeMetrics = user.role === 'employee' ? `<section class="profile-section"><h3>Listener performance</h3><div class="profile-metrics"><article><small>Work today</small><strong>${P.duration(workStats.today_work_seconds)}</strong></article><article><small>Work this week</small><strong>${P.duration(workStats.week_work_seconds)}</strong></article><article><small>Total work</small><strong>${P.duration(workStats.total_work_seconds)}</strong></article><article><small>Break today</small><strong>${P.duration(workStats.today_break_seconds)}</strong></article><article><small>Talk today</small><strong>${P.duration(callStats.today_talk_seconds)}</strong></article><article><small>Talk this week</small><strong>${P.duration(callStats.week_talk_seconds)}</strong></article><article><small>Total talk</small><strong>${P.duration(callStats.total_talk_seconds)}</strong></article><article><small>Connected calls</small><strong>${Number(callStats.connected_calls || 0)}</strong></article></div></section><section class="profile-section"><h3>Recent availability sessions</h3><div class="activity-table">${(data.activitySessions || []).slice(0, 25).map(session => `<div><span class="pill ${session.state === 'online' ? 'available' : 'break'}">${P.esc(session.state)}</span><span><b>${P.duration(session.duration_seconds)}</b><small>${P.date(session.started_at)} → ${session.ended_at ? P.date(session.ended_at) : 'Now'}</small></span><small>${P.esc(session.end_reason || (session.ended_at ? 'Status changed' : 'Current session'))}</small></div>`).join('') || '<p>No availability sessions recorded.</p>'}</div></section>` : '';
-      const recentCalls = (data.calls || []).slice(0, 20).map(call => `<div class="profile-row"><div>${profileLink(call.customer_id, call.customer_name)} <span class="connection-arrow">↔</span> ${profileLink(call.employee_id, call.employee_name)}</div><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span><small>${P.duration(call.billed_seconds)} • ${P.date(call.started_at || call.created_at)}</small></div>`).join('') || '<p>No calls recorded.</p>';
+      const listenerLedger = (data.listenerWallet || []).slice(0, 50).map(entry => `<div class="profile-row"><strong>${Number(entry.amount_paise) >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(Number(entry.amount_paise)))}</strong><span>${P.esc(entry.note || entry.type)}${entry.payment_reference ? ` • Ref ${P.esc(entry.payment_reference)}` : ''}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No listener wallet entries.</p>';
+      const listenerFinance = user.role === 'employee' ? `<section class="profile-section"><h3>Listener wallet</h3><div class="profile-metrics"><article><small>Current balance</small><strong>${P.moneyExact(listenerWalletSummary.balance_paise)}</strong></article><article><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></article><article><small>Earned today</small><strong>${P.moneyExact(listenerWalletSummary.today_earnings_paise)}</strong></article><article><small>Earned this week</small><strong>${P.moneyExact(listenerWalletSummary.week_earnings_paise)}</strong></article><article><small>Lifetime earned</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_earnings_paise)}</strong></article><article><small>Lifetime paid</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_paid_paise)}</strong></article></div><div class="profile-list">${listenerLedger}</div></section>` : '';
+      const recentCalls = (data.calls || []).slice(0, 20).map(call => `<div class="profile-row"><div>${profileLink(call.customer_id, call.customer_name)} <span class="connection-arrow">↔</span> ${profileLink(call.employee_id, call.employee_name)}</div><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span><small>${P.duration(call.billed_seconds)}${user.role === 'employee' ? ` • ${P.moneyExact(call.listener_earnings_paise)}` : ''} • ${P.date(call.started_at || call.created_at)}</small></div>`).join('') || '<p>No calls recorded.</p>';
       const wallet = (data.wallet || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${Number(entry.seconds_delta) >= 0 ? '+' : '−'}${P.duration(Math.abs(Number(entry.seconds_delta)))}</strong><span>${P.esc(entry.note || entry.type)}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No wallet entries.</p>';
       const audit = (data.audits || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${P.esc(entry.action)}</strong><span>${P.esc(entry.admin_name || 'Administrator')}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No administrator changes recorded for this account.</p>';
-      modal(`${user.name} — full profile`, `<div class="full-profile"><section class="profile-identity"><span class="customer-avatar profile-avatar">${P.esc(initials(user.name))}</span><div><span class="eyebrow">${P.esc(user.role)} PROFILE</span><h2>${P.esc(user.name)}</h2><p>${P.esc(user.email || user.username || 'No login identifier')}</p></div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></section><div class="profile-facts"><div><small>Phone</small><strong>${user.phone ? `<a href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : 'Not provided'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div><div><small>Last login</small><strong>${user.last_login_at ? P.date(user.last_login_at) : 'Not recorded'}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div>${user.role === 'customer' ? `<div><small>Wallet</small><strong>${P.duration(user.balance_seconds)}</strong></div>` : ''}${user.role === 'employee' ? `<div><small>Employee ID</small><strong>${P.esc(user.employee_code || 'Not set')}</strong></div><div><small>Language</small><strong>${P.esc(user.listener_language || 'Malayalam')}</strong></div><div><small>Availability</small><strong>${P.esc(user.listener_availability || 'offline')}</strong></div><div><small>UPI ID</small><strong>${P.esc(user.upi_id || 'Not set')}</strong></div>` : ''}</div>${user.bio ? `<p class="profile-bio">${P.esc(user.bio)}</p>` : ''}${user.suspension_reason ? `<p class="profile-warning"><b>Restriction:</b> ${P.esc(user.suspension_reason)}${user.suspended_until ? ` until ${P.date(user.suspended_until)}` : ''}</p>` : ''}${employeeMetrics}<section class="profile-section"><h3>Recent calls</h3><div class="profile-list">${recentCalls}</div></section>${user.role === 'customer' ? `<section class="profile-section"><h3>Wallet activity</h3><div class="profile-list">${wallet}</div></section>` : ''}<section class="profile-section"><h3>Safety and support</h3><p>${(data.reports || []).length} report(s) • ${(data.support || []).length} support ticket(s)</p></section><section class="profile-section"><h3>Administrator history</h3><div class="profile-list">${audit}</div></section></div>`);
+      modal(`${user.name} — full profile`, `<div class="full-profile"><section class="profile-identity"><span class="customer-avatar profile-avatar">${P.esc(initials(user.name))}</span><div><span class="eyebrow">${P.esc(user.role)} PROFILE</span><h2>${P.esc(user.name)}</h2><p>${P.esc(user.email || user.username || 'No login identifier')}</p></div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></section><div class="profile-facts"><div><small>Phone</small><strong>${user.phone ? `<a href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : 'Not provided'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div><div><small>Last login</small><strong>${user.last_login_at ? P.date(user.last_login_at) : 'Not recorded'}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div>${user.role === 'customer' ? `<div><small>Wallet</small><strong>${P.duration(user.balance_seconds)}</strong></div>` : ''}${user.role === 'employee' ? `<div><small>Employee ID</small><strong>${P.esc(user.employee_code || 'Not set')}</strong></div><div><small>Language</small><strong>${P.esc(user.listener_language || 'Malayalam')}</strong></div><div><small>Availability</small><strong>${P.esc(user.listener_availability || 'offline')}</strong></div><div><small>UPI ID</small><strong>${P.esc(user.upi_id || 'Not set')}</strong></div><div><small>UPI mobile</small><strong>${P.esc(user.upi_phone || 'Not set')}</strong></div><div><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div>` : ''}</div>${user.bio ? `<p class="profile-bio">${P.esc(user.bio)}</p>` : ''}${user.suspension_reason ? `<p class="profile-warning"><b>Restriction:</b> ${P.esc(user.suspension_reason)}${user.suspended_until ? ` until ${P.date(user.suspended_until)}` : ''}</p>` : ''}${employeeMetrics}${listenerFinance}<section class="profile-section"><h3>Recent calls</h3><div class="profile-list">${recentCalls}</div></section>${user.role === 'customer' ? `<section class="profile-section"><h3>Wallet activity</h3><div class="profile-list">${wallet}</div></section>` : ''}<section class="profile-section"><h3>Safety and support</h3><p>${(data.reports || []).length} report(s) • ${(data.support || []).length} support ticket(s)</p></section><section class="profile-section"><h3>Administrator history</h3><div class="profile-list">${audit}</div></section></div>`);
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
   function editListener(id) {
     const user = users.find(item => item.id === id && item.role === 'employee');
     if (!user) return;
-    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><label>Name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Username<input id="editListenerUsername" value="${P.esc(user.username || '')}"></label><label>Email<input id="editListenerEmail" type="email" value="${P.esc(user.email || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Phone<input id="editListenerPhone" value="${P.esc(user.phone || '')}"></label><label>UPI ID<input id="editListenerUpi" value="${P.esc(user.upi_id || '')}"></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
+    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><label>Name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Username<input id="editListenerUsername" value="${P.esc(user.username || '')}"></label><label>Email<input id="editListenerEmail" type="email" value="${P.esc(user.email || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Phone<input id="editListenerPhone" value="${P.esc(user.phone || '')}"></label><label>UPI ID<input id="editListenerUpi" value="${P.esc(user.upi_id || '')}" placeholder="name@bank"></label><label>UPI-linked mobile<input id="editListenerUpiPhone" inputmode="tel" value="${P.esc(user.upi_phone || '')}"></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
     $('#editListenerForm').onsubmit = async event => {
       event.preventDefault();
       try {
-        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, email: $('#editListenerEmail').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, upiId: $('#editListenerUpi').value, bio: $('#editListenerBio').value }) });
-        closeAdminModal(); P.toast('Listener updated.', 'success'); loadUsers(); loadLive(true);
+        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, email: $('#editListenerEmail').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, upiId: $('#editListenerUpi').value, upiPhone: $('#editListenerUpiPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value }) });
+        closeAdminModal(); P.toast('Listener updated.', 'success'); loadUsers(); loadListenerWallets(); loadLive(true);
       } catch (error) { P.toast(error.message, 'error'); }
+    };
+  }
+
+  async function loadListenerWallets() {
+    try {
+      listenerWallets = (await P.api('/api/admin/listener-wallets')).wallets || [];
+      renderListenerWallets();
+    } catch (error) {
+      P.toast(error.message, 'error');
+    }
+  }
+
+  function renderListenerWallets() {
+    const query = ($('#payoutSearch')?.value || '').trim().toLowerCase();
+    const list = listenerWallets.filter(item => `${item.name} ${item.email || ''} ${item.employee_code || ''} ${item.upi_id || ''} ${item.upi_phone || ''}`.toLowerCase().includes(query));
+    const total = field => listenerWallets.reduce((sum, item) => sum + Number(item[field] || 0), 0);
+    $('#payoutDueTotal').textContent = P.moneyExact(total('balance_paise'));
+    $('#payoutTodayTotal').textContent = P.moneyExact(total('today_earnings_paise'));
+    $('#payoutLifetimeTotal').textContent = P.moneyExact(total('lifetime_earnings_paise'));
+    $('#payoutPaidTotal').textContent = P.moneyExact(total('lifetime_paid_paise'));
+    $('#listenerWalletCards').innerHTML = list.length ? list.map(item => {
+      const payoutMethod = [item.upi_id, item.upi_phone].filter(Boolean).join(' • ') || 'Payout details not added';
+      const balance = Number(item.balance_paise || 0);
+      return `<article class="listener-wallet-card"><header><span class="customer-avatar listener-avatar">${P.esc(initials(item.name))}</span><div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(payoutMethod)}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span></div></header><div class="wallet-due"><small>Exact balance to pay</small><strong>${P.moneyExact(balance)}</strong><span>${balance > 0 ? 'Unpaid listener earnings' : 'Nothing due now'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Paid out</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last paid</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions"><button class="primary" data-wallet-paid="${item.id}" ${balance <= 0 ? 'disabled' : ''}>Mark paid</button><button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
+    }).join('') : '<p class="empty-copy">No listener wallets match this search.</p>';
+  }
+
+  function listenerRateModal(id) {
+    const listener = listenerWallets.find(item => item.id === id) || users.find(item => item.id === id && item.role === 'employee');
+    if (!listener) return;
+    modal(`Set rate — ${listener.name}`, `<form id="listenerRateForm" class="stack"><p class="modal-copy">This rate is snapshotted when a new call starts. Changing it does not rewrite previous calls or earnings.</p><label>Rupees per connected minute<input id="listenerRateValue" type="number" min="0" max="100000" step="0.01" value="${Number(listener.listener_rate_paise || 0) / 100}" required></label><button class="primary">Save rate</button></form>`);
+    $('#listenerRateForm').onsubmit = async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      button?.setAttribute('disabled', '');
+      try {
+        await P.api(`/api/admin/listener-wallets/${id}/rate`, { method: 'PATCH', body: JSON.stringify({ ratePaise: Math.round(Number($('#listenerRateValue').value) * 100) }) });
+        closeAdminModal();
+        P.toast('Listener rate updated for new calls.', 'success');
+        loadListenerWallets(); loadUsers(); loadAudit();
+      } catch (error) {
+        button?.removeAttribute('disabled');
+        P.toast(error.message, 'error');
+      }
+    };
+  }
+
+  function markListenerPaid(id) {
+    const listener = listenerWallets.find(item => item.id === id);
+    if (!listener || Number(listener.balance_paise || 0) <= 0) return;
+    const destination = [listener.upi_id, listener.upi_phone].filter(Boolean).join(' • ');
+    if (!destination) return P.toast('Add this listener’s UPI ID or UPI-linked mobile number first.', 'error');
+    modal(`Mark paid — ${listener.name}`, `<form id="listenerPaidForm" class="stack"><div class="exact-payout"><small>Exact amount being cleared</small><strong>${P.moneyExact(listener.balance_paise)}</strong><span>Pay to ${P.esc(destination)}</span></div><label>UPI transaction reference / UTR<input id="listenerPaymentReference" maxlength="160" placeholder="Recommended for payout audit"></label><label>Administrator note<textarea id="listenerPaymentNote" maxlength="500" placeholder="Optional payout note"></textarea></label><p class="modal-copy">Only click the button after this exact amount has actually been paid. The balance will move to withdrawal history and become ₹0.00.</p><button class="primary">Confirm exact payout paid</button></form>`);
+    $('#listenerPaidForm').onsubmit = async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      button?.setAttribute('disabled', '');
+      try {
+        await P.api(`/api/admin/listener-wallets/${id}/mark-paid`, { method: 'POST', body: JSON.stringify({ paymentReference: $('#listenerPaymentReference').value, note: $('#listenerPaymentNote').value }) });
+        closeAdminModal();
+        P.toast(`${P.moneyExact(listener.balance_paise)} marked paid and moved to history.`, 'success');
+        loadListenerWallets(); loadUsers(); loadAudit();
+      } catch (error) {
+        button?.removeAttribute('disabled');
+        P.toast(error.message, 'error');
+      }
+    };
+  }
+
+  function adjustListenerWallet(id) {
+    const listener = listenerWallets.find(item => item.id === id);
+    if (!listener) return;
+    modal(`Adjust wallet — ${listener.name}`, `<form id="listenerAdjustmentForm" class="stack"><p class="modal-copy">Current balance: <b>${P.moneyExact(listener.balance_paise)}</b>. Use a positive amount to add money or a negative amount to remove it.</p><label>Adjustment in rupees<input id="listenerAdjustmentAmount" type="number" step="0.01" required placeholder="Example: 50 or -20"></label><label>Reason<input id="listenerAdjustmentNote" maxlength="500" required placeholder="Reason shown in the audit history"></label><button class="primary">Apply adjustment</button></form>`);
+    $('#listenerAdjustmentForm').onsubmit = async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      button?.setAttribute('disabled', '');
+      try {
+        await P.api(`/api/admin/listener-wallets/${id}/adjust`, { method: 'POST', body: JSON.stringify({ amountPaise: Math.round(Number($('#listenerAdjustmentAmount').value) * 100), note: $('#listenerAdjustmentNote').value }) });
+        closeAdminModal();
+        P.toast('Listener wallet adjusted.', 'success');
+        loadListenerWallets(); loadUsers(); loadAudit();
+      } catch (error) {
+        button?.removeAttribute('disabled');
+        P.toast(error.message, 'error');
+      }
     };
   }
 
@@ -369,7 +472,7 @@
   async function createEmployee(event) {
     event.preventDefault();
     try {
-      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, email: $('#empEmail').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, upiId: $('#empUpi').value, bio: $('#empBio').value, language: $('#empLanguage').value }) });
+      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, email: $('#empEmail').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, upiId: $('#empUpi').value, upiPhone: $('#empUpiPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value }) });
       event.target.reset(); $('#empLanguage').value = 'Malayalam'; P.toast('Listener created.', 'success'); loadUsers();
     } catch (error) { P.toast(error.message, 'error'); }
   }
@@ -430,7 +533,7 @@
   function renderCalls() {
     const query = ($('#callSearch')?.value || '').toLowerCase();
     const list = calls.filter(call => `${call.customer_name} ${call.employee_name}`.toLowerCase().includes(query));
-    $('#callsTable').innerHTML = list.map(call => `<tr><td>${profileLink(call.customer_id, call.customer_name, call.customer_email || '')}</td><td>${profileLink(call.employee_id, call.employee_name, call.employee_email || '')}</td><td><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span></td><td>${P.duration(call.billed_seconds)}</td><td>${P.date(call.started_at || call.created_at)}</td><td>${P.esc(call.end_reason || '—')}</td></tr>`).join('') || '<tr><td colspan="6">No calls match this search.</td></tr>';
+    $('#callsTable').innerHTML = list.map(call => `<tr><td>${profileLink(call.customer_id, call.customer_name, call.customer_email || '')}</td><td>${profileLink(call.employee_id, call.employee_name, call.employee_email || '')}</td><td><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span></td><td>${P.duration(call.billed_seconds)}</td><td>${P.moneyExact(call.listener_rate_paise)}</td><td>${P.moneyExact(call.listener_earnings_paise)}</td><td>${P.date(call.started_at || call.created_at)}</td><td>${P.esc(call.end_reason || '—')}</td></tr>`).join('') || '<tr><td colspan="8">No calls match this search.</td></tr>';
   }
 
   async function loadReports() {

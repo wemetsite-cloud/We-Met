@@ -37,7 +37,7 @@ async function authenticate(req, res, next) {
 
     const payload = verifyToken(token);
     const result = await db.query(
-      `SELECT id,role,name,username,email,phone,bio,employee_code,upi_id,listener_availability,listener_language,
+      `SELECT id,role,name,username,email,phone,bio,employee_code,upi_id,upi_phone,listener_rate_paise,listener_availability,listener_language,
               balance_seconds,status,suspended_until,suspension_reason,auth_version,created_at
        FROM users WHERE id=$1`,
       [payload.sub],

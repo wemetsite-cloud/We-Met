@@ -50,6 +50,8 @@ function publicUser(user) {
     bio: user.bio,
     employeeCode: user.employee_code,
     upiId: user.upi_id,
+    upiPhone: user.upi_phone,
+    listenerRatePaise: Number(user.listener_rate_paise || 0),
     listenerAvailability: user.listener_availability,
     listenerLanguage: user.listener_language || 'Malayalam',
     balanceSeconds: user.balance_seconds,
