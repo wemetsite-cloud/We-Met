@@ -56,10 +56,15 @@ const config = {
   serveFrontends: bool(process.env.SERVE_FRONTENDS, true),
   supportEmail,
   upiPayment: {
-    enabled: true,
+    enabled: bool(process.env.DIRECT_UPI_ENABLED, false),
     payeeName: upiPaymentPayeeName,
     upiId: upiPaymentId,
     intentMinutes: number(process.env.UPI_PAYMENT_INTENT_MINUTES, 1440),
+  },
+  googlePlay: {
+    enabled: bool(process.env.GOOGLE_PLAY_BILLING_ENABLED, false),
+    packageName: String(process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.quartzwebsolutions.wemet').trim(),
+    serviceAccountJsonBase64: String(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 || '').trim(),
   },
   webPush: {
     enabled: Boolean(vapidPublicKey && vapidPrivateKey),
@@ -121,14 +126,24 @@ function validateConfig() {
   if (config.initialListener.password && !/^\S+@\S+\.\S+$/.test(config.initialListener.email)) {
     problems.push('INITIAL_LISTENER_EMAIL is required when an initial listener password is configured.');
   }
-  if (config.upiPayment.payeeName.length < 2) {
-    problems.push('UPI_PAYMENT_PAYEE_NAME must exactly match the receiving UPI account name.');
+  if (config.upiPayment.enabled) {
+    if (config.upiPayment.payeeName.length < 2) {
+      problems.push('UPI_PAYMENT_PAYEE_NAME must exactly match the receiving UPI account name.');
+    }
+    if (!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(config.upiPayment.upiId)) {
+      problems.push('UPI_PAYMENT_ID must be a valid receiving UPI ID.');
+    }
+    if (!Number.isInteger(config.upiPayment.intentMinutes) || config.upiPayment.intentMinutes < 15 || config.upiPayment.intentMinutes > 10080) {
+      problems.push('UPI_PAYMENT_INTENT_MINUTES must be between 15 and 10080.');
+    }
   }
-  if (!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(config.upiPayment.upiId)) {
-    problems.push('UPI_PAYMENT_ID must be a valid receiving UPI ID.');
-  }
-  if (!Number.isInteger(config.upiPayment.intentMinutes) || config.upiPayment.intentMinutes < 15 || config.upiPayment.intentMinutes > 10080) {
-    problems.push('UPI_PAYMENT_INTENT_MINUTES must be between 15 and 10080.');
+  if (config.googlePlay.enabled) {
+    if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(config.googlePlay.packageName)) {
+      problems.push('GOOGLE_PLAY_PACKAGE_NAME must be a valid Android application ID.');
+    }
+    if (!config.googlePlay.serviceAccountJsonBase64) {
+      problems.push('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 is required when Google Play billing is enabled.');
+    }
   }
   if (!Number.isInteger(config.listenerDisconnectGraceSeconds)
       || config.listenerDisconnectGraceSeconds < 10

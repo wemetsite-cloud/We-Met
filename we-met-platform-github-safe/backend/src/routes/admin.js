@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword } = require('../auth');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
+const { settleCallWithClient } = require('../call-settlement');
 
 const router = express.Router();
 router.use(authenticate, requireRole('admin'));
@@ -59,6 +60,22 @@ function upiPhone(value) {
   if (digits.length === 10) return `+91${digits}`;
   if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
   return false;
+}
+
+async function settleCompletedCallsBeforePayout(client, employeeId) {
+  const pending = await client.query(`
+    SELECT id
+    FROM calls
+    WHERE employee_id=$1
+      AND ended_at IS NOT NULL
+      AND earnings_settled_at IS NULL
+    ORDER BY ended_at,id
+    FOR UPDATE
+  `, [employeeId]);
+  for (const call of pending.rows) {
+    await settleCallWithClient(call.id, client);
+  }
+  return pending.rows.length;
 }
 
 router.get('/dashboard', asyncHandler(async (_req, res) => {
@@ -588,15 +605,67 @@ router.patch('/listener-wallets/:id/rate', asyncHandler(async (req, res) => {
 router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => {
   const paymentReference = text(req.body.paymentReference, 160) || null;
   const note = text(req.body.note, 500) || 'Full listener balance marked paid by administrator';
+  const requestedIdempotencyKey = text(req.body.idempotencyKey, 100);
+  if (requestedIdempotencyKey && !/^[A-Za-z0-9._:-]{16,100}$/.test(requestedIdempotencyKey)) {
+    return res.status(400).json({ error: 'Invalid payout request key.' });
+  }
+  const idempotencyKey = requestedIdempotencyKey || crypto.randomUUID();
 
   const output = await db.transaction(async (client) => {
+    const employeeLookup = await client.query(`
+      SELECT id,name,upi_id,upi_phone
+      FROM users
+      WHERE id=$1 AND role='employee'
+    `, [req.params.id]);
+    let employee = employeeLookup.rows[0];
+    if (!employee) throw Object.assign(new Error('Listener not found.'), { status: 404 });
+
+    // Serialize retries carrying the same request key before inspecting the
+    // ledger. This also makes a response-lost HTTP retry return the first
+    // payout instead of racing the unique index.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [idempotencyKey]);
+
+    const previousResult = await client.query(`
+      SELECT *
+      FROM listener_wallet_transactions
+      WHERE type='payout' AND idempotency_key=$1
+      LIMIT 1
+    `, [idempotencyKey]);
+    const previous = previousResult.rows[0];
+    if (previous) {
+      if (previous.employee_id !== employee.id) {
+        throw Object.assign(new Error('That payout request key is already in use.'), { status: 409 });
+      }
+      const current = await client.query(`
+        SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+        FROM listener_wallet_transactions
+        WHERE employee_id=$1
+      `, [employee.id]);
+      return {
+        employee,
+        payout: previous,
+        paidPaise: Math.abs(Number(previous.amount_paise || 0)),
+        balancePaise: Number(current.rows[0].balance_paise || 0),
+        alreadyProcessed: true,
+      };
+    }
+
+    // Pull every completed but interrupted call settlement into the ledger
+    // before taking the exact payout snapshot. In-progress calls remain new
+    // earnings and can only appear after this payout is permanently recorded.
+    await settleCompletedCallsBeforePayout(client, employee.id);
+
+    // Call settlement always locks call -> listener. Taking the listener lock
+    // only after settling keeps that lock order consistent and avoids a
+    // payout/settlement deadlock. It is also the serialization point for two
+    // simultaneous administrator payout actions.
     const employeeResult = await client.query(`
       SELECT id,name,upi_id,upi_phone
       FROM users
       WHERE id=$1 AND role='employee'
       FOR UPDATE
-    `, [req.params.id]);
-    const employee = employeeResult.rows[0];
+    `, [employee.id]);
+    employee = employeeResult.rows[0];
     if (!employee) throw Object.assign(new Error('Listener not found.'), { status: 404 });
     if (!employee.upi_id && !employee.upi_phone) {
       throw Object.assign(new Error('Add a UPI ID or UPI-linked mobile number before marking this balance paid.'), { status: 400 });
@@ -615,9 +684,9 @@ router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => 
     const payout = await client.query(`
       INSERT INTO listener_wallet_transactions(
         employee_id,type,amount_paise,payout_upi_id,payout_upi_phone,
-        payment_reference,note,created_by
+        payment_reference,idempotency_key,note,created_by
       )
-      VALUES($1,'payout',$2,$3,$4,$5,$6,$7)
+      VALUES($1,'payout',$2,$3,$4,$5,$6,$7,$8)
       RETURNING *
     `, [
       employee.id,
@@ -625,6 +694,7 @@ router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => 
       employee.upi_id,
       employee.upi_phone,
       paymentReference,
+      idempotencyKey,
       note,
       req.user.id,
     ]);
@@ -632,18 +702,28 @@ router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => 
     const title = 'Listener payout recorded';
     const body = `Your ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(balancePaise / 100)} wallet balance was marked paid.${paymentReference ? ` Reference: ${paymentReference}` : ''}`;
     await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [employee.id, title, body]);
-    return { employee, payout: payout.rows[0], balancePaise, notification: { title, body } };
+    return {
+      employee,
+      payout: payout.rows[0],
+      paidPaise: balancePaise,
+      balancePaise: 0,
+      alreadyProcessed: false,
+      notification: { title, body },
+    };
   });
 
-  await req.app.locals.notifyUser?.(output.employee.id, {
-    ...output.notification,
-    url: './',
-    tag: `we-met-listener-payout-${output.payout.id}`,
-  });
+  if (!output.alreadyProcessed) {
+    await req.app.locals.notifyUser?.(output.employee.id, {
+      ...output.notification,
+      url: './',
+      tag: `we-met-listener-payout-${output.payout.id}`,
+    });
+  }
   res.json({
     payout: { ...output.payout, amount_paise: Number(output.payout.amount_paise) },
-    paidPaise: output.balancePaise,
-    balancePaise: 0,
+    paidPaise: output.paidPaise,
+    balancePaise: output.balancePaise,
+    alreadyProcessed: output.alreadyProcessed,
   });
 }));
 

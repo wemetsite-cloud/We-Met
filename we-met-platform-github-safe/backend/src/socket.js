@@ -164,6 +164,14 @@ function createSocketServer(io) {
       return;
     }
 
+    const blockResult = await db.query(
+      'SELECT employee_id FROM customer_listener_blocks WHERE customer_id=$1',
+      [customerId],
+    );
+    const excludedEmployees = [
+      ...new Set([...triedEmployees, ...blockResult.rows.map((row) => row.employee_id)]),
+    ];
+
     let primaryLanguage = String(options.primaryLanguage || 'Malayalam').trim() || 'Malayalam';
     const allowOtherLanguages = Boolean(options.allowOtherLanguages);
 
@@ -172,9 +180,13 @@ function createSocketServer(io) {
       if (preferred?.language) primaryLanguage = preferred.language;
     }
 
-    const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
+    const employeeId = findAvailableEmployee(excludedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
     if (!employeeId) {
-      const otherLanguagesAvailable = [...employees.values()].some((item) => item.state === 'available' && !sameLanguage(item.language, primaryLanguage));
+      const otherLanguagesAvailable = [...employees.entries()].some(([id, item]) => (
+        !excludedEmployees.includes(id)
+          && item.state === 'available'
+          && !sameLanguage(item.language, primaryLanguage)
+      ));
       emitToUser(customerId, 'call:unavailable', {
         message: allowOtherLanguages
           ? `No ${primaryLanguage} or other-language listener is available right now. Please try again shortly.`
@@ -187,7 +199,7 @@ function createSocketServer(io) {
     const employee = employees.get(employeeId);
     if (!employee || employee.state !== 'available' || !hasLiveSocket(employeeId)) {
       if (!hasLiveSocket(employeeId)) employees.delete(employeeId);
-      await ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
+      await ringCustomer(customerId, null, [...excludedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
       return;
     }
     employee.state = 'ringing';
@@ -222,7 +234,11 @@ function createSocketServer(io) {
     const stillOnline = await db.query(`
       SELECT 1 FROM users
       WHERE id=$1 AND role='employee' AND status='active' AND listener_availability='online'
-    `, [employeeId]);
+        AND NOT EXISTS (
+          SELECT 1 FROM customer_listener_blocks
+          WHERE customer_id=$2 AND employee_id=$1
+        )
+    `, [employeeId, customerId]);
     if (!stillOnline.rows[0] || !hasLiveSocket(employeeId) || employees.get(employeeId) !== employee || employee.state !== 'ringing') {
       await db.query(`
         UPDATE calls SET status='cancelled',ended_at=now(),end_reason='Listener availability changed before ringing'
@@ -230,7 +246,7 @@ function createSocketServer(io) {
       `, [callRow.id]);
       if (employees.get(employeeId) === employee && employee.state === 'ringing') employee.state = 'available';
       broadcastListeners();
-      await ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
+      await ringCustomer(customerId, null, [...excludedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
       return;
     }
 
@@ -241,7 +257,7 @@ function createSocketServer(io) {
       status: 'ringing',
       billedSeconds: 0,
       listenerRatePaise: Number(callRow.listener_rate_paise || 0),
-      tried: [...triedEmployees, employeeId],
+      tried: [...excludedEmployees, employeeId],
       language: employee.language || primaryLanguage,
       primaryLanguage,
       allowOtherLanguages,
@@ -510,11 +526,20 @@ function createSocketServer(io) {
     socket.emit('session:ready', { user });
     db.query('UPDATE users SET last_seen_at=now() WHERE id=$1', [user.id]).catch(console.error);
 
+    const currentRuntime = calls.get(userCall.get(user.id));
+    if (currentRuntime && ['connecting', 'active'].includes(currentRuntime.status)) {
+      socket.join(`call:${currentRuntime.id}`);
+      socket.emit('call:resumed', {
+        callId: currentRuntime.id,
+        status: currentRuntime.status,
+        billedSeconds: currentRuntime.billedSeconds,
+      });
+    }
+
     if (user.role === 'employee') {
       cancelListenerDisconnect(user.id);
       listenerActivity.touchLastSeen(user.id).catch(console.error);
       const availability = user.listener_availability || 'offline';
-      const currentRuntime = calls.get(userCall.get(user.id));
       if (availability === 'online' || availability === 'break') {
         const presenceState = currentRuntime
           ? (currentRuntime.status === 'ringing' ? 'ringing' : 'busy')
@@ -750,6 +775,14 @@ function createSocketServer(io) {
 
       if (runtime?.status === 'ringing' && user.role === 'employee') {
         await retryCall(runtime.id, 'The listener disconnected before answering.');
+      } else if (runtime?.status === 'active') {
+        // Pause connected-second billing immediately, then let the bounded
+        // media reconnect timer recover a brief Wi-Fi/mobile-data switch.
+        updateMediaState(runtime, user.id, false);
+      } else if (runtime?.status === 'connecting') {
+        runtime.signalingReady.delete(user.id);
+        runtime.mediaConnected.delete(user.id);
+        // The existing connection timer remains the recovery deadline.
       } else if (callId) {
         await endCall(callId, `${user.role === 'employee' ? 'The listener' : 'The customer'} disconnected.`);
       }

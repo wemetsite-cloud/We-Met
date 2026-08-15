@@ -66,6 +66,7 @@ app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
 app.use('/api/customer/manual-payments', require('./src/routes/manual-payments'));
+app.use('/api/customer/play-purchases', require('./src/routes/play-purchases'));
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/employee', require('./src/routes/employee'));
 app.use('/api/admin', require('./src/routes/admin'));
@@ -103,7 +104,7 @@ const staticOptions = {
 };
 
 if (config.serveFrontends) {
-  const root = path.resolve(__dirname, '..');
+  const root = path.join(path.resolve(__dirname, '..'), 'legacy-web');
   const customer = path.join(root, 'customer-site');
   const employee = path.join(root, 'employee-site');
   const admin = path.join(root, 'admin-site');

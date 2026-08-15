@@ -27,6 +27,11 @@ const recoveryLimit = createRateLimit({
   max: 12,
   message: 'Too many recovery checks. Try again later.',
 });
+const deletionLimit = createRateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many account-deletion attempts. Try again later.',
+});
 
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
@@ -122,11 +127,13 @@ router.post('/register', registrationLimit, asyncHandler(async (req, res) => {
   const phone = normalisePhone(req.body.phone);
   const password = String(req.body.password || '');
   const termsAccepted = Boolean(req.body.termsAccepted);
+  const ageConfirmed = Boolean(req.body.ageConfirmed);
 
   if (name.length < 2) return res.status(400).json({ error: 'Enter your full name.' });
   if (!validEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
   if (!phone) return res.status(400).json({ error: 'Enter a valid phone number with 10 to 15 digits.' });
   if (password.length < 8) return res.status(400).json({ error: 'Use a password with at least 8 characters.' });
+  if (!ageConfirmed) return res.status(400).json({ error: 'You must be 18 or older to create an account.' });
   if (!termsAccepted) {
     return res.status(400).json({
       error: 'Accept the Terms and Privacy Policy to continue.',
@@ -241,6 +248,76 @@ router.post('/change-phone', authenticate, asyncHandler(async (req, res) => {
 
   await db.query('UPDATE users SET phone=$2,updated_at=now() WHERE id=$1', [req.user.id, phone]);
   res.json({ ok: true, phone });
+}));
+
+router.post('/account-deletion', deletionLimit, authenticate, asyncHandler(async (req, res) => {
+  if (req.user.role === 'admin') {
+    return res.status(403).json({ error: 'Administrator accounts must be transferred and closed through the deployment owner.' });
+  }
+  if (String(req.body.confirmation || '') !== 'DELETE') {
+    return res.status(400).json({ error: 'Enter DELETE to confirm permanent account deletion.' });
+  }
+  const password = String(req.body.password || '');
+  const account = await db.query('SELECT role,password_hash FROM users WHERE id=$1', [req.user.id]);
+  if (!account.rows[0] || !(await verifyPassword(password, account.rows[0].password_hash))) {
+    return res.status(400).json({ error: 'The current password is incorrect.' });
+  }
+
+  const activeCall = await db.query(`
+    SELECT id FROM calls
+    WHERE (customer_id=$1 OR employee_id=$1)
+      AND status IN ('ringing','connecting','active')
+    LIMIT 1
+  `, [req.user.id]);
+  if (activeCall.rows[0]) {
+    return res.status(409).json({ error: 'End the current call before deleting this account.' });
+  }
+
+  const replacementPassword = await hashPassword(crypto.randomBytes(48).toString('base64url'));
+  const retainedRecords = await db.transaction(async (client) => {
+    if (req.user.role === 'customer') {
+      await client.query('DELETE FROM calls WHERE customer_id=$1', [req.user.id]);
+      await client.query('DELETE FROM users WHERE id=$1', [req.user.id]);
+      return false;
+    }
+
+    // Listener payout and fraud-prevention ledgers may need to be retained for
+    // accounting. Remove identity fields, direct contact data and call content,
+    // then make the managed account permanently unusable.
+    await client.query('DELETE FROM calls WHERE employee_id=$1', [req.user.id]);
+    await client.query('DELETE FROM favorites WHERE employee_id=$1', [req.user.id]);
+    await client.query('DELETE FROM listener_activity_sessions WHERE employee_id=$1', [req.user.id]);
+    await client.query('DELETE FROM notifications WHERE user_id=$1', [req.user.id]);
+    await client.query('DELETE FROM push_subscriptions WHERE user_id=$1', [req.user.id]);
+    await client.query('DELETE FROM password_reset_requests WHERE user_id=$1', [req.user.id]);
+    await client.query('DELETE FROM reports WHERE reporter_id=$1', [req.user.id]);
+    await client.query('UPDATE reports SET target_id=NULL WHERE target_id=$1', [req.user.id]);
+    await client.query(`
+      UPDATE listener_wallet_transactions
+      SET payout_upi_id=NULL,payout_upi_phone=NULL,note=NULL
+      WHERE employee_id=$1
+    `, [req.user.id]);
+    await client.query(`
+      UPDATE users SET
+        name='Deleted listener',username=NULL,email=NULL,phone=NULL,bio=NULL,
+        employee_code=NULL,upi_id=NULL,upi_phone=NULL,listener_rate_paise=0,
+        listener_availability='offline',password_hash=$2,auth_version=auth_version+1,
+        balance_seconds=0,status='blocked',suspended_until=NULL,suspension_reason=NULL,
+        terms_accepted_at=NULL,last_login_at=NULL,last_seen_at=NULL,updated_at=now()
+      WHERE id=$1
+    `, [req.user.id, replacementPassword]);
+    return true;
+  });
+
+  await req.app.locals.socketRuntime?.restrictUser(req.user.id, 'Account deleted.');
+  res.json({
+    ok: true,
+    signedOut: true,
+    retainedRecords,
+    message: retainedRecords
+      ? 'Your account and personal profile were deleted. De-identified payout records are retained only where required for accounting and safety.'
+      : 'Your account and associated data were deleted.',
+  });
 }));
 
 router.post('/forgot-password', recoveryLimit, asyncHandler(async (req, res) => {
