@@ -3,7 +3,6 @@ const config = require('./config');
 const { verifyToken } = require('./auth');
 const { activateExpiredSuspension } = require('./middleware');
 const listenerActivity = require('./listener-activity');
-const { settleCall } = require('./call-settlement');
 
 function createSocketServer(io) {
   const employees = new Map();
@@ -138,6 +137,29 @@ function createSocketServer(io) {
       .sort((a, b) => a[1].lastAssigned - b[1].lastAssigned)[0]?.[0] || null;
   }
 
+  async function writeCallDebit(callRuntime) {
+    const callResult = await db.query(`
+      SELECT billed_seconds FROM calls WHERE id = $1
+    `, [callRuntime.id]);
+    const billedSeconds = Number(callResult.rows[0]?.billed_seconds || callRuntime.billedSeconds || 0);
+    callRuntime.billedSeconds = billedSeconds;
+
+    if (billedSeconds <= 0) return;
+
+    await db.query(`
+      INSERT INTO wallet_transactions (
+        customer_id, seconds_delta, type, note, reference_id
+      )
+      VALUES ($1, $2, 'call_debit', $3, $4)
+      ON CONFLICT DO NOTHING
+    `, [
+      callRuntime.customerId,
+      -billedSeconds,
+      `${callRuntime.language || 'Voice'} voice call`,
+      callRuntime.id,
+    ]);
+  }
+
   async function ringCustomer(customerId, preferredEmployeeId = null, triedEmployees = [], options = {}) {
     if (userCall.has(customerId)) {
       emitToUser(customerId, 'call:error', { message: 'You already have a call in progress.' });
@@ -164,14 +186,6 @@ function createSocketServer(io) {
       return;
     }
 
-    const blockResult = await db.query(
-      'SELECT employee_id FROM customer_listener_blocks WHERE customer_id=$1',
-      [customerId],
-    );
-    const excludedEmployees = [
-      ...new Set([...triedEmployees, ...blockResult.rows.map((row) => row.employee_id)]),
-    ];
-
     let primaryLanguage = String(options.primaryLanguage || 'Malayalam').trim() || 'Malayalam';
     const allowOtherLanguages = Boolean(options.allowOtherLanguages);
 
@@ -180,13 +194,9 @@ function createSocketServer(io) {
       if (preferred?.language) primaryLanguage = preferred.language;
     }
 
-    const employeeId = findAvailableEmployee(excludedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
+    const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
     if (!employeeId) {
-      const otherLanguagesAvailable = [...employees.entries()].some(([id, item]) => (
-        !excludedEmployees.includes(id)
-          && item.state === 'available'
-          && !sameLanguage(item.language, primaryLanguage)
-      ));
+      const otherLanguagesAvailable = [...employees.values()].some((item) => item.state === 'available' && !sameLanguage(item.language, primaryLanguage));
       emitToUser(customerId, 'call:unavailable', {
         message: allowOtherLanguages
           ? `No ${primaryLanguage} or other-language listener is available right now. Please try again shortly.`
@@ -199,7 +209,7 @@ function createSocketServer(io) {
     const employee = employees.get(employeeId);
     if (!employee || employee.state !== 'available' || !hasLiveSocket(employeeId)) {
       if (!hasLiveSocket(employeeId)) employees.delete(employeeId);
-      await ringCustomer(customerId, null, [...excludedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
+      await ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
       return;
     }
     employee.state = 'ringing';
@@ -209,14 +219,9 @@ function createSocketServer(io) {
     let callRow;
     try {
       const callResult = await db.query(`
-        INSERT INTO calls (customer_id, employee_id, status, listener_rate_paise)
-        VALUES (
-          $1,
-          $2,
-          'ringing',
-          COALESCE((SELECT listener_rate_paise FROM users WHERE id=$2 AND role='employee'),0)
-        )
-        RETURNING id,listener_rate_paise
+        INSERT INTO calls (customer_id, employee_id, status)
+        VALUES ($1, $2, 'ringing')
+        RETURNING id
       `, [customerId, employeeId]);
       callRow = callResult.rows[0];
     } catch (error) {
@@ -234,11 +239,7 @@ function createSocketServer(io) {
     const stillOnline = await db.query(`
       SELECT 1 FROM users
       WHERE id=$1 AND role='employee' AND status='active' AND listener_availability='online'
-        AND NOT EXISTS (
-          SELECT 1 FROM customer_listener_blocks
-          WHERE customer_id=$2 AND employee_id=$1
-        )
-    `, [employeeId, customerId]);
+    `, [employeeId]);
     if (!stillOnline.rows[0] || !hasLiveSocket(employeeId) || employees.get(employeeId) !== employee || employee.state !== 'ringing') {
       await db.query(`
         UPDATE calls SET status='cancelled',ended_at=now(),end_reason='Listener availability changed before ringing'
@@ -246,7 +247,7 @@ function createSocketServer(io) {
       `, [callRow.id]);
       if (employees.get(employeeId) === employee && employee.state === 'ringing') employee.state = 'available';
       broadcastListeners();
-      await ringCustomer(customerId, null, [...excludedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
+      await ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
       return;
     }
 
@@ -256,8 +257,7 @@ function createSocketServer(io) {
       employeeId,
       status: 'ringing',
       billedSeconds: 0,
-      listenerRatePaise: Number(callRow.listener_rate_paise || 0),
-      tried: [...excludedEmployees, employeeId],
+      tried: [...triedEmployees, employeeId],
       language: employee.language || primaryLanguage,
       primaryLanguage,
       allowOtherLanguages,
@@ -347,14 +347,9 @@ function createSocketServer(io) {
     `, [callId, finalStatus, reason]);
 
     try {
-      const settlement = await settleCall(runtime.id);
-      if (settlement) runtime.billedSeconds = settlement.billedSeconds;
+      await writeCallDebit(runtime);
     } catch (error) {
-      console.error('Could not settle call wallets:', error);
-      const retryTimer = setTimeout(() => {
-        settleCall(runtime.id).catch((retryError) => console.error('Call settlement retry failed:', retryError));
-      }, 5000);
-      retryTimer.unref();
+      console.error('Could not save call wallet transaction:', error);
     }
 
     calls.delete(callId);
@@ -526,20 +521,11 @@ function createSocketServer(io) {
     socket.emit('session:ready', { user });
     db.query('UPDATE users SET last_seen_at=now() WHERE id=$1', [user.id]).catch(console.error);
 
-    const currentRuntime = calls.get(userCall.get(user.id));
-    if (currentRuntime && ['connecting', 'active'].includes(currentRuntime.status)) {
-      socket.join(`call:${currentRuntime.id}`);
-      socket.emit('call:resumed', {
-        callId: currentRuntime.id,
-        status: currentRuntime.status,
-        billedSeconds: currentRuntime.billedSeconds,
-      });
-    }
-
     if (user.role === 'employee') {
       cancelListenerDisconnect(user.id);
       listenerActivity.touchLastSeen(user.id).catch(console.error);
       const availability = user.listener_availability || 'offline';
+      const currentRuntime = calls.get(userCall.get(user.id));
       if (availability === 'online' || availability === 'break') {
         const presenceState = currentRuntime
           ? (currentRuntime.status === 'ringing' ? 'ringing' : 'busy')
@@ -775,14 +761,6 @@ function createSocketServer(io) {
 
       if (runtime?.status === 'ringing' && user.role === 'employee') {
         await retryCall(runtime.id, 'The listener disconnected before answering.');
-      } else if (runtime?.status === 'active') {
-        // Pause connected-second billing immediately, then let the bounded
-        // media reconnect timer recover a brief Wi-Fi/mobile-data switch.
-        updateMediaState(runtime, user.id, false);
-      } else if (runtime?.status === 'connecting') {
-        runtime.signalingReady.delete(user.id);
-        runtime.mediaConnected.delete(user.id);
-        // The existing connection timer remains the recovery deadline.
       } else if (callId) {
         await endCall(callId, `${user.role === 'employee' ? 'The listener' : 'The customer'} disconnected.`);
       }

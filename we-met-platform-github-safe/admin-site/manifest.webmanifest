@@ -1,7 +1,7 @@
 {
   "name": "We Met Operations",
   "short_name": "WM Ops",
-  "description": "Secure We Met operations dashboard for listener activity, rates, earnings, payouts and customer payment verification.",
+  "description": "Secure We Met operations, listener activity and payment verification dashboard.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

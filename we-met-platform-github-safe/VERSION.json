@@ -1,5 +1,5 @@
 {
   "version": "6.1.0",
-  "updated": "2026-08-09",
-  "notes": "Adds connected-second listener earnings with an individual administrator-set rate, a separate listener wallet with exact balance and UPI payout details, immutable earnings and withdrawal history, and an administrator payout centre with atomic Mark Paid and guarded adjustments. Listener cards now show only talk-time today, talk-time this week, total connected calls and all-time talk-time; administrator work-session analytics remain available."
+  "updated": "2026-08-17",
+  "notes": "Payment-focused optimization release: Paytm UPI destination paytm.s3hc53w@pty, \u20b91999 Long Connect updated to 240 minutes, mobile UPI deep-link checkout, clearer payment references/expiry, stronger UTR validation and admin verification details, plus cache/version refresh."
 }

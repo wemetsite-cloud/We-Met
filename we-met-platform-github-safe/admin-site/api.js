@@ -68,15 +68,6 @@
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format((Number(paise) || 0) / 100);
   }
 
-  function moneyExact(paise = 0) {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format((Number(paise) || 0) / 100);
-  }
-
   function toast(message, type = 'info') {
     let box = document.querySelector('.toast-box');
     if (!box) {
@@ -113,7 +104,6 @@
     duration,
     date,
     money,
-    moneyExact,
     toast,
     notify,
     socketUrl: base || location.origin,

@@ -7,7 +7,7 @@ router.use(authenticate, requireRole('customer'));
 
 router.get('/plans', asyncHandler(async (_req, res) => {
   const result = await db.query(`
-    SELECT id,name,play_product_id,price_paise,seconds,popular
+    SELECT id,name,price_paise,seconds,popular
     FROM plans
     WHERE active=true
     ORDER BY sort_order,price_paise
@@ -19,11 +19,7 @@ router.get('/history', asyncHandler(async (req, res) => {
   const [calls, wallet] = await Promise.all([
     db.query(
       `SELECT c.id,c.employee_id,c.status,c.started_at,c.ended_at,c.billed_seconds,
-              c.end_reason,c.created_at,e.name employee_name,e.bio employee_bio,
-              EXISTS(
-                SELECT 1 FROM customer_listener_blocks block
-                WHERE block.customer_id=c.customer_id AND block.employee_id=c.employee_id
-              ) is_blocked
+              c.end_reason,c.created_at,e.name employee_name,e.bio employee_bio
        FROM calls c JOIN users e ON e.id=c.employee_id
        WHERE c.customer_id=$1 ORDER BY c.created_at DESC LIMIT 100`,
       [req.user.id],
@@ -97,12 +93,7 @@ router.get('/favorites', asyncHandler(async (req, res) => {
   const result = await db.query(
     `SELECT f.employee_id,f.created_at,u.name,u.bio,u.status,u.listener_language
      FROM favorites f JOIN users u ON u.id=f.employee_id
-     WHERE f.customer_id=$1
-       AND NOT EXISTS (
-         SELECT 1 FROM customer_listener_blocks block
-         WHERE block.customer_id=f.customer_id AND block.employee_id=f.employee_id
-       )
-     ORDER BY f.created_at DESC`,
+     WHERE f.customer_id=$1 ORDER BY f.created_at DESC`,
     [req.user.id],
   );
   res.json({ favorites: result.rows });
@@ -111,11 +102,6 @@ router.get('/favorites', asyncHandler(async (req, res) => {
 router.post('/favorites/:employeeId', asyncHandler(async (req, res) => {
   const employee = await db.query(`SELECT id FROM users WHERE id=$1 AND role='employee'`, [req.params.employeeId]);
   if (!employee.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
-  const blocked = await db.query(
-    'SELECT 1 FROM customer_listener_blocks WHERE customer_id=$1 AND employee_id=$2',
-    [req.user.id, req.params.employeeId],
-  );
-  if (blocked.rows[0]) return res.status(409).json({ error: 'Unblock this listener before adding them to favourites.' });
   await db.query('INSERT INTO favorites(customer_id,employee_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.user.id, req.params.employeeId]);
   res.json({ ok: true });
 }));
@@ -123,44 +109,6 @@ router.post('/favorites/:employeeId', asyncHandler(async (req, res) => {
 router.delete('/favorites/:employeeId', asyncHandler(async (req, res) => {
   await db.query('DELETE FROM favorites WHERE customer_id=$1 AND employee_id=$2', [req.user.id, req.params.employeeId]);
   res.json({ ok: true });
-}));
-
-router.get('/blocks', asyncHandler(async (req, res) => {
-  const result = await db.query(`
-    SELECT block.employee_id,block.created_at,user.name,user.listener_language
-    FROM customer_listener_blocks block
-    JOIN users user ON user.id=block.employee_id
-    WHERE block.customer_id=$1
-    ORDER BY block.created_at DESC
-  `, [req.user.id]);
-  res.json({ blocks: result.rows });
-}));
-
-router.post('/blocks/:employeeId', asyncHandler(async (req, res) => {
-  const employee = await db.query(
-    `SELECT id FROM users WHERE id=$1 AND role='employee'`,
-    [req.params.employeeId],
-  );
-  if (!employee.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
-  await db.transaction(async (client) => {
-    await client.query(
-      'INSERT INTO customer_listener_blocks(customer_id,employee_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
-      [req.user.id, req.params.employeeId],
-    );
-    await client.query(
-      'DELETE FROM favorites WHERE customer_id=$1 AND employee_id=$2',
-      [req.user.id, req.params.employeeId],
-    );
-  });
-  res.json({ ok: true, blocked: true });
-}));
-
-router.delete('/blocks/:employeeId', asyncHandler(async (req, res) => {
-  await db.query(
-    'DELETE FROM customer_listener_blocks WHERE customer_id=$1 AND employee_id=$2',
-    [req.user.id, req.params.employeeId],
-  );
-  res.json({ ok: true, blocked: false });
 }));
 
 router.post('/reports', asyncHandler(async (req, res) => {

@@ -141,7 +141,7 @@ router.post('/intents', requireDirectUpi, asyncHandler(async (req, res) => {
     : '';
 
   return res.status(201).json({
-    intent: { ...intent, upi_qr_data_url: upiQrDataUrl },
+    intent: { ...intent, upi_uri: qrPayload, upi_qr_data_url: upiQrDataUrl },
     notice: 'After paying, submit the successful UTR and payment screenshot for administrator review.',
   });
 }));

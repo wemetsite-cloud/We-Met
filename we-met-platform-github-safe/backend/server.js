@@ -6,7 +6,6 @@ const config = require('./src/config');
 const db = require('./src/db');
 const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
-const { settleCall } = require('./src/call-settlement');
 
 const app = express();
 const server = http.createServer(app);
@@ -66,7 +65,6 @@ app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
 app.use('/api/customer/manual-payments', require('./src/routes/manual-payments'));
-app.use('/api/customer/play-purchases', require('./src/routes/play-purchases'));
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/employee', require('./src/routes/employee'));
 app.use('/api/admin', require('./src/routes/admin'));
@@ -104,7 +102,7 @@ const staticOptions = {
 };
 
 if (config.serveFrontends) {
-  const root = path.join(path.resolve(__dirname, '..'), 'legacy-web');
+  const root = path.resolve(__dirname, '..');
   const customer = path.join(root, 'customer-site');
   const employee = path.join(root, 'employee-site');
   const admin = path.join(root, 'admin-site');
@@ -179,6 +177,14 @@ app.use((error, _req, res, _next) => {
 
 async function reconcileInterruptedCalls() {
   await db.query(`
+    INSERT INTO wallet_transactions (customer_id, seconds_delta, type, note, reference_id)
+    SELECT customer_id, -billed_seconds, 'call_debit', 'Voice call', id
+    FROM calls
+    WHERE billed_seconds > 0
+    ON CONFLICT DO NOTHING
+  `);
+
+  await db.query(`
     UPDATE calls
     SET
       status = CASE WHEN status = 'ringing' THEN 'cancelled' ELSE 'ended' END,
@@ -186,16 +192,6 @@ async function reconcileInterruptedCalls() {
       end_reason = 'Server restarted during the call'
     WHERE status IN ('ringing', 'connecting', 'active')
   `);
-
-  const unsettled = await db.query(`
-    SELECT id FROM calls
-    WHERE earnings_settled_at IS NULL
-      AND status IN ('ended','rejected','cancelled','failed')
-    ORDER BY created_at
-  `);
-  for (const call of unsettled.rows) {
-    await settleCall(call.id);
-  }
 }
 
 async function reconcileInterruptedListenerActivity() {

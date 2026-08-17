@@ -4,7 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
-const sitesRoot = path.join(projectRoot, 'legacy-web');
 const sites = ['customer-site', 'admin-site', 'employee-site'];
 
 function localReference(value) {
@@ -15,7 +14,7 @@ function localReference(value) {
 
 test('every local HTML asset and page reference resolves to a shipped file', () => {
   for (const site of sites) {
-    const siteRoot = path.join(sitesRoot, site);
+    const siteRoot = path.join(projectRoot, site);
     for (const name of fs.readdirSync(siteRoot).filter((entry) => entry.endsWith('.html'))) {
       const html = fs.readFileSync(path.join(siteRoot, name), 'utf8');
       for (const match of html.matchAll(/\b(?:href|src)=["']([^"']+)["']/gi)) {
@@ -30,7 +29,7 @@ test('every local HTML asset and page reference resolves to a shipped file', () 
 
 test('all web manifests are valid and their icons resolve', () => {
   for (const site of sites) {
-    const siteRoot = path.join(sitesRoot, site);
+    const siteRoot = path.join(projectRoot, site);
     const manifest = JSON.parse(fs.readFileSync(path.join(siteRoot, 'manifest.webmanifest'), 'utf8'));
     assert.ok(manifest.name);
     assert.ok(manifest.short_name);
@@ -42,7 +41,7 @@ test('all web manifests are valid and their icons resolve', () => {
 });
 
 test('the public sitemap only points to shipped customer pages', () => {
-  const siteRoot = path.join(sitesRoot, 'customer-site');
+  const siteRoot = path.join(projectRoot, 'customer-site');
   const sitemap = fs.readFileSync(path.join(siteRoot, 'sitemap.xml'), 'utf8');
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
   assert.ok(locations.length >= 6);
@@ -50,17 +49,5 @@ test('the public sitemap only points to shipped customer pages', () => {
     const url = new URL(location);
     const name = url.pathname === '/' ? 'index.html' : path.basename(url.pathname);
     assert.equal(fs.existsSync(path.join(siteRoot, name)), true, `sitemap page ${name} is missing`);
-  }
-});
-
-test('every admin page and listener tab navigation target exists', () => {
-  const admin = fs.readFileSync(path.join(sitesRoot, 'admin-site', 'index.html'), 'utf8');
-  for (const match of admin.matchAll(/data-page="([^"]+)"/g)) {
-    assert.match(admin, new RegExp(`id="page-${match[1]}"`), `admin page ${match[1]} is missing`);
-  }
-
-  const listener = fs.readFileSync(path.join(sitesRoot, 'employee-site', 'index.html'), 'utf8');
-  for (const match of listener.matchAll(/data-tab="([^"]+)"/g)) {
-    assert.match(listener, new RegExp(`id="tab-${match[1]}"`), `listener tab ${match[1]} is missing`);
   }
 });

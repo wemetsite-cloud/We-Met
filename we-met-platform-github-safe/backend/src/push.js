@@ -1,18 +1,8 @@
+const webPush = require('web-push');
 const config = require('./config');
+const db = require('./db');
 
 let configured = false;
-let webPush;
-let database;
-
-function provider() {
-  if (!webPush) webPush = require('web-push');
-  return webPush;
-}
-
-function db() {
-  if (!database) database = require('./db');
-  return database;
-}
 
 function enabled() {
   return config.webPush.enabled;
@@ -20,7 +10,7 @@ function enabled() {
 
 function configure() {
   if (!enabled() || configured) return;
-  provider().setVapidDetails(
+  webPush.setVapidDetails(
     config.webPush.subject,
     config.webPush.publicKey,
     config.webPush.privateKey,
@@ -53,20 +43,20 @@ function notificationPayload(payload = {}) {
 
 async function removeExpired(endpoints) {
   if (!endpoints.length) return;
-  await db().query('DELETE FROM push_subscriptions WHERE endpoint = ANY($1::text[])', [endpoints]);
+  await db.query('DELETE FROM push_subscriptions WHERE endpoint = ANY($1::text[])', [endpoints]);
 }
 
 async function sendToUser(userId, payload) {
   if (!enabled() || !userId) return { sent: 0, removed: 0 };
 
-  const account = await db().query('SELECT role FROM users WHERE id=$1', [userId]);
+  const account = await db.query('SELECT role FROM users WHERE id=$1', [userId]);
   if (account.rows[0]?.role === 'employee') {
-    await db().query('DELETE FROM push_subscriptions WHERE user_id=$1', [userId]);
+    await db.query('DELETE FROM push_subscriptions WHERE user_id=$1', [userId]);
     return { sent: 0, removed: 0 };
   }
 
   configure();
-  const result = await db().query(`
+  const result = await db.query(`
     SELECT endpoint,p256dh,auth
     FROM push_subscriptions
     WHERE user_id=$1
@@ -82,7 +72,7 @@ async function sendToUser(userId, payload) {
 
   await Promise.all(result.rows.map(async (subscription) => {
     try {
-      await provider().sendNotification({
+      await webPush.sendNotification({
         endpoint: subscription.endpoint,
         keys: { p256dh: subscription.p256dh, auth: subscription.auth },
       }, message, { TTL: ttl, urgency: payload?.urgency === 'high' ? 'high' : 'normal' });
