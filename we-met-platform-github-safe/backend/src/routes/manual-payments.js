@@ -15,10 +15,6 @@ const {
 
 const router = express.Router();
 const MAX_PROOF_BYTES = 3 * 1024 * 1024;
-const OFFICIAL_PAYTM_VPA = 'paytm.s3hc53w@pty';
-const OFFICIAL_PAYTM_PAYEE = 'Paytm';
-const OFFICIAL_PAYTM_NOTE = 'Verified Paytm Merchant';
-
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_PROOF_BYTES, files: 1, fields: 8 },
@@ -42,20 +38,9 @@ function requireDirectUpi(req, res, next) {
 }
 
 function merchantUpiProfile() {
-  const upiId = String(config.upiPayment.upiId || '').trim();
-  if (upiId.toLowerCase() === OFFICIAL_PAYTM_VPA) {
-    return {
-      upiId,
-      payeeName: OFFICIAL_PAYTM_PAYEE,
-      note: OFFICIAL_PAYTM_NOTE,
-      includeCheckoutReference: false,
-    };
-  }
   return {
-    upiId,
-    payeeName: config.upiPayment.payeeName,
-    note: '',
-    includeCheckoutReference: true,
+    upiId: String(config.upiPayment.upiId || '').trim(),
+    payeeName: String(config.upiPayment.payeeName || '').trim(),
   };
 }
 
@@ -65,8 +50,8 @@ function paymentDetails(intent) {
     upiId: merchant.upiId,
     payeeName: merchant.payeeName,
     amountPaise: intent.amount_paise,
-    reference: merchant.includeCheckoutReference ? intent.checkout_reference : '',
-    note: merchant.note || `We Met ${intent.checkout_reference}`,
+    reference: intent.checkout_reference,
+    note: `We Met ${intent.checkout_reference}`,
   };
 }
 

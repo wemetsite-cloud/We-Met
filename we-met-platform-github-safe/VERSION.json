@@ -1,14 +1,11 @@
 {
-  "version": "6.6.0",
-  "name": "We Met v6.6.0 professional verification-ready cleanup",
+  "version": "6.6.1",
+  "name": "We Met v6.6.1 listener visibility and UPI identity fix",
   "changes": [
-    "Keeps real listener availability truthful while replacing the harsh empty-state wording with a live availability panel",
-    "Adds folded listener profile, avatar, payout and security settings",
-    "Improves Android UPI app launching with Android intent routing while keeping the working QR fallback",
-    "Adds professional avatar-based trust visuals without fake testimonials or fake listener availability",
-    "Adds customer self-service account deletion and public deletion page",
-    "Adds child-safety standards and clearer policy links",
-    "Neutralizes risky marketing wording and removes stale duplicate project copies and APK binaries",
-    "Keeps the existing server-generated UPI QR/payment destination unchanged"
+    "Hides the customer live-listener discovery section completely when nobody is online",
+    "Uses Sabith Salah K P as the configured UPI payee name instead of forcing a provider name",
+    "Keeps the existing receiving UPI ID while restoring a unique transaction reference in direct UPI payment links",
+    "Keeps the working QR payment flow unchanged",
+    "Keeps Google Pay and generic UPI launch buttons with the corrected UPI payload"
   ]
 }

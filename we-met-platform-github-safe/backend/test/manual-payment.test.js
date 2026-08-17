@@ -36,21 +36,20 @@ test('builds a private exact-amount payload for the server-rendered QR', () => {
 });
 
 
-test('builds the exact verified Paytm merchant payload when optional reference is omitted', () => {
+test('builds the configured UPI account identity and unique transaction reference', () => {
   const uri = upiPaymentUri({
     upiId: 'paytm.s3hc53w@pty',
-    payeeName: 'Paytm',
+    payeeName: 'Sabith Salah K P',
     amountPaise: 199900,
-    reference: '',
-    note: 'Verified Paytm Merchant',
+    reference: 'WM-TEST-1999',
+    note: 'We Met WM-TEST-1999',
   });
-  assert.equal(uri, 'upi://pay?pa=paytm.s3hc53w@pty&pn=Paytm&tn=Verified%20Paytm%20Merchant&am=1999.00&cu=INR');
   const parsed = new URL(uri);
   assert.equal(parsed.searchParams.get('pa'), 'paytm.s3hc53w@pty');
-  assert.equal(parsed.searchParams.get('pn'), 'Paytm');
-  assert.equal(parsed.searchParams.get('tn'), 'Verified Paytm Merchant');
+  assert.equal(parsed.searchParams.get('pn'), 'Sabith Salah K P');
+  assert.equal(parsed.searchParams.get('tn'), 'We Met WM-TEST-1999');
   assert.equal(parsed.searchParams.get('am'), '1999.00');
-  assert.equal(parsed.searchParams.get('tr'), null);
+  assert.equal(parsed.searchParams.get('tr'), 'WM-TEST-1999');
 });
 
 test('accepts only recognised raster-image signatures', () => {
