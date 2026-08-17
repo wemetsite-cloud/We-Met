@@ -14,8 +14,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=6.1.0">
-  <link rel="stylesheet" href="style.css?v=6.1.0">
+  <link rel="manifest" href="manifest.webmanifest?v=6.3.0">
+  <link rel="stylesheet" href="style.css?v=6.3.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -129,8 +129,8 @@
         </section>
 
         <div id="previousBox" class="previous-box hidden"></div>
-        <section id="onlineListenersSection" class="online-listeners-section hidden" aria-label="Online listeners">
-          <div class="section-head listener-heading"><div><span class="eyebrow">AVAILABLE NOW</span><h2>Choose your Malayalam listener</h2><p>Listener language is shown on every profile.</p></div><button id="refreshListeners" class="button button-quiet" type="button">Refresh</button></div>
+        <section id="listenerDiscovery" class="listener-discovery hidden" aria-live="polite">
+          <div class="section-head listener-heading"><div><span class="eyebrow">AVAILABLE NOW</span><h2>Choose your Malayalam listener</h2><p>Choose who you would like to talk with.</p></div><button id="refreshListeners" class="button button-quiet" type="button">Refresh</button></div>
           <label class="language-fallback-toggle"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>If no Malayalam listener is available, We Met can try another language listener.</small></span></label>
           <div id="listenerGrid" class="listener-grid" aria-live="polite"></div>
           <section id="otherLanguageSection" class="other-language-section hidden"><div class="section-head compact"><div><span class="eyebrow">OTHER LANGUAGES</span><h2>Other language listeners</h2><p>Turn this option off anytime to keep automatic matching Malayalam-only.</p></div></div><div id="otherLanguageGrid" class="listener-grid other-language-grid" aria-live="polite"></div></section>
@@ -142,6 +142,7 @@
         <div class="section-head"><div><span class="eyebrow">TALK-TIME PAYMENT</span><h2>Choose a talk-time pack</h2><p id="walletPaymentIntro">Choose a pack to view the available payment method and exact amount.</p></div></div>
         <div id="plansGrid" class="plans-grid"></div>
         <div class="grid-two">
+
           <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
           <section class="panel coupon-panel">
             <span class="eyebrow">REDEEM TALK-TIME</span>
@@ -226,50 +227,47 @@
         <div id="paymentPayContent" class="hidden">
           <div id="paymentSummary" class="payment-summary"></div>
           <div id="manualCheckoutPanel" class="manual-checkout-panel hidden">
-            <section class="simple-payment-box">
-              <span class="payment-kicker">CHOOSE PAYMENT APP</span>
-              <div class="payment-app-options">
-                <a id="payWithGooglePay" class="payment-app-option google-pay-option" href="#">
-                  <span class="payment-app-icon gpay-mark">G Pay</span>
-                  <span class="payment-app-copy"><strong>Google Pay</strong><small>Open Google Pay and pay</small></span>
-                  <span class="payment-app-arrow" aria-hidden="true">›</span>
-                </a>
-                <a id="payWithOtherUpi" class="payment-app-option" href="#">
-                  <span class="payment-app-icon upi-mark">UPI</span>
-                  <span class="payment-app-copy"><strong>Other UPI apps</strong><small>PhonePe, Paytm, BHIM and more</small></span>
-                  <span class="payment-app-arrow" aria-hidden="true">›</span>
-                </a>
-              </div>
-
-              <div class="payment-fallback">
-                <div class="payment-fallback-head"><span>Or scan QR</span><button id="downloadUpiQr" class="qr-save-link" type="button">Save QR</button></div>
-                <div class="payment-fallback-body">
-                  <div class="qr-frame compact-qr"><img id="manualUpiQr" alt="UPI payment QR code with the exact amount"></div>
-                  <div class="payment-fallback-details">
-                    <small>UPI ID</small>
-                    <div class="simple-upi-id"><strong id="manualUpiId">—</strong><button class="button button-soft" type="button" data-copy-payment="manualUpiId">Copy</button></div>
-                    <small>Payee: <b id="manualPayeeName">—</b></small>
-                    <small class="payment-reference-simple">Reference: <b id="manualPaymentReference">—</b></small>
-                    <small id="manualIntentExpiry" class="payment-expiry">Checkout expires later today.</small>
-                  </div>
+            <div id="manualUpiDetails" class="premium-upi-layout">
+              <section class="premium-pay-panel">
+                <span class="payment-kicker">PAY WITH UPI</span>
+                <h3>Choose how you want to pay</h3>
+                <p>Use your preferred UPI app. The exact amount and payment reference are filled automatically.</p>
+                <div class="upi-app-actions">
+                  <button id="payWithGooglePay" class="upi-app-button upi-app-google" type="button"><span class="upi-app-mark">G</span><span><b>Google Pay</b><small>Open Google Pay</small></span><i>›</i></button>
+                  <button id="payWithAnyUpi" class="upi-app-button upi-app-other" type="button"><span class="upi-app-mark">UPI</span><span><b>Other UPI apps</b><small>Paytm, PhonePe, BHIM &amp; more</small></span><i>›</i></button>
                 </div>
-              </div>
-
-              <p class="simple-payment-note">Pay the exact amount shown above. Never share your UPI PIN or OTP.</p>
-              <button id="manualTransferContinue" class="button button-primary button-large payment-next" type="button">I have paid</button>
-            </section>
+                <div class="payment-divider"><span>or scan QR</span></div>
+                <div class="merchant-detail-card">
+                  <div><small>UPI ID</small><strong id="manualUpiId">—</strong></div>
+                  <button class="merchant-copy" type="button" data-copy-payment="manualUpiId">Copy</button>
+                </div>
+                <div class="merchant-payee">Paying <b id="manualPayeeName">—</b></div>
+                <div class="payment-security-line"><span>✓</span><p>Confirm the merchant name and exact amount inside your UPI app. Never share your UPI PIN or OTP.</p></div>
+                <button id="manualTransferContinue" class="button button-primary button-large payment-next premium-paid-button" type="button">I’ve completed the payment</button>
+              </section>
+              <section class="payment-qr-card premium-qr-card">
+                <span class="payment-kicker">SCAN TO PAY</span>
+                <div class="qr-scan-shell">
+                  <span class="qr-corner top-left"></span><span class="qr-corner top-right"></span><span class="qr-corner bottom-left"></span><span class="qr-corner bottom-right"></span>
+                  <div class="qr-frame"><img id="manualUpiQr" alt="Black and white UPI payment QR code with the exact amount"></div>
+                </div>
+                <strong>Scan with any UPI app</strong>
+                <small>Amount and reference are already included</small>
+                <button id="downloadUpiQr" class="qr-save-link" type="button">Save QR to phone</button>
+              </section>
+            </div>
           </div>
         </div>
       </section>
 
       <section id="paymentStepSubmit" class="payment-step hidden" data-payment-step="submit">
-        <div class="upload-intro"><span class="upload-icon">✓</span><div><span class="payment-kicker">PAYMENT DETAILS</span><h3>Confirm your successful payment</h3><p>Enter the UTR from the successful transaction and attach its screenshot. This prevents duplicate or incorrect wallet credits.</p></div></div>
+        <div class="upload-intro"><span class="upload-icon">✓</span><div><span class="payment-kicker">PAYMENT DETAILS</span><h3>Add your UTR and screenshot</h3><p>Copy the successful UPI transaction ID or UTR and attach the completed-payment screenshot.</p></div></div>
         <form id="manualPaymentForm" class="stack">
           <label>UPI transaction ID / UTR <span class="required-label">Required</span><input id="manualUtr" name="utrReference" autocomplete="off" inputmode="text" minlength="6" maxlength="64" placeholder="Example: 423456789012" required><small>Use the unique reference from the successful transaction—not your phone number or UPI ID.</small></label>
           <label>Payment screenshot <span class="required-label">Required</span><input id="manualProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp" required><small>Attach the successful-payment screen as PNG, JPG, or WebP up to 3 MB.</small></label>
           <div id="manualProofPreview" class="proof-preview hidden"><img id="manualProofImage" alt="Selected screenshot preview"><div><strong id="manualProofName"></strong><small>This screenshot and the UTR will be shown to the administrator.</small></div></div>
           <label>Optional note<textarea id="manualCustomerNote" name="customerNote" maxlength="500" placeholder="Only add a note if the payment needs clarification"></textarea></label>
-          <div class="payment-form-actions"><button id="manualBackToTransfer" class="button button-quiet" type="button">Back to UPI</button><button id="submitPaymentProof" class="button button-primary" type="submit">Submit for verification</button></div>
+          <div class="payment-form-actions"><button id="manualBackToTransfer" class="button button-quiet" type="button">Back to UPI</button><button class="button button-primary" type="submit">Send payment details</button></div>
         </form>
       </section>
 
@@ -298,6 +296,6 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=6.1.0"></script><script src="socket-loader.js?v=6.1.0"></script><script src="api.js?v=6.1.0"></script><script src="webrtc.js?v=6.1.0"></script><script src="app.js?v=6.1.0"></script>
+  <script src="config.js?v=6.3.0"></script><script src="socket-loader.js?v=6.3.0"></script><script src="api.js?v=6.3.0"></script><script src="webrtc.js?v=6.3.0"></script><script src="app.js?v=6.3.0"></script>
 </body>
 </html>

@@ -170,8 +170,8 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
   .app-back,.modal-back{width:42px;height:42px;min-width:42px;min-height:42px}
 }
 
-/* Simple UPI payment */
-.simple-upi-mode{width:min(560px,calc(100% - 32px));padding:26px 28px 28px;background:#fff}
+/* Lightweight QR payment */
+.simple-upi-mode{width:min(820px,calc(100% - 32px));padding:28px 30px 30px;background:#fff}
 .simple-upi-mode .payment-progress{display:none}
 .simple-upi-mode>.close{display:none}
 .simple-upi-mode .payment-heading{padding-right:0;margin-bottom:14px}
@@ -181,46 +181,32 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 .simple-upi-mode .payment-summary{grid-template-columns:1fr 1fr;margin:0 0 12px;border:0;box-shadow:none;background:transparent;gap:8px}
 .simple-upi-mode .payment-summary div{padding:11px 13px;border-radius:13px;background:#fff6fa;border:1px solid rgba(201,47,120,.11)}
 .simple-upi-mode .payment-summary .exact-amount{background:#351522;border-color:#351522}
-.simple-payment-box{display:grid;gap:12px;padding:16px;border:1px solid rgba(201,47,120,.12);border-radius:20px;background:#fff}
-.payment-app-options{display:grid;gap:9px}
-.payment-app-option{display:grid;grid-template-columns:52px minmax(0,1fr) 22px;align-items:center;gap:12px;padding:12px 13px;border:1px solid var(--line);border-radius:15px;background:#fff;color:var(--ink);text-decoration:none;min-height:68px;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
-.payment-app-option:hover{transform:translateY(-1px);border-color:rgba(201,47,120,.28);box-shadow:0 8px 24px rgba(64,21,41,.07)}
-.payment-app-option:active{transform:scale(.99)}
-.payment-app-option.disabled{opacity:.5;pointer-events:none}
-.payment-app-icon{width:48px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:11px;font-weight:900;letter-spacing:-.02em;background:#f7f7f7;border:1px solid #ececec}
-.gpay-mark{background:#fff;color:#303134;font-size:12px}
-.upi-mark{background:#fff8f2;color:#b85418;letter-spacing:.04em}
-.payment-app-copy{display:grid;gap:3px;min-width:0}
-.payment-app-copy strong{font-size:14px}
-.payment-app-copy small{font-size:10px;color:var(--muted)}
-.payment-app-arrow{font-size:26px;line-height:1;color:#a47b8f;text-align:right}
-.payment-fallback{border-top:1px solid var(--line);padding-top:12px}
-.payment-fallback-head{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
-.payment-fallback-body{display:grid;grid-template-columns:120px minmax(0,1fr);gap:13px;align-items:center;margin-top:8px}
-.compact-qr{width:120px;padding:6px;border-radius:13px;box-shadow:none;border:1px solid var(--line);background:#fff}
-.compact-qr img{display:block;width:100%;height:auto}
-.payment-fallback-details{display:grid;gap:6px;min-width:0}
-.payment-fallback-details>small{color:var(--muted);font-size:9px;overflow-wrap:anywhere}
-.simple-upi-id{display:flex;align-items:center;gap:7px;min-width:0}
-.simple-upi-id strong{flex:1;min-width:0;color:var(--pink-deep);font-size:13px;overflow-wrap:anywhere}
-.simple-upi-id .button{padding:7px 9px;min-height:34px;font-size:10px;flex:none}
-.payment-reference-simple b{color:var(--ink);overflow-wrap:anywhere}
-.qr-save-link{border:0;background:transparent;color:var(--pink-deep);font-weight:800;font-size:10px;padding:6px;cursor:pointer}
+.simple-upi-mode .manual-checkout-panel{gap:10px}
+.simple-upi-layout{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(300px,1.1fr);gap:14px;align-items:stretch}
+.simple-upi-layout .payment-qr-card{padding:18px;border:1px solid rgba(201,47,120,.12);border-radius:18px;background:linear-gradient(145deg,#fffafd,#fff);box-shadow:none}
+.simple-upi-layout .qr-frame{width:min(220px,75vw);padding:9px;border-radius:16px;box-shadow:0 8px 22px rgba(67,24,43,.07)}
+.simple-upi-layout .payment-qr-card>strong{font-size:13px;margin-top:9px}
+.qr-save-link{border:0;background:transparent;color:var(--pink-deep);font-weight:800;font-size:11px;padding:7px;cursor:pointer}
+.simple-upi-details{display:flex;flex-direction:column;justify-content:flex-start;gap:11px;min-width:0;padding:21px;border:1px solid rgba(201,47,120,.12);border-radius:18px;background:linear-gradient(145deg,#fff,#fff8fb)}
+.simple-upi-id{display:flex;align-items:center;gap:8px;min-width:0}
+.simple-upi-id strong{flex:1;min-width:0;color:var(--pink-deep);font-size:15px;overflow-wrap:anywhere}
+.simple-upi-id .button{padding:8px 11px;font-size:11px;flex:0 0 auto}
+.simple-upi-details>small{color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.upi-payment-checklist{display:grid;gap:8px;list-style:none;padding:0;margin:2px 0}
+.upi-payment-checklist li{display:grid;grid-template-columns:27px minmax(0,1fr);align-items:center;gap:9px;color:var(--muted);font-size:11px;line-height:1.4}
+.upi-payment-checklist b{width:27px;height:27px;border-radius:9px;display:grid;place-items:center;background:#ffeaf3;color:var(--pink-deep);font-size:10px}
 .simple-payment-note{margin:0!important;padding:9px 11px;border-radius:11px;background:#fff8e9;color:#76500c;font-size:10px!important;line-height:1.45}
-.simple-upi-mode .payment-next{min-height:48px;margin-top:0;width:100%}
-.online-listeners-section{margin-top:4px}
-@media(min-width:721px){.payment-card:not(.simple-upi-mode){width:min(760px,calc(100vw - 48px))}}
+.simple-upi-mode .payment-next{min-height:48px;margin-top:0}
+@media(min-width:721px){
+  .payment-card:not(.simple-upi-mode){width:min(760px,calc(100vw - 48px))}
+}
 @media(max-width:600px){
   .simple-upi-mode{width:100%;max-width:none;padding:calc(15px + env(safe-area-inset-top)) 15px calc(18px + env(safe-area-inset-bottom))}
   .simple-upi-mode .payment-modal-back{margin-bottom:10px}
-  .simple-upi-mode .payment-heading{margin-bottom:10px}
-  .simple-upi-mode .payment-heading h2{font-size:23px}
-  .simple-upi-mode .payment-summary div{padding:9px 10px}
-  .simple-upi-mode .payment-summary strong{font-size:13px}
-  .simple-payment-box{padding:13px}
-  .payment-app-option{grid-template-columns:48px minmax(0,1fr) 18px;padding:10px 11px;min-height:64px}
-  .payment-fallback-body{grid-template-columns:94px minmax(0,1fr);gap:10px}
-  .compact-qr{width:94px}
+  .simple-upi-mode .payment-heading{margin-bottom:10px}.simple-upi-mode .payment-heading h2{font-size:23px}
+  .simple-upi-layout{grid-template-columns:1fr}.simple-upi-layout .payment-qr-card{order:1;padding:13px}
+  .simple-upi-layout .qr-frame{width:min(205px,62vw)}.simple-upi-details{order:2;padding:13px}
+  .simple-upi-mode .payment-summary div{padding:9px 10px}.simple-upi-mode .payment-summary strong{font-size:13px}
 }
 
 /* Themed scrolling and the main listener card slider */
@@ -273,9 +259,49 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 .public-footer>small a{color:var(--pink-deep);font-weight:800}
 @media(max-width:700px){.public-footer{grid-template-columns:1fr;margin-top:62px}.public-footer nav{justify-content:flex-start}.public-footer>small{grid-column:auto}}
 
-/* v6.1 payment checkout refinements */
-.payment-reference-row{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid rgba(201,47,120,.11);border-radius:12px;background:#fff;min-width:0}
-.payment-reference-row>div{flex:1;min-width:0}.payment-reference-row small,.payment-reference-row strong{display:block}.payment-reference-row small{color:var(--muted);font-size:9px}.payment-reference-row strong{margin-top:3px;font-size:11px;overflow-wrap:anywhere}
-.payment-reference-row .button{padding:8px 11px;font-size:10px;flex:none}.payment-expiry{display:block;color:var(--muted);line-height:1.45}.upi-open-button{text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center}.upi-open-button.disabled{opacity:.55;pointer-events:none}
-.simple-upi-mode .payment-next{border-color:rgba(201,47,120,.18)}
-@media(min-width:821px){.upi-open-button{display:none}}
+
+/* v6.3 premium customer payment and availability polish */
+.listener-discovery{margin-top:4px}
+.simple-upi-mode{width:min(930px,calc(100% - 32px));background:#f7f7f8;border:1px solid rgba(17,17,19,.08);box-shadow:0 34px 90px rgba(15,15,18,.20)}
+.simple-upi-mode .payment-heading h2{color:#111114;font-size:30px;letter-spacing:-.045em}
+.simple-upi-mode .payment-heading>p{max-width:650px;color:#6b6b73}
+.simple-upi-mode .payment-summary{grid-template-columns:1fr 1fr;gap:10px}
+.simple-upi-mode .payment-summary div{background:#fff;border:1px solid #e6e6e9;border-radius:16px;padding:14px 16px}
+.simple-upi-mode .payment-summary .exact-amount{background:#111114;border-color:#111114;color:#fff}
+.simple-upi-mode .payment-summary .exact-amount small{color:#bdbdc4}
+.premium-upi-layout{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(280px,.88fr);gap:14px;align-items:stretch}
+.premium-pay-panel,.premium-qr-card{border:1px solid #e5e5e8;border-radius:22px;background:#fff;box-shadow:0 16px 42px rgba(17,17,20,.06)}
+.premium-pay-panel{padding:24px;display:flex;flex-direction:column;min-width:0}
+.premium-pay-panel .payment-kicker,.premium-qr-card .payment-kicker{color:#111114;letter-spacing:.14em}
+.premium-pay-panel h3{font-size:23px;letter-spacing:-.035em;margin:1px 0 6px;color:#111114}
+.premium-pay-panel>p{font-size:12px;line-height:1.55;color:#707078;margin:0 0 17px}
+.upi-app-actions{display:grid;gap:9px}
+.upi-app-button{width:100%;min-height:66px;border:1px solid #ddddE2;border-radius:17px;background:#fff;color:#141418;display:grid;grid-template-columns:42px minmax(0,1fr) 20px;align-items:center;gap:12px;padding:10px 14px;text-align:left;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease,background .16s ease}
+.upi-app-button:hover{transform:translateY(-1px);border-color:#b8b8bf;box-shadow:0 12px 26px rgba(17,17,20,.08)}
+.upi-app-button:active{transform:translateY(0)}
+.upi-app-button span:nth-child(2){display:grid;gap:3px}.upi-app-button b{font-size:14px}.upi-app-button small{font-size:10px;color:#74747c}.upi-app-button>i{font-style:normal;font-size:25px;color:#8c8c94;text-align:right}
+.upi-app-mark{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:#111114;color:#fff;font-size:15px;font-weight:900;letter-spacing:-.04em}
+.upi-app-other .upi-app-mark{font-size:9px;letter-spacing:.03em}
+.payment-divider{display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:#919199;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em}.payment-divider:before,.payment-divider:after{content:"";height:1px;background:#ececef;flex:1}
+.merchant-detail-card{display:flex;align-items:center;gap:10px;border:1px solid #e7e7ea;border-radius:15px;background:#fafafa;padding:11px 12px;min-width:0}.merchant-detail-card>div{min-width:0;flex:1;display:grid;gap:3px}.merchant-detail-card small{font-size:9px;color:#85858d;text-transform:uppercase;letter-spacing:.08em}.merchant-detail-card strong{font-size:13px;color:#111114;overflow-wrap:anywhere}.merchant-copy{border:0;border-radius:10px;background:#111114;color:#fff;padding:8px 11px;font-size:10px;font-weight:800;cursor:pointer;min-height:36px}
+.merchant-payee{font-size:10px;color:#777780;margin:8px 2px 0}.merchant-payee b{color:#242429}
+.payment-security-line{display:grid;grid-template-columns:24px 1fr;gap:9px;align-items:start;margin:14px 0}.payment-security-line>span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#111114;color:#fff;font-size:11px;font-weight:900}.payment-security-line p{margin:1px 0 0!important;font-size:10px!important;line-height:1.5;color:#696970!important}
+.premium-paid-button{background:#111114!important;border-color:#111114!important;color:#fff!important;box-shadow:none!important}.premium-paid-button:hover{background:#000!important}
+.premium-qr-card{padding:23px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111114;border-color:#111114;color:#fff}
+.premium-qr-card .payment-kicker{color:#c9c9ce}.premium-qr-card>strong{color:#fff!important;font-size:14px;margin-top:14px!important}.premium-qr-card>small{color:#9e9ea6!important;font-size:10px;line-height:1.45;max-width:230px}.premium-qr-card .qr-save-link{color:#fff;border:1px solid #38383e;border-radius:11px;margin-top:10px;padding:9px 12px;background:#1b1b1f}
+.qr-scan-shell{position:relative;width:min(244px,72vw);aspect-ratio:1;padding:14px;margin-top:5px}.premium-qr-card .qr-frame{width:100%;height:100%;padding:10px;border:0;border-radius:18px;background:#fff;box-shadow:none}.premium-qr-card .qr-frame img{image-rendering:auto}
+.qr-corner{position:absolute;width:34px;height:34px;border-color:#fff;border-style:solid;pointer-events:none}.qr-corner.top-left{left:0;top:0;border-width:3px 0 0 3px;border-radius:8px 0 0}.qr-corner.top-right{right:0;top:0;border-width:3px 3px 0 0;border-radius:0 8px 0 0}.qr-corner.bottom-left{left:0;bottom:0;border-width:0 0 3px 3px;border-radius:0 0 0 8px}.qr-corner.bottom-right{right:0;bottom:0;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+.proof-preview{border-color:#dedee3;background:#f7f7f8}.proof-preview small{color:#6e6e76}.payment-status-icon.approved{background:#111114;color:#fff}
+@media(max-width:720px){.premium-upi-layout{grid-template-columns:1fr}.premium-qr-card{order:2}.premium-pay-panel{order:1}.simple-upi-mode{width:100%;max-width:none}.qr-scan-shell{width:min(225px,66vw)}}
+@media(max-width:480px){.premium-pay-panel,.premium-qr-card{border-radius:18px;padding:17px}.premium-pay-panel h3{font-size:20px}.upi-app-button{min-height:62px}.simple-upi-mode .payment-summary div{padding:11px 12px}}
+
+
+/* v6.3 restrained premium surface polish */
+.welcome-card,.call-hero,.panel,.plan-card,.listener-card{border-color:rgba(67,48,58,.09)}
+.welcome-card,.call-hero{box-shadow:0 22px 55px rgba(66,31,49,.07)}
+.plan-card{background:linear-gradient(180deg,#fff 0%,#fffafb 100%);box-shadow:0 12px 34px rgba(81,34,58,.055)}
+.plan-card:hover{transform:translateY(-3px);box-shadow:0 20px 44px rgba(81,34,58,.09)}
+.listener-card{background:#fff;box-shadow:0 12px 32px rgba(66,31,49,.055)}
+.tabs{border:1px solid rgba(67,48,58,.08);box-shadow:0 10px 30px rgba(66,31,49,.045)}
+.button{transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease}.button:active{transform:translateY(1px)}
+.wallet-pill,.balance-ring{box-shadow:0 14px 32px rgba(72,26,50,.08)}

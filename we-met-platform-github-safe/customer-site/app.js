@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.1.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.3.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -210,8 +210,8 @@
     $('#couponForm').addEventListener('submit', redeem);
     $('#refreshPayments').addEventListener('click', loadPayments);
     $('#downloadUpiQr').addEventListener('click', saveUpiQr);
-    $('#payWithGooglePay').addEventListener('click', (event) => openPaymentApp(event, 'google'));
-    $('#payWithOtherUpi').addEventListener('click', (event) => openPaymentApp(event, 'other'));
+    $('#payWithGooglePay').addEventListener('click', () => openUpiApp('google'));
+    $('#payWithAnyUpi').addEventListener('click', () => openUpiApp('upi'));
     $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
     $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
     $('#manualPaymentForm').addEventListener('submit', submitManualPayment);
@@ -685,25 +685,23 @@
   }
 
   function renderListeners() {
-    const onlineListeners = listeners.filter((listener) => listener.status !== 'offline');
-    const malayalam = onlineListeners.filter((listener) => listenerLanguage(listener).toLowerCase() === 'malayalam');
-    const others = onlineListeners.filter((listener) => listenerLanguage(listener).toLowerCase() !== 'malayalam');
-    const malayalamAvailable = malayalam.filter((listener) => listener.status === 'available').length;
-    const otherAvailable = others.filter((listener) => listener.status === 'available').length;
+    const malayalam = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() === 'malayalam');
+    const others = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() !== 'malayalam');
+    const malayalamAvailable = malayalam.some((listener) => listener.status === 'available');
+    const otherAvailable = others.some((listener) => listener.status === 'available');
+    const anyAvailable = malayalamAvailable || otherAvailable;
+    const anyoneOnline = listeners.length > 0;
 
-    $('#availabilityText').textContent = malayalamAvailable
-      ? `${malayalamAvailable} Malayalam listener${malayalamAvailable === 1 ? '' : 's'} available now`
-      : otherLanguagesEnabled && otherAvailable
-        ? `No Malayalam listener right now · ${otherAvailable} other-language listener${otherAvailable === 1 ? '' : 's'} available`
-        : otherAvailable
-          ? 'No Malayalam listener right now · other languages are available'
-          : onlineListeners.length
-            ? 'Listeners are online but currently unavailable'
-            : 'No listener is available right now';
+    $('#availabilityText').textContent = anyAvailable
+      ? 'Listeners are available now'
+      : anyoneOnline
+        ? 'Listeners are online, but currently unavailable'
+        : 'No listener is online right now';
 
-    const hasOnlineListener = onlineListeners.length > 0;
-    show('#onlineListenersSection', hasOnlineListener);
-    if (!hasOnlineListener) {
+    // Keep the customer home clean: the complete listener discovery area is only
+    // visible while at least one real listener has a live socket connection.
+    show('#listenerDiscovery', anyoneOnline);
+    if (!anyoneOnline) {
       $('#listenerGrid').innerHTML = '';
       $('#otherLanguageGrid').innerHTML = '';
       show('#otherLanguageSection', false);
@@ -712,12 +710,12 @@
 
     $('#listenerGrid').innerHTML = listenerCardsMarkup(
       malayalam,
-      'No Malayalam listeners online',
-      otherAvailable ? 'Turn on “Suggest other languages” to see other available listeners.' : 'No Malayalam listener is online right now.',
+      'No Malayalam listener available',
+      otherAvailable ? 'Turn on “Suggest other languages” to see another available listener.' : 'Please try again shortly.',
     );
     show('#otherLanguageSection', otherLanguagesEnabled);
     if (otherLanguagesEnabled) {
-      $('#otherLanguageGrid').innerHTML = listenerCardsMarkup(others, 'No other-language listeners online', 'Other language listeners will appear here when they are online.');
+      $('#otherLanguageGrid').innerHTML = listenerCardsMarkup(others, 'No other-language listener available', 'Other language listeners will appear here when they are online.');
     }
 
     $$('[data-call]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.call)));
@@ -905,8 +903,8 @@
 
   function renderPlans(plans = []) {
     paymentPlans = plans;
-    const planDescription = 'Exact-amount UPI · verified once · billed by connected second.';
-    $('#walletPaymentIntro').textContent = 'Scan the QR or copy the UPI ID, pay the exact amount, then submit the successful UTR and payment screenshot.';
+    const planDescription = 'Secure UPI checkout · exact amount · billed by connected second.';
+    $('#walletPaymentIntro').textContent = 'Choose a pack, pay securely with Google Pay or another UPI app, then submit the successful transaction details.';
     $('#paymentHistoryIntro').textContent = 'UPI submissions remain pending until an administrator verifies the UTR and screenshot.';
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
@@ -1005,9 +1003,9 @@
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
     resetPaymentCheckout(mode);
     currentCheckout = { mode, plan };
-    $('#paymentTitle').textContent = 'Scan to pay';
-    $('#paymentEyebrow').textContent = 'DIRECT UPI';
-    $('#paymentSubtitle').textContent = 'Pay the exact amount shown below.';
+    $('#paymentTitle').textContent = 'Secure UPI payment';
+    $('#paymentEyebrow').textContent = 'WE MET CHECKOUT';
+    $('#paymentSubtitle').textContent = 'Choose a UPI app or scan the QR. Always verify the payee before confirming.';
     openManagedOverlay('#paymentModal', 'paymentModal');
     setPaymentStep('pay');
     try {
@@ -1026,42 +1024,37 @@
     }
   }
 
-  function googlePayUri(upiUri = '') {
-    if (!upiUri.startsWith('upi://pay')) return '';
-    const suffix = upiUri.slice('upi://pay'.length);
-    return /iPhone|iPad|iPod/i.test(navigator.userAgent) ? `gpay://upi/pay${suffix}` : `tez://upi/pay${suffix}`;
-  }
-
   function renderDirectUpiIntent(intent) {
     $('#paymentSummary').innerHTML = `<div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
     $('#manualUpiId').textContent = intent.upi.id;
     $('#manualPayeeName').textContent = intent.upi.payee_name;
-    $('#manualPaymentReference').textContent = intent.checkout_reference;
     $('#manualUpiQr').src = intent.upi_qr_data_url;
-    const genericUri = intent.upi_uri || '';
-    const gpayUri = googlePayUri(genericUri);
-    $('#payWithGooglePay').href = gpayUri || '#';
-    $('#payWithOtherUpi').href = genericUri || '#';
-    $('#payWithGooglePay').classList.toggle('disabled', !gpayUri);
-    $('#payWithOtherUpi').classList.toggle('disabled', !genericUri);
-    $('#payWithGooglePay').setAttribute('aria-disabled', gpayUri ? 'false' : 'true');
-    $('#payWithOtherUpi').setAttribute('aria-disabled', genericUri ? 'false' : 'true');
-    const expiry = new Date(intent.expires_at);
-    $('#manualIntentExpiry').textContent = Number.isNaN(expiry.getTime())
-      ? 'Use this checkout only for the exact pack shown above.'
-      : `Valid until ${new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(expiry)}.`;
     show('#manualCheckoutPanel');
   }
 
-  function openPaymentApp(event, app) {
+  function upiPaymentLink(scheme = 'upi') {
     const intent = currentCheckout?.intent;
-    const uri = app === 'google' ? googlePayUri(intent?.upi_uri || '') : (intent?.upi_uri || '');
-    if (!uri) {
-      event.preventDefault();
-      return P.toast('UPI app link is unavailable. Scan the QR or copy the UPI ID.', 'error');
+    if (!intent?.upi?.id) return '';
+    const query = new URLSearchParams({
+      pa: intent.upi.id,
+      pn: intent.upi.payee_name || 'We Met',
+      am: (Number(intent.amount_paise || 0) / 100).toFixed(2),
+      cu: 'INR',
+      tr: intent.checkout_reference || '',
+      tn: `We Met ${intent.checkout_reference || 'payment'}`,
+    });
+    const base = scheme === 'tez' ? 'tez://upi/pay' : 'upi://pay';
+    return `${base}?${query.toString()}`;
+  }
+
+  function openUpiApp(type = 'upi') {
+    const link = upiPaymentLink(type === 'google' ? 'tez' : 'upi');
+    if (!link) return P.toast('The UPI payment is not ready. Please try again.', 'error');
+    if (type === 'google') {
+      window.location.href = link;
+      return;
     }
-    event.currentTarget.href = uri;
-    setTimeout(() => P.toast('After payment succeeds, return here and tap “I have paid”.', 'info'), 500);
+    window.location.href = link;
   }
 
   function saveUpiQr() {
@@ -1100,19 +1093,10 @@
     event.preventDefault();
     const intent = currentCheckout?.intent;
     if (!intent) return P.toast('This checkout expired. Start again.', 'error');
-    const rawReference = $('#manualUtr').value.trim().toUpperCase().replace(/\s+/g, '');
-    if (rawReference.length < 6 || rawReference.length > 64 || !/^[A-Z0-9/:-]+$/.test(rawReference)) {
-      $('#manualUtr').focus();
-      return P.toast('Enter the valid UTR / UPI transaction ID from the successful payment.', 'error');
-    }
-    $('#manualUtr').value = rawReference;
-    const button = event.submitter || $('#submitPaymentProof');
-    const originalLabel = button?.textContent;
+    const button = event.submitter;
     button?.setAttribute('disabled', '');
-    if (button) button.textContent = 'Submitting…';
     try {
       const body = new FormData(event.target);
-      body.set('utrReference', rawReference);
       body.set('intentId', intent.id);
       body.set('paymentMethod', 'upi');
       const response = await P.api('/api/customer/manual-payments/submissions', {
@@ -1131,7 +1115,6 @@
       P.toast(error.message || 'The UPI transaction ID could not be submitted.', 'error');
     } finally {
       button?.removeAttribute('disabled');
-      if (button && originalLabel) button.textContent = originalLabel;
     }
   }
 
