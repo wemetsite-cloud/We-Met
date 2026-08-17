@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.6.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.6.1', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -701,18 +701,16 @@
         ? 'Live listener status is updating'
         : 'Listener availability updates live';
 
-    // Keep the discovery area visible without claiming that an offline listener is available.
-    // When nobody is connected, show a calm neutral state instead of hiding the whole section.
-    show('#listenerDiscovery', true);
+    // Hide listener discovery completely when nobody is online.
+    // This keeps the customer home clean and avoids showing an empty live-listener section.
     if (!anyoneOnline) {
-      $('#listenerGrid').innerHTML = emptyState(
-        'Available listener list',
-        'There is no active listener card at this moment. Refresh shortly and available profiles will appear here automatically.',
-      );
+      show('#listenerDiscovery', false);
+      $('#listenerGrid').innerHTML = '';
       $('#otherLanguageGrid').innerHTML = '';
       show('#otherLanguageSection', false);
       return;
     }
+    show('#listenerDiscovery', true);
 
     $('#listenerGrid').innerHTML = listenerCardsMarkup(
       malayalam,
@@ -1011,7 +1009,7 @@
     currentCheckout = { mode, plan };
     $('#paymentTitle').textContent = 'Secure UPI payment';
     $('#paymentEyebrow').textContent = 'WE MET CHECKOUT';
-    $('#paymentSubtitle').textContent = 'Choose a UPI app or scan the QR. The payment should show Paytm as the verified merchant.';
+    $('#paymentSubtitle').textContent = 'Choose a UPI app or scan the QR. Confirm Sabith Salah K P as the payee before completing payment.';
     openManagedOverlay('#paymentModal', 'paymentModal');
     setPaymentStep('pay');
     try {
