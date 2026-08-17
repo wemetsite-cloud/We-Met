@@ -210,7 +210,8 @@
     $('#couponForm').addEventListener('submit', redeem);
     $('#refreshPayments').addEventListener('click', loadPayments);
     $('#downloadUpiQr').addEventListener('click', saveUpiQr);
-    $('#openUpiApp').addEventListener('click', openUpiApp);
+    $('#payWithGooglePay').addEventListener('click', (event) => openPaymentApp(event, 'google'));
+    $('#payWithOtherUpi').addEventListener('click', (event) => openPaymentApp(event, 'other'));
     $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
     $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
     $('#manualPaymentForm').addEventListener('submit', submitManualPayment);
@@ -684,8 +685,9 @@
   }
 
   function renderListeners() {
-    const malayalam = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() === 'malayalam');
-    const others = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() !== 'malayalam');
+    const onlineListeners = listeners.filter((listener) => listener.status !== 'offline');
+    const malayalam = onlineListeners.filter((listener) => listenerLanguage(listener).toLowerCase() === 'malayalam');
+    const others = onlineListeners.filter((listener) => listenerLanguage(listener).toLowerCase() !== 'malayalam');
     const malayalamAvailable = malayalam.filter((listener) => listener.status === 'available').length;
     const otherAvailable = others.filter((listener) => listener.status === 'available').length;
 
@@ -695,16 +697,27 @@
         ? `No Malayalam listener right now · ${otherAvailable} other-language listener${otherAvailable === 1 ? '' : 's'} available`
         : otherAvailable
           ? 'No Malayalam listener right now · other languages are available'
-          : 'No listener is available right now';
+          : onlineListeners.length
+            ? 'Listeners are online but currently unavailable'
+            : 'No listener is available right now';
+
+    const hasOnlineListener = onlineListeners.length > 0;
+    show('#onlineListenersSection', hasOnlineListener);
+    if (!hasOnlineListener) {
+      $('#listenerGrid').innerHTML = '';
+      $('#otherLanguageGrid').innerHTML = '';
+      show('#otherLanguageSection', false);
+      return;
+    }
 
     $('#listenerGrid').innerHTML = listenerCardsMarkup(
       malayalam,
       'No Malayalam listeners online',
-      otherAvailable ? 'Turn on “Suggest other languages” to see other available listeners.' : 'Please refresh or try again shortly.',
+      otherAvailable ? 'Turn on “Suggest other languages” to see other available listeners.' : 'No Malayalam listener is online right now.',
     );
     show('#otherLanguageSection', otherLanguagesEnabled);
     if (otherLanguagesEnabled) {
-      $('#otherLanguageGrid').innerHTML = listenerCardsMarkup(others, 'No other-language listeners online', 'Other language listeners will appear here when they are available.');
+      $('#otherLanguageGrid').innerHTML = listenerCardsMarkup(others, 'No other-language listeners online', 'Other language listeners will appear here when they are online.');
     }
 
     $$('[data-call]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.call)));
@@ -1013,15 +1026,26 @@
     }
   }
 
+  function googlePayUri(upiUri = '') {
+    if (!upiUri.startsWith('upi://pay')) return '';
+    const suffix = upiUri.slice('upi://pay'.length);
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent) ? `gpay://upi/pay${suffix}` : `tez://upi/pay${suffix}`;
+  }
+
   function renderDirectUpiIntent(intent) {
     $('#paymentSummary').innerHTML = `<div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
     $('#manualUpiId').textContent = intent.upi.id;
     $('#manualPayeeName').textContent = intent.upi.payee_name;
     $('#manualPaymentReference').textContent = intent.checkout_reference;
     $('#manualUpiQr').src = intent.upi_qr_data_url;
-    $('#openUpiApp').href = intent.upi_uri || '#';
-    $('#openUpiApp').classList.toggle('disabled', !intent.upi_uri);
-    $('#openUpiApp').setAttribute('aria-disabled', intent.upi_uri ? 'false' : 'true');
+    const genericUri = intent.upi_uri || '';
+    const gpayUri = googlePayUri(genericUri);
+    $('#payWithGooglePay').href = gpayUri || '#';
+    $('#payWithOtherUpi').href = genericUri || '#';
+    $('#payWithGooglePay').classList.toggle('disabled', !gpayUri);
+    $('#payWithOtherUpi').classList.toggle('disabled', !genericUri);
+    $('#payWithGooglePay').setAttribute('aria-disabled', gpayUri ? 'false' : 'true');
+    $('#payWithOtherUpi').setAttribute('aria-disabled', genericUri ? 'false' : 'true');
     const expiry = new Date(intent.expires_at);
     $('#manualIntentExpiry').textContent = Number.isNaN(expiry.getTime())
       ? 'Use this checkout only for the exact pack shown above.'
@@ -1029,14 +1053,15 @@
     show('#manualCheckoutPanel');
   }
 
-  function openUpiApp(event) {
-    const uri = currentCheckout?.intent?.upi_uri;
+  function openPaymentApp(event, app) {
+    const intent = currentCheckout?.intent;
+    const uri = app === 'google' ? googlePayUri(intent?.upi_uri || '') : (intent?.upi_uri || '');
     if (!uri) {
       event.preventDefault();
       return P.toast('UPI app link is unavailable. Scan the QR or copy the UPI ID.', 'error');
     }
     event.currentTarget.href = uri;
-    setTimeout(() => P.toast('After payment succeeds, return here and tap “I have already paid”.', 'info'), 500);
+    setTimeout(() => P.toast('After payment succeeds, return here and tap “I have paid”.', 'info'), 500);
   }
 
   function saveUpiQr() {
