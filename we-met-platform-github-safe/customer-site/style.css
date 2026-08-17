@@ -258,3 +258,10 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 .public-footer>small{grid-column:1/-1;color:var(--muted)}
 .public-footer>small a{color:var(--pink-deep);font-weight:800}
 @media(max-width:700px){.public-footer{grid-template-columns:1fr;margin-top:62px}.public-footer nav{justify-content:flex-start}.public-footer>small{grid-column:auto}}
+
+/* v6.1 payment checkout refinements */
+.payment-reference-row{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid rgba(201,47,120,.11);border-radius:12px;background:#fff;min-width:0}
+.payment-reference-row>div{flex:1;min-width:0}.payment-reference-row small,.payment-reference-row strong{display:block}.payment-reference-row small{color:var(--muted);font-size:9px}.payment-reference-row strong{margin-top:3px;font-size:11px;overflow-wrap:anywhere}
+.payment-reference-row .button{padding:8px 11px;font-size:10px;flex:none}.payment-expiry{display:block;color:var(--muted);line-height:1.45}.upi-open-button{text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center}.upi-open-button.disabled{opacity:.55;pointer-events:none}
+.simple-upi-mode .payment-next{border-color:rgba(201,47,120,.18)}
+@media(min-width:821px){.upi-open-button{display:none}}

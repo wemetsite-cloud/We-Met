@@ -210,6 +210,7 @@
     $('#couponForm').addEventListener('submit', redeem);
     $('#refreshPayments').addEventListener('click', loadPayments);
     $('#downloadUpiQr').addEventListener('click', saveUpiQr);
+    $('#openUpiApp').addEventListener('click', openUpiApp);
     $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
     $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
     $('#manualPaymentForm').addEventListener('submit', submitManualPayment);
@@ -1016,8 +1017,26 @@
     $('#paymentSummary').innerHTML = `<div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
     $('#manualUpiId').textContent = intent.upi.id;
     $('#manualPayeeName').textContent = intent.upi.payee_name;
+    $('#manualPaymentReference').textContent = intent.checkout_reference;
     $('#manualUpiQr').src = intent.upi_qr_data_url;
+    $('#openUpiApp').href = intent.upi_uri || '#';
+    $('#openUpiApp').classList.toggle('disabled', !intent.upi_uri);
+    $('#openUpiApp').setAttribute('aria-disabled', intent.upi_uri ? 'false' : 'true');
+    const expiry = new Date(intent.expires_at);
+    $('#manualIntentExpiry').textContent = Number.isNaN(expiry.getTime())
+      ? 'Use this checkout only for the exact pack shown above.'
+      : `Valid until ${new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(expiry)}.`;
     show('#manualCheckoutPanel');
+  }
+
+  function openUpiApp(event) {
+    const uri = currentCheckout?.intent?.upi_uri;
+    if (!uri) {
+      event.preventDefault();
+      return P.toast('UPI app link is unavailable. Scan the QR or copy the UPI ID.', 'error');
+    }
+    event.currentTarget.href = uri;
+    setTimeout(() => P.toast('After payment succeeds, return here and tap “I have already paid”.', 'info'), 500);
   }
 
   function saveUpiQr() {
@@ -1056,10 +1075,19 @@
     event.preventDefault();
     const intent = currentCheckout?.intent;
     if (!intent) return P.toast('This checkout expired. Start again.', 'error');
-    const button = event.submitter;
+    const rawReference = $('#manualUtr').value.trim().toUpperCase().replace(/\s+/g, '');
+    if (rawReference.length < 6 || rawReference.length > 64 || !/^[A-Z0-9/:-]+$/.test(rawReference)) {
+      $('#manualUtr').focus();
+      return P.toast('Enter the valid UTR / UPI transaction ID from the successful payment.', 'error');
+    }
+    $('#manualUtr').value = rawReference;
+    const button = event.submitter || $('#submitPaymentProof');
+    const originalLabel = button?.textContent;
     button?.setAttribute('disabled', '');
+    if (button) button.textContent = 'Submitting…';
     try {
       const body = new FormData(event.target);
+      body.set('utrReference', rawReference);
       body.set('intentId', intent.id);
       body.set('paymentMethod', 'upi');
       const response = await P.api('/api/customer/manual-payments/submissions', {
@@ -1078,6 +1106,7 @@
       P.toast(error.message || 'The UPI transaction ID could not be submitted.', 'error');
     } finally {
       button?.removeAttribute('disabled');
+      if (button && originalLabel) button.textContent = originalLabel;
     }
   }
 

@@ -138,9 +138,6 @@
         <div class="section-head"><div><span class="eyebrow">TALK-TIME PAYMENT</span><h2>Choose a talk-time pack</h2><p id="walletPaymentIntro">Choose a pack to view the available payment method and exact amount.</p></div></div>
         <div id="plansGrid" class="plans-grid"></div>
         <div class="grid-two">
-
-          <div style="height: 40px;"></div>
-
           <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
           <section class="panel coupon-panel">
             <span class="eyebrow">REDEEM TALK-TIME</span>
@@ -236,13 +233,16 @@
                 <span class="payment-kicker">OR USE UPI ID</span>
                 <div class="simple-upi-id"><strong id="manualUpiId">—</strong><button class="button button-soft" type="button" data-copy-payment="manualUpiId">Copy</button></div>
                 <small>Payee: <b id="manualPayeeName">—</b></small>
+                <div class="payment-reference-row"><div><small>Payment reference</small><strong id="manualPaymentReference">—</strong></div><button class="button button-soft" type="button" data-copy-payment="manualPaymentReference">Copy</button></div>
+                <small id="manualIntentExpiry" class="payment-expiry">Checkout expires later today.</small>
+                <a id="openUpiApp" class="button button-primary button-large upi-open-button" href="#">Open UPI app</a>
                 <ol class="upi-payment-checklist" aria-label="UPI payment steps">
-                  <li><b>1</b><span>Open any trusted UPI app or scan the QR.</span></li>
-                  <li><b>2</b><span>Pay the exact amount shown above.</span></li>
-                  <li><b>3</b><span>Keep the successful transaction screen.</span></li>
+                  <li><b>1</b><span>Open a UPI app or scan the QR.</span></li>
+                  <li><b>2</b><span>Confirm the exact amount and receiving UPI ID.</span></li>
+                  <li><b>3</b><span>After success, keep the UTR and payment screenshot.</span></li>
                 </ol>
-                <p class="simple-payment-note">Check the payee and amount before paying. Never share your UPI PIN or OTP.</p>
-                <button id="manualTransferContinue" class="button button-primary button-large payment-next" type="button">I have paid</button>
+                <p class="simple-payment-note">Pay only to the UPI ID shown here. Never share your UPI PIN or OTP.</p>
+                <button id="manualTransferContinue" class="button button-soft button-large payment-next" type="button">I have already paid</button>
               </section>
             </div>
           </div>
@@ -250,13 +250,13 @@
       </section>
 
       <section id="paymentStepSubmit" class="payment-step hidden" data-payment-step="submit">
-        <div class="upload-intro"><span class="upload-icon">✓</span><div><span class="payment-kicker">PAYMENT DETAILS</span><h3>Add your UTR and screenshot</h3><p>Copy the successful UPI transaction ID or UTR and attach the completed-payment screenshot.</p></div></div>
+        <div class="upload-intro"><span class="upload-icon">✓</span><div><span class="payment-kicker">PAYMENT DETAILS</span><h3>Confirm your successful payment</h3><p>Enter the UTR from the successful transaction and attach its screenshot. This prevents duplicate or incorrect wallet credits.</p></div></div>
         <form id="manualPaymentForm" class="stack">
           <label>UPI transaction ID / UTR <span class="required-label">Required</span><input id="manualUtr" name="utrReference" autocomplete="off" inputmode="text" minlength="6" maxlength="64" placeholder="Example: 423456789012" required><small>Use the unique reference from the successful transaction—not your phone number or UPI ID.</small></label>
           <label>Payment screenshot <span class="required-label">Required</span><input id="manualProof" name="proof" type="file" accept="image/png,image/jpeg,image/webp" required><small>Attach the successful-payment screen as PNG, JPG, or WebP up to 3 MB.</small></label>
           <div id="manualProofPreview" class="proof-preview hidden"><img id="manualProofImage" alt="Selected screenshot preview"><div><strong id="manualProofName"></strong><small>This screenshot and the UTR will be shown to the administrator.</small></div></div>
           <label>Optional note<textarea id="manualCustomerNote" name="customerNote" maxlength="500" placeholder="Only add a note if the payment needs clarification"></textarea></label>
-          <div class="payment-form-actions"><button id="manualBackToTransfer" class="button button-quiet" type="button">Back to UPI</button><button class="button button-primary" type="submit">Send payment details</button></div>
+          <div class="payment-form-actions"><button id="manualBackToTransfer" class="button button-quiet" type="button">Back to UPI</button><button id="submitPaymentProof" class="button button-primary" type="submit">Submit for verification</button></div>
         </form>
       </section>
 
