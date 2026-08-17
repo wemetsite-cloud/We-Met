@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.4.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.5.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -1008,7 +1008,7 @@
     currentCheckout = { mode, plan };
     $('#paymentTitle').textContent = 'Secure UPI payment';
     $('#paymentEyebrow').textContent = 'WE MET CHECKOUT';
-    $('#paymentSubtitle').textContent = 'Choose a UPI app or scan the QR. Always verify the payee before confirming.';
+    $('#paymentSubtitle').textContent = 'Choose a UPI app or scan the QR. The payment should show Paytm as the verified merchant.';
     openManagedOverlay('#paymentModal', 'paymentModal');
     setPaymentStep('pay');
     try {
@@ -1035,29 +1035,49 @@
     show('#manualCheckoutPanel');
   }
 
-  function upiPaymentLink(scheme = 'upi') {
-    const intent = currentCheckout?.intent;
-    if (!intent?.upi?.id) return '';
-    const query = new URLSearchParams({
-      pa: intent.upi.id,
-      pn: intent.upi.payee_name || 'We Met',
-      am: (Number(intent.amount_paise || 0) / 100).toFixed(2),
-      cu: 'INR',
-      tr: intent.checkout_reference || '',
-      tn: `We Met ${intent.checkout_reference || 'payment'}`,
-    });
-    const base = scheme === 'tez' ? 'tez://upi/pay' : 'upi://pay';
-    return `${base}?${query.toString()}`;
+  function upiPaymentLink() {
+    const link = String(currentCheckout?.intent?.upi?.payment_uri || '').trim();
+    return /^upi:\/\/pay\?/i.test(link) ? link : '';
+  }
+
+  function googlePayIntentLink(upiLink) {
+    const query = upiLink.split('?')[1] || '';
+    if (!query) return '';
+    return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
   }
 
   function openUpiApp(type = 'upi') {
-    const link = upiPaymentLink(type === 'google' ? 'tez' : 'upi');
+    const link = upiPaymentLink();
     if (!link) return P.toast('The UPI payment is not ready. Please try again.', 'error');
-    if (type === 'google') {
+    if (type !== 'google') {
       window.location.href = link;
       return;
     }
-    window.location.href = link;
+
+    const isAndroid = /Android/i.test(navigator.userAgent || '');
+    if (!isAndroid) {
+      window.location.href = link;
+      return;
+    }
+
+    const googleLink = googlePayIntentLink(link);
+    if (!googleLink) {
+      window.location.href = link;
+      return;
+    }
+
+    let fallbackTimer = window.setTimeout(() => {
+      fallbackTimer = 0;
+      if (document.visibilityState === 'visible') window.location.href = link;
+    }, 1100);
+    const cancelFallback = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+      fallbackTimer = 0;
+      document.removeEventListener('visibilitychange', cancelFallback);
+    };
+    document.addEventListener('visibilitychange', cancelFallback);
+    window.location.href = googleLink;
   }
 
   function saveUpiQr() {
