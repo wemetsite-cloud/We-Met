@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
+const { normalizeProfileImage } = require('../profile-image');
 
 const router = express.Router();
 router.use(authenticate, requireRole('employee'));
@@ -138,15 +139,21 @@ router.patch('/profile', asyncHandler(async (req, res) => {
   const username = String(req.body.username || '').trim().toLowerCase().slice(0, 50) || null;
   const phone = String(req.body.phone || '').trim().slice(0, 30) || null;
   const bio = String(req.body.bio || '').trim().slice(0, 500) || null;
+  const profileImage = normalizeProfileImage(req.body.profileImage);
   if (name.length < 2) return res.status(400).json({ error: 'Enter a display name.' });
+  if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
 
   try {
     const result = await db.query(
-      `UPDATE users SET name=$2,username=$3,phone=$4,bio=$5,updated_at=now()
-       WHERE id=$1 RETURNING id,name,username,email,phone,upi_id,upi_phone,bio,employee_code,listener_language,listener_rate_paise`,
-      [req.user.id, name, username, phone, bio],
+      `UPDATE users SET name=$2,username=$3,phone=$4,bio=$5,
+       profile_image=CASE WHEN $6::boolean THEN $7 ELSE profile_image END,updated_at=now()
+       WHERE id=$1 RETURNING id,name,username,email,phone,upi_id,upi_phone,bio,profile_image,employee_code,listener_language,listener_rate_paise`,
+      [req.user.id, name, username, phone, bio, profileImage !== undefined, profileImage === undefined ? null : profileImage],
     );
-    res.json({ user: result.rows[0] });
+    await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(req.user.id);
+    const user = result.rows[0];
+    if (String(user.profile_image || '').startsWith('data:image/')) user.profile_image = `photo:${user.id}`;
+    res.json({ user });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That username is already in use.' });
     throw error;

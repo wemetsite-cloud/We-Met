@@ -67,6 +67,7 @@ function createSocketServer(io) {
       availability,
       name: user.name,
       bio: user.bio || '',
+      avatar: user.profile_image || '',
       language: user.listener_language || 'Malayalam',
       lastAssigned: employees.get(user.id)?.lastAssigned || 0,
     });
@@ -93,7 +94,7 @@ function createSocketServer(io) {
     try {
       const payload = verifyToken(socket.handshake.auth?.token);
       const result = await db.query(`
-        SELECT id, role, name, email, bio, balance_seconds, status, listener_availability, listener_language,
+        SELECT id, role, name, email, bio, CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image, balance_seconds, status, listener_availability, listener_language,
                suspended_until, suspension_reason, auth_version
         FROM users
         WHERE id = $1
@@ -760,7 +761,7 @@ function createSocketServer(io) {
   async function refreshEmployeeProfile(userId) {
     const current = employees.get(userId);
     if (!current) return;
-    const result = await db.query(`SELECT name,bio,listener_language,listener_availability,status FROM users WHERE id=$1 AND role='employee'`, [userId]);
+    const result = await db.query(`SELECT id,name,bio,CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,listener_language,listener_availability,status FROM users WHERE id=$1 AND role='employee'`, [userId]);
     const row = result.rows[0];
     if (!row || row.status !== 'active' || !hasLiveSocket(userId) || !['online','break'].includes(row.listener_availability)) {
       employees.delete(userId);
@@ -770,6 +771,7 @@ function createSocketServer(io) {
     } else {
       current.name = row.name;
       current.bio = row.bio || '';
+      current.avatar = row.profile_image || '';
       current.language = row.listener_language || 'Malayalam';
       current.availability = row.listener_availability;
       if (current.state !== 'ringing' && current.state !== 'busy') current.state = row.listener_availability === 'break' ? 'break' : 'available';

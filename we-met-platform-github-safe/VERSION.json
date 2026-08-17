@@ -1,5 +1,12 @@
 {
-  "version": "6.3.0",
-  "updated": "2026-08-17",
-  "notes": "Premium black-and-white UPI checkout with Google Pay and other UPI app launch options, higher-quality QR generation, no customer-facing listener counts, listener discovery hidden when nobody is connected, \u20b91999 restored to 240 minutes, and listener connected-second earnings/payout wallet logic preserved."
+  "version": "6.4.0",
+  "name": "We Met v6.4.0 profile photos + themed payment",
+  "changes": [
+    "Restored pink/light We Met payment theme",
+    "QR remains black/white for reliable scanning",
+    "Listener can upload a profile photo or choose 20 built-in avatars",
+    "Admin can upload/select/reset listener profile photos",
+    "Customer listener cards use saved listener profile images",
+    "Profile images propagate live to connected customers"
+  ]
 }

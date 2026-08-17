@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { authenticate, asyncHandler, unavailable, activateExpiredSuspension } = require('../middleware');
+const { profileImageReference } = require('../profile-image');
 const createRateLimit = require('../request-limit');
 
 const router = express.Router();
@@ -48,6 +49,7 @@ function publicUser(user) {
     email: user.email,
     phone: user.phone,
     bio: user.bio,
+    profileImage: String(user.profile_image || '').startsWith('photo:') ? user.profile_image : profileImageReference(user.profile_image, user.id),
     employeeCode: user.employee_code,
     upiId: user.upi_id,
     upiPhone: user.upi_phone,

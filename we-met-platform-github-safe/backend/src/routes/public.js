@@ -1,5 +1,8 @@
 const express = require('express');
 const config = require('../config');
+const db = require('../db');
+const { decodeProfileImage } = require('../profile-image');
+const { asyncHandler } = require('../middleware');
 
 const router = express.Router();
 
@@ -13,6 +16,20 @@ router.get('/config', (_req, res) => res.json({
   minimumStartSeconds: config.minimumStartSeconds,
   ringSeconds: config.ringSeconds,
   callingLanguage: 'Malayalam',
+}));
+
+
+router.get('/listener-profile-image/:id', asyncHandler(async (req, res) => {
+  const result = await db.query(
+    `SELECT profile_image FROM users WHERE id=$1 AND role='employee'`,
+    [req.params.id],
+  );
+  const image = decodeProfileImage(result.rows[0]?.profile_image);
+  if (!image) return res.status(404).end();
+  res.setHeader('Content-Type', image.mime);
+  res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
+  res.setHeader('Content-Length', String(image.buffer.length));
+  return res.end(image.buffer);
 }));
 
 router.get('/legal/:type', (req, res) => {

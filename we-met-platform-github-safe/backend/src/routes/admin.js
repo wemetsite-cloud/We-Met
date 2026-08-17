@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword } = require('../auth');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
+const { normalizeProfileImage } = require('../profile-image');
 
 const router = express.Router();
 router.use(authenticate, requireRole('admin'));
@@ -99,7 +100,7 @@ router.get('/users', asyncHandler(async (req, res) => {
   }
 
   const result = await db.query(`
-    SELECT u.id, u.role, u.name, u.username, u.email, u.phone, u.bio,
+    SELECT u.id, u.role, u.name, u.username, u.email, u.phone, u.bio, CASE WHEN u.profile_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.profile_image END AS profile_image,
            u.employee_code, u.upi_id, u.upi_phone, u.listener_rate_paise,
            u.listener_availability, u.listener_language,
            u.balance_seconds, u.status, u.suspended_until, u.suspension_reason,
@@ -224,6 +225,7 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   const hasUpiPhone = Object.hasOwn(req.body, 'upiPhone');
   const listenerUpiPhone = hasUpiPhone ? upiPhone(req.body.upiPhone) : null;
   const bio = text(req.body.bio, 500) || null;
+  const profileImage = normalizeProfileImage(req.body.profileImage);
   const language = text(req.body.language, 60) || 'Malayalam';
   const hasRate = Object.hasOwn(req.body, 'ratePaise');
   const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : null;
@@ -236,6 +238,7 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   }
   if (listenerUpiId === false) return res.status(400).json({ error: 'Enter a valid listener UPI ID.' });
   if (listenerUpiPhone === false) return res.status(400).json({ error: 'Enter a valid UPI-linked mobile number.' });
+  if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
   if (hasRate && ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
   try {
@@ -245,9 +248,10 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
           upi_phone=CASE WHEN $9::boolean THEN $7 ELSE upi_phone END,
           bio=$8,listener_language=$10,
           listener_rate_paise=CASE WHEN $11::boolean THEN $12 ELSE listener_rate_paise END,
+          profile_image=CASE WHEN $13::boolean THEN $14 ELSE profile_image END,
           updated_at=now()
       WHERE id=$1 AND role='employee'
-      RETURNING id,role,name,username,email,phone,upi_id,upi_phone,bio,employee_code,
+      RETURNING id,role,name,username,email,phone,upi_id,upi_phone,bio,profile_image,employee_code,
                 listener_availability,listener_language,listener_rate_paise,status,created_at
     `, [
       req.params.id,
@@ -262,10 +266,14 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
       language,
       hasRate,
       ratePaise,
+      profileImage !== undefined,
+      profileImage === undefined ? null : profileImage,
     ]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
     await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(req.params.id);
-    res.json({ employee: result.rows[0] });
+    const employee = result.rows[0];
+    if (String(employee.profile_image || '').startsWith('data:image/')) employee.profile_image = `photo:${employee.id}`;
+    res.json({ employee });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That email address or username is already in use.' });
     throw error;
@@ -404,7 +412,7 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     audits,
   ] = await Promise.all([
     db.query(`
-      SELECT id, role, name, username, email, phone, bio,
+      SELECT id, role, name, username, email, phone, bio, CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
              employee_code, upi_id, upi_phone, listener_rate_paise,
              listener_availability, listener_language,
              balance_seconds, status, suspended_until, suspension_reason,
@@ -525,7 +533,7 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
 
 router.get('/listener-wallets', asyncHandler(async (_req, res) => {
   const result = await db.query(`
-    SELECT u.id,u.name,u.email,u.phone,u.employee_code,u.upi_id,u.upi_phone,
+    SELECT u.id,u.name,u.email,u.phone,CASE WHEN u.profile_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.profile_image END AS profile_image,u.employee_code,u.upi_id,u.upi_phone,
            u.listener_rate_paise,u.listener_language,u.listener_availability,u.status,
            COALESCE(wallet.balance_paise,0)::bigint AS balance_paise,
            COALESCE(wallet.lifetime_earnings_paise,0)::bigint AS lifetime_earnings_paise,
