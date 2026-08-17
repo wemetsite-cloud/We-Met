@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.3.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.4.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -661,7 +661,10 @@
 
   function statusText(status) { return ({ available: 'Available', busy: 'On a call', break: 'On break', ringing: 'Ringing', offline:'Offline' })[status] || 'Offline'; }
   function avatarFor(listener) {
-    if (listener.avatar) return listener.avatar;
+    const avatar = String(listener.avatar || '');
+    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(avatar)) return `assets/${avatar}`;
+    if (avatar === `photo:${listener.id}` || avatar === 'photo') return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(listener.id)}`;
+    if (/^data:image\/(?:jpeg|png|webp);base64,/.test(avatar)) return avatar;
     let n = 0; for (const c of String(listener.id || '')) n += c.charCodeAt(0);
     return `assets/avatar-${String((n % 20) + 1).padStart(2,'0')}.svg`;
   }

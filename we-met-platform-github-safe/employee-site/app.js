@@ -7,6 +7,8 @@
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
 
   let me = null;
+  let profileImageDraft = '';
+  const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let socket = null;
   let audioCall = null;
   let currentCall = null;
@@ -105,9 +107,46 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.3.0', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.4.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
+  }
+
+  function profileImageSrc(value, name = 'Listener', userId = me?.id) {
+    const image = String(value || '');
+    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(image)) return `assets/${image}`;
+    if ((image === 'photo' || image === `photo:${userId}`) && userId) return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(userId)}`;
+    if (/^data:image\/(?:jpeg|png|webp);base64,/.test(image)) return image;
+    let total = 0; for (const char of String(name || 'Listener')) total += char.charCodeAt(0);
+    return `assets/avatar-${String((total % 20) + 1).padStart(2, '0')}.svg`;
+  }
+
+  function renderProfileImageEditor() {
+    const preview = $('#profileImagePreview');
+    if (preview) preview.src = profileImageSrc(profileImageDraft, me?.name);
+    const grid = $('#profileAvatarGrid');
+    if (!grid) return;
+    grid.innerHTML = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-profile-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="assets/${avatar}" alt=""></button>`).join('');
+  }
+
+  async function compressProfilePhoto(file) {
+    if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP photo.');
+    if (file.size > 5 * 1024 * 1024) throw new Error('Choose a profile photo smaller than 5 MB.');
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; });
+      const size = 420;
+      const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const crop = Math.min(image.naturalWidth, image.naturalHeight);
+      const sx = (image.naturalWidth - crop) / 2; const sy = (image.naturalHeight - crop) / 2;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,size,size);
+      ctx.drawImage(image, sx, sy, crop, crop, 0, 0, size, size);
+      const result = canvas.toDataURL('image/jpeg', .84);
+      if (result.length > 600000) throw new Error('This photo is still too large. Choose a simpler or smaller image.');
+      return result;
+    } finally { URL.revokeObjectURL(url); }
   }
 
   function bind() {
@@ -132,6 +171,10 @@
     $('#reportBtn').addEventListener('click', reportCurrent);
     $('#chatForm').addEventListener('submit', sendChat);
     $('#profileForm').addEventListener('submit', saveProfile);
+    $('#profileUploadPhoto').addEventListener('click', () => $('#profilePhotoFile').click());
+    $('#profilePhotoFile').addEventListener('change', async (event) => { try { profileImageDraft = await compressProfilePhoto(event.target.files?.[0]); renderProfileImageEditor(); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
+    $('#profileAutoAvatar').addEventListener('click', () => { profileImageDraft = ''; renderProfileImageEditor(); });
+    $('#profileAvatarGrid').addEventListener('click', (event) => { const button = event.target.closest('[data-profile-avatar]'); if (!button) return; profileImageDraft = button.dataset.profileAvatar; renderProfileImageEditor(); });
     $('#payoutDetailsForm').addEventListener('submit', savePayoutDetails);
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#employeeEmailForm').addEventListener('submit', changeEmail);
@@ -317,6 +360,8 @@
     $('#profileBio').value = me.bio || '';
     $('#profileCode').value = me.employeeCode || '';
     $('#profileLanguage').value = me.listenerLanguage || 'Malayalam';
+    profileImageDraft = me.profileImage || '';
+    renderProfileImageEditor();
     $('#deskLanguage').textContent = `${me.listenerLanguage || 'Malayalam'} calls`;
     connect();
     loadStats();
@@ -750,9 +795,12 @@
           username: $('#profileUsername').value,
           phone: $('#profilePhone').value,
           bio: $('#profileBio').value,
+          profileImage: profileImageDraft,
         }),
       });
-      me = { ...me, ...response.user };
+      me = { ...me, ...response.user, profileImage: response.user.profile_image ?? response.user.profileImage ?? profileImageDraft };
+      profileImageDraft = me.profileImage || '';
+      renderProfileImageEditor();
       $('#hello').textContent = `Hello, ${me.name}`;
       P.toast('Profile saved.', 'success');
     } catch (error) {

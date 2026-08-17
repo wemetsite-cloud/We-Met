@@ -8,8 +8,8 @@
   <title>We Met Listener Workspace</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=6.3.0">
-  <link rel="stylesheet" href="style.css?v=6.3.0">
+  <link rel="manifest" href="manifest.webmanifest?v=6.4.0">
+  <link rel="stylesheet" href="style.css?v=6.4.0">
 </head>
 <body>
   <div id="loginView" class="login-view">
@@ -54,7 +54,7 @@
       </section>
 
       <section id="tab-history" class="tab"><div class="section-head"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Call history</h2></div><button id="refreshHistory" class="button button-quiet" type="button">Refresh</button></div><div id="historyList" class="list"></div></section>
-      <section id="tab-profile" class="tab"><div class="grid-two"><form id="profileForm" class="panel stack"><span class="eyebrow">LISTENER PROFILE</span><h2>Your public details</h2><label>Display name<input id="profileName" required></label><label>Username<input id="profileUsername" autocomplete="username"></label><label>Login email<input id="profileEmail" disabled></label><label>Phone number<input id="profilePhone" inputmode="tel"></label><label>Assigned language<input id="profileLanguage" disabled></label><label>Short bio<textarea id="profileBio" maxlength="500" placeholder="A short, warm introduction for customers"></textarea></label><label>Employee ID<input id="profileCode" disabled></label><button class="button button-primary">Save profile</button></form><section class="panel"><span class="eyebrow">LOGIN SECURITY</span><form id="employeeEmailForm" class="stack"><h2>Change login email</h2><label>New email<input id="employeeNewEmail" type="email" required></label><label>Current password<input id="employeeEmailPassword" type="password" required></label><button class="button button-soft">Update email</button></form><hr><form id="passwordForm" class="stack"><h2>Change password</h2><label>Current password<input id="currentPassword" type="password" required></label><label>New password<input id="newPassword" type="password" minlength="8" required></label><button class="button button-primary">Update password</button></form></section></div></section>
+      <section id="tab-profile" class="tab"><div class="grid-two"><form id="profileForm" class="panel stack"><span class="eyebrow">LISTENER PROFILE</span><h2>Your public details</h2><div class="profile-photo-editor"><div class="profile-photo-head"><div class="profile-photo-preview"><img id="profileImagePreview" alt="Your listener profile photo"></div><div><strong>Profile photo</strong><p>Upload a photo or choose an avatar. Customers will see this on your listener card.</p><div class="profile-photo-actions"><button id="profileUploadPhoto" class="button button-soft" type="button">Upload photo</button><button id="profileAutoAvatar" class="button button-quiet" type="button">Automatic avatar</button><input id="profilePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div><small class="avatar-picker-label">Or choose an avatar</small><div id="profileAvatarGrid" class="avatar-picker" aria-label="Choose a profile avatar"></div></div></div><label>Display name<input id="profileName" required></label><label>Username<input id="profileUsername" autocomplete="username"></label><label>Login email<input id="profileEmail" disabled></label><label>Phone number<input id="profilePhone" inputmode="tel"></label><label>Assigned language<input id="profileLanguage" disabled></label><label>Short bio<textarea id="profileBio" maxlength="500" placeholder="A short, warm introduction for customers"></textarea></label><label>Employee ID<input id="profileCode" disabled></label><button class="button button-primary">Save profile</button></form><section class="panel"><span class="eyebrow">LOGIN SECURITY</span><form id="employeeEmailForm" class="stack"><h2>Change login email</h2><label>New email<input id="employeeNewEmail" type="email" required></label><label>Current password<input id="employeeEmailPassword" type="password" required></label><button class="button button-soft">Update email</button></form><hr><form id="passwordForm" class="stack"><h2>Change password</h2><label>Current password<input id="currentPassword" type="password" required></label><label>New password<input id="newPassword" type="password" minlength="8" required></label><button class="button button-primary">Update password</button></form></section></div></section>
       <section id="tab-notifications" class="tab"><div class="section-head"><div><span class="eyebrow">ADMIN UPDATES</span><h2>Messages and alerts</h2></div></div><div id="notificationList" class="list"></div></section>
     </main>
   </div>
@@ -65,6 +65,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Call active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=6.3.0"></script><script src="socket-loader.js?v=6.3.0"></script><script src="api.js?v=6.3.0"></script><script src="webrtc.js?v=6.3.0"></script><script src="app.js?v=6.3.0"></script>
+  <script src="config.js?v=6.4.0"></script><script src="socket-loader.js?v=6.4.0"></script><script src="api.js?v=6.4.0"></script><script src="webrtc.js?v=6.4.0"></script><script src="app.js?v=6.4.0"></script>
 </body>
 </html>
