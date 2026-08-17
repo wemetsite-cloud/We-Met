@@ -1,6 +1,6 @@
 {
   "name": "we-met-backend",
-  "version": "6.4.0",
+  "version": "6.5.0",
   "private": true,
   "description": "We Met backend for browser calls, listener profile photos/avatars, connected-second billing, listener earnings, payouts and verified direct UPI payments.",
   "main": "server.js",

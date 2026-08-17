@@ -1,12 +1,14 @@
 {
-  "version": "6.4.0",
-  "name": "We Met v6.4.0 profile photos + themed payment",
+  "version": "6.5.0",
+  "name": "We Met v6.5.0 verified Paytm UPI fix",
   "changes": [
-    "Restored pink/light We Met payment theme",
-    "QR remains black/white for reliable scanning",
-    "Listener can upload a profile photo or choose 20 built-in avatars",
-    "Admin can upload/select/reset listener profile photos",
-    "Customer listener cards use saved listener profile images",
-    "Profile images propagate live to connected customers"
+    "Uses the exact verified Paytm merchant VPA profile from the working official QR",
+    "Generated QR keeps Paytm + Verified Paytm Merchant and only adds the selected amount",
+    "Removes We Met checkout reference from the UPI payload while preserving it for manual verification",
+    "Google Pay button targets the Android Google Pay package and falls back to generic UPI",
+    "Other UPI apps use the same server-generated UPI URI as the QR",
+    "Keeps the existing We Met pink/light payment theme and black/white QR",
+    "Keeps listener/admin profile photo and avatar controls from v6.4.0",
+    "Long Connect remains ₹1999 for 240 minutes"
   ]
 }

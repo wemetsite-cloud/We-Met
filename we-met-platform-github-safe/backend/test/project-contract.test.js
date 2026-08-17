@@ -115,6 +115,10 @@ test('ships the premium UPI checkout and customer listener privacy polish', () =
   assert.doesNotMatch(customerApp, /\$\{malayalamAvailable\} Malayalam listener/);
   assert.match(paymentRoutes, /errorCorrectionLevel: 'H'/);
   assert.match(paymentRoutes, /dark: '#000000'/);
+  assert.match(paymentRoutes, /OFFICIAL_PAYTM_VPA = 'paytm\.s3hc53w@pty'/);
+  assert.match(paymentRoutes, /OFFICIAL_PAYTM_PAYEE = 'Paytm'/);
+  assert.match(paymentRoutes, /OFFICIAL_PAYTM_NOTE = 'Verified Paytm Merchant'/);
+  assert.match(customerApp, /package=com\.google\.android\.apps\.nbu\.paisa\.user/);
   assert.match(schema, /\('Long Connect',199900,14400,false,true,60\)/);
   assert.match(render, /UPI_PAYMENT_ID[\s\S]*paytm\.s3hc53w@pty/);
 });

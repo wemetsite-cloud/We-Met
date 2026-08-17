@@ -34,7 +34,7 @@ const supportEmail = process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com';
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
 const upiPaymentId = String(process.env.UPI_PAYMENT_ID || 'paytm.s3hc53w@pty').trim();
-const upiPaymentPayeeName = String(process.env.UPI_PAYMENT_PAYEE_NAME || '').trim();
+const upiPaymentPayeeName = String(process.env.UPI_PAYMENT_PAYEE_NAME || 'Paytm').trim();
 const publicUrl = (
   process.env.PUBLIC_URL
   || process.env.RENDER_EXTERNAL_URL

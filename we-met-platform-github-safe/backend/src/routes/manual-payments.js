@@ -15,6 +15,9 @@ const {
 
 const router = express.Router();
 const MAX_PROOF_BYTES = 3 * 1024 * 1024;
+const OFFICIAL_PAYTM_VPA = 'paytm.s3hc53w@pty';
+const OFFICIAL_PAYTM_PAYEE = 'Paytm';
+const OFFICIAL_PAYTM_NOTE = 'Verified Paytm Merchant';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -38,19 +41,37 @@ function requireDirectUpi(req, res, next) {
   return next();
 }
 
-function paymentDetails(intent) {
-  const payment = config.upiPayment;
+function merchantUpiProfile() {
+  const upiId = String(config.upiPayment.upiId || '').trim();
+  if (upiId.toLowerCase() === OFFICIAL_PAYTM_VPA) {
+    return {
+      upiId,
+      payeeName: OFFICIAL_PAYTM_PAYEE,
+      note: OFFICIAL_PAYTM_NOTE,
+      includeCheckoutReference: false,
+    };
+  }
   return {
-    upiId: payment.upiId,
-    payeeName: payment.payeeName,
+    upiId,
+    payeeName: config.upiPayment.payeeName,
+    note: '',
+    includeCheckoutReference: true,
+  };
+}
+
+function paymentDetails(intent) {
+  const merchant = merchantUpiProfile();
+  return {
+    upiId: merchant.upiId,
+    payeeName: merchant.payeeName,
     amountPaise: intent.amount_paise,
-    reference: intent.checkout_reference,
-    note: `We Met ${intent.checkout_reference}`,
+    reference: merchant.includeCheckoutReference ? intent.checkout_reference : '',
+    note: merchant.note || `We Met ${intent.checkout_reference}`,
   };
 }
 
 function publicIntent(intent) {
-  const payment = config.upiPayment;
+  const details = paymentDetails(intent);
   return {
     id: intent.id,
     plan_id: intent.plan_id,
@@ -60,8 +81,10 @@ function publicIntent(intent) {
     checkout_reference: intent.checkout_reference,
     expires_at: intent.expires_at,
     upi: {
-      id: payment.upiId,
-      payee_name: payment.payeeName,
+      id: details.upiId,
+      payee_name: details.payeeName,
+      payment_note: details.note,
+      payment_uri: upiPaymentUri(details),
     },
   };
 }
@@ -130,7 +153,7 @@ router.post('/intents', requireDirectUpi, asyncHandler(async (req, res) => {
 
   const storedIntent = intentResult.rows[0];
   const intent = publicIntent(storedIntent);
-  const qrPayload = upiPaymentUri(paymentDetails(storedIntent));
+  const qrPayload = intent.upi.payment_uri;
   const upiQrDataUrl = qrPayload
     ? await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: 'H',

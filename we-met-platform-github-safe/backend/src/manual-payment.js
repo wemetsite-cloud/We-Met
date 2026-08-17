@@ -23,7 +23,12 @@ function encodeUpiValue(value) {
 function upiQuery(parameters) {
   return Object.entries(parameters)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
-    .map(([key, value]) => `${encodeUpiValue(key)}=${encodeUpiValue(value)}`)
+    .map(([key, value]) => {
+      let encodedValue = encodeUpiValue(value);
+      // Keep the VPA separator literal, matching standard UPI QR/deep-link examples.
+      if (key === 'pa') encodedValue = encodedValue.replace(/%40/gi, '@');
+      return `${encodeUpiValue(key)}=${encodedValue}`;
+    })
     .join('&');
 }
 
@@ -32,10 +37,10 @@ function upiPaymentUri({ upiId, payeeName, amountPaise, reference, note }) {
   const query = upiQuery({
     pa: upiId,
     pn: payeeName,
-    am: (Number(amountPaise) / 100).toFixed(2),
-    cu: 'INR',
     tr: reference,
     tn: note || `We Met ${reference}`,
+    am: (Number(amountPaise) / 100).toFixed(2),
+    cu: 'INR',
   });
   return `upi://pay?${query}`;
 }

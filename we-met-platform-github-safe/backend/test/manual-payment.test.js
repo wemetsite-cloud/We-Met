@@ -35,6 +35,24 @@ test('builds a private exact-amount payload for the server-rendered QR', () => {
   assert.doesNotMatch(uri, /gpay:|intent:/i);
 });
 
+
+test('builds the exact verified Paytm merchant payload when optional reference is omitted', () => {
+  const uri = upiPaymentUri({
+    upiId: 'paytm.s3hc53w@pty',
+    payeeName: 'Paytm',
+    amountPaise: 199900,
+    reference: '',
+    note: 'Verified Paytm Merchant',
+  });
+  assert.equal(uri, 'upi://pay?pa=paytm.s3hc53w@pty&pn=Paytm&tn=Verified%20Paytm%20Merchant&am=1999.00&cu=INR');
+  const parsed = new URL(uri);
+  assert.equal(parsed.searchParams.get('pa'), 'paytm.s3hc53w@pty');
+  assert.equal(parsed.searchParams.get('pn'), 'Paytm');
+  assert.equal(parsed.searchParams.get('tn'), 'Verified Paytm Merchant');
+  assert.equal(parsed.searchParams.get('am'), '1999.00');
+  assert.equal(parsed.searchParams.get('tr'), null);
+});
+
 test('accepts only recognised raster-image signatures', () => {
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]);

@@ -60,7 +60,7 @@ services:
       - key: STUN_URL
         value: "stun:stun.l.google.com:19302"
       - key: UPI_PAYMENT_PAYEE_NAME
-        sync: false
+        value: "Paytm"
       - key: UPI_PAYMENT_ID
         value: "paytm.s3hc53w@pty"
       - key: UPI_PAYMENT_INTENT_MINUTES
