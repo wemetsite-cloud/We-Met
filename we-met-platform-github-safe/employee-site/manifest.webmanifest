@@ -1,0 +1,14 @@
+{
+  "name": "We Met Listener",
+  "short_name": "WM Listener",
+  "description": "We Met listener workspace for private calls, talk-time analytics, earnings, payouts and profile management.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff8fb",
+  "theme_color": "#f0448f",
+  "icons": [
+    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
