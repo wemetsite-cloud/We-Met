@@ -1,8 +1,8 @@
 {
   "name": "we-met-backend",
-  "version": "6.1.0",
+  "version": "6.3.0",
   "private": true,
-  "description": "We Met backend for multi-language browser calls, verified direct UPI payments, listener work analytics, notifications and secure recovery.",
+  "description": "We Met backend for multi-language browser calls, connected-second billing, listener earnings and payouts, verified direct UPI payments, notifications and secure recovery.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -34,14 +34,36 @@ test('keeps talk-time plans behind customer authentication', () => {
   assert.doesNotMatch(landing, /id="plansGrid"|class="plans-grid"/);
 });
 
-test('ships listener work-session tracking across database, API and both staff interfaces', () => {
+test('keeps listener work-session analytics private to admin while listener sees talk-time only', () => {
   assert.match(read('backend', 'database', 'schema.sql'), /listener_activity_sessions/);
   assert.match(read('backend', 'src', 'routes', 'employee.js'), /router\.get\(['"]\/activity/);
   assert.match(read('backend', 'src', 'routes', 'admin.js'), /today_work_seconds/);
-  assert.match(read('employee-site', 'index.html'), /id="todayWork"/);
+  assert.doesNotMatch(read('employee-site', 'index.html'), /id="(?:todayWork|weekWork|todayBreak)"/);
+  assert.match(read('employee-site', 'index.html'), /id="weekTime"/);
   assert.match(read('employee-site', 'index.html'), /id="activityList"/);
   assert.match(read('admin-site', 'index.html'), /id="listenerTodayWork"/);
   assert.match(read('backend', 'src', 'socket.js'), /currentRuntime\s*\?\s*\(currentRuntime\.status === 'ringing' \? 'ringing' : 'busy'\)/);
+});
+
+test('ships listener earnings, individual rates, exact payouts and immutable wallet history', () => {
+  const schema = read('backend', 'database', 'schema.sql');
+  const adminRoutes = read('backend', 'src', 'routes', 'admin.js');
+  const employeeRoutes = read('backend', 'src', 'routes', 'employee.js');
+  const listenerHtml = read('employee-site', 'index.html');
+  const adminHtml = read('admin-site', 'index.html');
+  assert.match(schema, /listener_wallet_transactions/);
+  assert.match(schema, /uq_listener_wallet_call_credit/);
+  assert.match(schema, /listener_rate_paise/);
+  assert.match(schema, /IF NOT earnings_column_exists THEN/);
+  assert.doesNotMatch(schema, /WHERE earnings_settled_at IS NULL\s+AND status IN/);
+  assert.match(adminRoutes, /\/listener-wallets\/:id\/mark-paid/);
+  assert.match(adminRoutes, /FOR UPDATE/);
+  assert.match(employeeRoutes, /router\.get\(['"]\/wallet/);
+  assert.match(employeeRoutes, /\/wallet\/payout-details/);
+  assert.match(listenerHtml, /id="tab-wallet"/);
+  assert.match(listenerHtml, /id="walletBalance"/);
+  assert.match(adminHtml, /id="page-payouts"/);
+  assert.match(adminHtml, /id="payoutDueTotal"/);
 });
 
 test('provides full clickable admin profiles and administrator audit history', () => {
@@ -80,9 +102,19 @@ test('uses unique element ids in each primary interface', () => {
 });
 
 
-test('ships the configured Paytm UPI destination and 240-minute ₹1999 plan', () => {
-  const render = read('render.yaml');
+test('ships the premium UPI checkout and customer listener privacy polish', () => {
+  const customerHtml = read('customer-site', 'index.html');
+  const customerApp = read('customer-site', 'app.js');
+  const paymentRoutes = read('backend', 'src', 'routes', 'manual-payments.js');
   const schema = read('backend', 'database', 'schema.sql');
-  assert.match(render, /UPI_PAYMENT_ID[\s\S]*paytm\.s3hc53w@pty/);
+  const render = read('render.yaml');
+  assert.match(customerHtml, /id="payWithGooglePay"/);
+  assert.match(customerHtml, /id="payWithAnyUpi"/);
+  assert.match(customerHtml, /id="listenerDiscovery"/);
+  assert.match(customerApp, /Listeners are available now/);
+  assert.doesNotMatch(customerApp, /\$\{malayalamAvailable\} Malayalam listener/);
+  assert.match(paymentRoutes, /errorCorrectionLevel: 'H'/);
+  assert.match(paymentRoutes, /dark: '#000000'/);
   assert.match(schema, /\('Long Connect',199900,14400,false,true,60\)/);
+  assert.match(render, /UPI_PAYMENT_ID[\s\S]*paytm\.s3hc53w@pty/);
 });

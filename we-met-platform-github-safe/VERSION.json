@@ -1,5 +1,5 @@
 {
-  "version": "6.1.0",
+  "version": "6.3.0",
   "updated": "2026-08-17",
-  "notes": "Payment-focused optimization release: Paytm UPI destination paytm.s3hc53w@pty, \u20b91999 Long Connect updated to 240 minutes, mobile UPI deep-link checkout, clearer payment references/expiry, stronger UTR validation and admin verification details, plus cache/version refresh."
+  "notes": "Premium black-and-white UPI checkout with Google Pay and other UPI app launch options, higher-quality QR generation, no customer-facing listener counts, listener discovery hidden when nobody is connected, \u20b91999 restored to 240 minutes, and listener connected-second earnings/payout wallet logic preserved."
 }

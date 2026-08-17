@@ -133,15 +133,15 @@ router.post('/intents', requireDirectUpi, asyncHandler(async (req, res) => {
   const qrPayload = upiPaymentUri(paymentDetails(storedIntent));
   const upiQrDataUrl = qrPayload
     ? await QRCode.toDataURL(qrPayload, {
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 420,
-      color: { dark: '#0F5F63', light: '#FFFFFFFF' },
+      errorCorrectionLevel: 'H',
+      margin: 2,
+      width: 512,
+      color: { dark: '#000000', light: '#FFFFFFFF' },
     })
     : '';
 
   return res.status(201).json({
-    intent: { ...intent, upi_uri: qrPayload, upi_qr_data_url: upiQrDataUrl },
+    intent: { ...intent, upi_qr_data_url: upiQrDataUrl },
     notice: 'After paying, submit the successful UTR and payment screenshot for administrator review.',
   });
 }));

@@ -46,6 +46,21 @@ function integer(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_I
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : null;
 }
 
+function upiId(value) {
+  const normalized = text(value, 120).toLowerCase();
+  if (!normalized) return null;
+  return /^[a-z0-9._-]{2,100}@[a-z0-9.-]{2,40}$/.test(normalized) ? normalized : false;
+}
+
+function upiPhone(value) {
+  const original = text(value, 40);
+  if (!original) return null;
+  const digits = original.replace(/\D/g, '');
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
+  return false;
+}
+
 router.get('/dashboard', asyncHandler(async (_req, res) => {
   const [users, calls, reports, tickets, coupons, minutes, payments] = await Promise.all([
     db.query(`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role`),
@@ -85,7 +100,8 @@ router.get('/users', asyncHandler(async (req, res) => {
 
   const result = await db.query(`
     SELECT u.id, u.role, u.name, u.username, u.email, u.phone, u.bio,
-           u.employee_code, u.upi_id, u.listener_availability, u.listener_language,
+           u.employee_code, u.upi_id, u.upi_phone, u.listener_rate_paise,
+           u.listener_availability, u.listener_language,
            u.balance_seconds, u.status, u.suspended_until, u.suspension_reason,
            u.last_login_at, u.last_seen_at, u.created_at,
            COALESCE(call_stats.total_calls,0)::int AS total_calls,
@@ -96,6 +112,9 @@ router.get('/users', asyncHandler(async (req, res) => {
            COALESCE(activity_stats.total_work_seconds,0)::bigint AS total_work_seconds,
            COALESCE(activity_stats.today_work_seconds,0)::bigint AS today_work_seconds,
            COALESCE(activity_stats.today_break_seconds,0)::bigint AS today_break_seconds,
+           COALESCE(listener_wallet.balance_paise,0)::bigint AS listener_wallet_balance_paise,
+           COALESCE(listener_wallet.lifetime_earnings_paise,0)::bigint AS listener_lifetime_earnings_paise,
+           COALESCE(listener_wallet.lifetime_paid_paise,0)::bigint AS listener_lifetime_paid_paise,
            activity_stats.current_activity_started_at
     FROM users u
     LEFT JOIN LATERAL (
@@ -116,6 +135,13 @@ router.get('/users', asyncHandler(async (req, res) => {
       FROM listener_activity_sessions s
       WHERE s.employee_id=u.id
     ) activity_stats ON u.role='employee'
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise
+      FROM listener_wallet_transactions t
+      WHERE t.employee_id=u.id
+    ) listener_wallet ON u.role='employee'
     ${where}
     ORDER BY u.created_at DESC
     LIMIT 1000
@@ -130,9 +156,11 @@ router.post('/employees', asyncHandler(async (req, res) => {
   const email = text(req.body.email, 180).toLowerCase();
   const password = String(req.body.password || '');
   const phone = text(req.body.phone, 30) || null;
-  const upiId = text(req.body.upiId, 120) || null;
+  const listenerUpiId = upiId(req.body.upiId);
+  const listenerUpiPhone = upiPhone(req.body.upiPhone);
   const bio = text(req.body.bio, 500) || null;
   const language = text(req.body.language, 60) || 'Malayalam';
+  const ratePaise = integer(req.body.ratePaise, { min: 0, max: 10_000_000 });
   const employeeCode = (text(req.body.employeeCode, 40) || `WM-L${Date.now().toString().slice(-6)}`)
     .toUpperCase()
     .replace(/[^A-Z0-9-]/g, '');
@@ -142,6 +170,9 @@ router.post('/employees', asyncHandler(async (req, res) => {
       error: 'Enter a valid name, email address, and a password with at least 8 characters.',
     });
   }
+  if (listenerUpiId === false) return res.status(400).json({ error: 'Enter a valid listener UPI ID.' });
+  if (listenerUpiPhone === false) return res.status(400).json({ error: 'Enter a valid UPI-linked mobile number.' });
+  if (ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
   if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
     return res.status(400).json({
@@ -152,20 +183,24 @@ router.post('/employees', asyncHandler(async (req, res) => {
   try {
     const result = await db.query(`
       INSERT INTO users (
-        role, name, username, email, phone, upi_id, bio, employee_code, listener_language, password_hash
+        role, name, username, email, phone, upi_id, upi_phone, bio, employee_code,
+        listener_language, listener_rate_paise, password_hash
       )
-      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, role, name, username, email, phone, upi_id, bio,
-                employee_code, listener_availability, listener_language, status, created_at
+      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING id, role, name, username, email, phone, upi_id, upi_phone, bio,
+                employee_code, listener_availability, listener_language,
+                listener_rate_paise, status, created_at
     `, [
       name,
       username,
       email,
       phone,
-      upiId,
+      listenerUpiId,
+      listenerUpiPhone,
       bio,
       employeeCode,
       language,
+      ratePaise,
       await hashPassword(password),
     ]);
 
@@ -185,9 +220,13 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   const username = text(req.body.username, 80).toLowerCase() || null;
   const email = text(req.body.email, 180).toLowerCase();
   const phone = text(req.body.phone, 30) || null;
-  const upiId = text(req.body.upiId, 120) || null;
+  const listenerUpiId = upiId(req.body.upiId);
+  const hasUpiPhone = Object.hasOwn(req.body, 'upiPhone');
+  const listenerUpiPhone = hasUpiPhone ? upiPhone(req.body.upiPhone) : null;
   const bio = text(req.body.bio, 500) || null;
   const language = text(req.body.language, 60) || 'Malayalam';
+  const hasRate = Object.hasOwn(req.body, 'ratePaise');
+  const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : null;
 
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email)) {
     return res.status(400).json({ error: 'Enter a valid name and email address.' });
@@ -195,14 +234,35 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
     return res.status(400).json({ error: 'Username may contain only letters, numbers, dots, underscores, and hyphens.' });
   }
+  if (listenerUpiId === false) return res.status(400).json({ error: 'Enter a valid listener UPI ID.' });
+  if (listenerUpiPhone === false) return res.status(400).json({ error: 'Enter a valid UPI-linked mobile number.' });
+  if (hasRate && ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
   try {
     const result = await db.query(`
       UPDATE users
-      SET name=$2,username=$3,email=$4,phone=$5,upi_id=$6,bio=$7,listener_language=$8,updated_at=now()
+      SET name=$2,username=$3,email=$4,phone=$5,upi_id=$6,
+          upi_phone=CASE WHEN $9::boolean THEN $7 ELSE upi_phone END,
+          bio=$8,listener_language=$10,
+          listener_rate_paise=CASE WHEN $11::boolean THEN $12 ELSE listener_rate_paise END,
+          updated_at=now()
       WHERE id=$1 AND role='employee'
-      RETURNING id,role,name,username,email,phone,upi_id,bio,employee_code,listener_availability,listener_language,status,created_at
-    `, [req.params.id, name, username, email, phone, upiId, bio, language]);
+      RETURNING id,role,name,username,email,phone,upi_id,upi_phone,bio,employee_code,
+                listener_availability,listener_language,listener_rate_paise,status,created_at
+    `, [
+      req.params.id,
+      name,
+      username,
+      email,
+      phone,
+      listenerUpiId,
+      listenerUpiPhone,
+      bio,
+      hasUpiPhone,
+      language,
+      hasRate,
+      ratePaise,
+    ]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
     await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(req.params.id);
     res.json({ employee: result.rows[0] });
@@ -330,10 +390,23 @@ router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
 }));
 
 router.get('/users/:id/details', asyncHandler(async (req, res) => {
-  const [user, calls, wallet, reports, support, callAnalytics, workAnalytics, activitySessions, audits] = await Promise.all([
+  const [
+    user,
+    calls,
+    wallet,
+    listenerWallet,
+    listenerWalletSummary,
+    reports,
+    support,
+    callAnalytics,
+    workAnalytics,
+    activitySessions,
+    audits,
+  ] = await Promise.all([
     db.query(`
       SELECT id, role, name, username, email, phone, bio,
-             employee_code, upi_id, listener_availability, listener_language,
+             employee_code, upi_id, upi_phone, listener_rate_paise,
+             listener_availability, listener_language,
              balance_seconds, status, suspended_until, suspension_reason,
              last_login_at, last_seen_at, created_at, updated_at
       FROM users WHERE id = $1
@@ -352,6 +425,27 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
       WHERE customer_id = $1
       ORDER BY created_at DESC
       LIMIT 100
+    `, [req.params.id]),
+    db.query(`
+      SELECT t.*,c.started_at AS call_started_at,c.ended_at AS call_ended_at
+      FROM listener_wallet_transactions t
+      LEFT JOIN calls c ON c.id=t.reference_id AND t.type='call_credit'
+      WHERE t.employee_id=$1
+      ORDER BY t.created_at DESC
+      LIMIT 250
+    `, [req.params.id]),
+    db.query(`
+      SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise,
+             COALESCE(SUM(amount_paise) FILTER (WHERE type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(-amount_paise) FILTER (WHERE type='payout'),0)::bigint AS lifetime_paid_paise,
+             COALESCE(SUM(amount_paise) FILTER (
+               WHERE type='call_credit' AND created_at>=date_trunc('day',now())
+             ),0)::bigint AS today_earnings_paise,
+             COALESCE(SUM(amount_paise) FILTER (
+               WHERE type='call_credit' AND created_at>=now()-interval '7 days'
+             ),0)::bigint AS week_earnings_paise
+      FROM listener_wallet_transactions
+      WHERE employee_id=$1
     `, [req.params.id]),
     db.query(`
       SELECT r.*, reporter.name AS reporter_name, target.name AS target_name
@@ -418,12 +512,190 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     user: user.rows[0],
     calls: calls.rows,
     wallet: wallet.rows,
+    listenerWallet: listenerWallet.rows,
+    listenerWalletSummary: listenerWalletSummary.rows[0],
     reports: reports.rows,
     support: support.rows,
     callAnalytics: callAnalytics.rows[0],
     workAnalytics: workAnalytics.rows[0],
     activitySessions: activitySessions.rows,
     audits: audits.rows,
+  });
+}));
+
+router.get('/listener-wallets', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT u.id,u.name,u.email,u.phone,u.employee_code,u.upi_id,u.upi_phone,
+           u.listener_rate_paise,u.listener_language,u.listener_availability,u.status,
+           COALESCE(wallet.balance_paise,0)::bigint AS balance_paise,
+           COALESCE(wallet.lifetime_earnings_paise,0)::bigint AS lifetime_earnings_paise,
+           COALESCE(wallet.lifetime_paid_paise,0)::bigint AS lifetime_paid_paise,
+           COALESCE(wallet.today_earnings_paise,0)::bigint AS today_earnings_paise,
+           COALESCE(wallet.week_earnings_paise,0)::bigint AS week_earnings_paise,
+           wallet.last_paid_at
+    FROM users u
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (
+               WHERE t.type='call_credit' AND t.created_at>=date_trunc('day',now())
+             ),0)::bigint AS today_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (
+               WHERE t.type='call_credit' AND t.created_at>=now()-interval '7 days'
+             ),0)::bigint AS week_earnings_paise,
+             MAX(t.created_at) FILTER (WHERE t.type='payout') AS last_paid_at
+      FROM listener_wallet_transactions t
+      WHERE t.employee_id=u.id
+    ) wallet ON true
+    WHERE u.role='employee'
+    ORDER BY COALESCE(wallet.balance_paise,0) DESC,u.name
+  `);
+
+  res.json({
+    wallets: result.rows.map((row) => ({
+      ...row,
+      listener_rate_paise: Number(row.listener_rate_paise || 0),
+      balance_paise: Number(row.balance_paise || 0),
+      lifetime_earnings_paise: Number(row.lifetime_earnings_paise || 0),
+      lifetime_paid_paise: Number(row.lifetime_paid_paise || 0),
+      today_earnings_paise: Number(row.today_earnings_paise || 0),
+      week_earnings_paise: Number(row.week_earnings_paise || 0),
+    })),
+  });
+}));
+
+router.patch('/listener-wallets/:id/rate', asyncHandler(async (req, res) => {
+  const ratePaise = integer(req.body.ratePaise, { min: 0, max: 10_000_000 });
+  if (ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
+
+  const result = await db.query(`
+    UPDATE users
+    SET listener_rate_paise=$2,updated_at=now()
+    WHERE id=$1 AND role='employee'
+    RETURNING id,name,listener_rate_paise
+  `, [req.params.id, ratePaise]);
+  const listener = result.rows[0];
+  if (!listener) return res.status(404).json({ error: 'Listener not found.' });
+
+  const title = 'Listener rate updated';
+  const body = `Your rate is now ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(ratePaise / 100)} per connected minute. New calls use this rate.`;
+  await db.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [listener.id, title, body]);
+  await req.app.locals.notifyUser?.(listener.id, { title, body, url: './', tag: `we-met-listener-rate-${Date.now()}` });
+  res.json({ listener: { ...listener, listener_rate_paise: Number(listener.listener_rate_paise) } });
+}));
+
+router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => {
+  const paymentReference = text(req.body.paymentReference, 160) || null;
+  const note = text(req.body.note, 500) || 'Full listener balance marked paid by administrator';
+
+  const output = await db.transaction(async (client) => {
+    const employeeResult = await client.query(`
+      SELECT id,name,upi_id,upi_phone
+      FROM users
+      WHERE id=$1 AND role='employee'
+      FOR UPDATE
+    `, [req.params.id]);
+    const employee = employeeResult.rows[0];
+    if (!employee) throw Object.assign(new Error('Listener not found.'), { status: 404 });
+    if (!employee.upi_id && !employee.upi_phone) {
+      throw Object.assign(new Error('Add a UPI ID or UPI-linked mobile number before marking this balance paid.'), { status: 400 });
+    }
+
+    const balanceResult = await client.query(`
+      SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+      FROM listener_wallet_transactions
+      WHERE employee_id=$1
+    `, [employee.id]);
+    const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
+    if (balancePaise <= 0) {
+      throw Object.assign(new Error('This listener has no unpaid wallet balance.'), { status: 409 });
+    }
+
+    const payout = await client.query(`
+      INSERT INTO listener_wallet_transactions(
+        employee_id,type,amount_paise,payout_upi_id,payout_upi_phone,
+        payment_reference,note,created_by
+      )
+      VALUES($1,'payout',$2,$3,$4,$5,$6,$7)
+      RETURNING *
+    `, [
+      employee.id,
+      -balancePaise,
+      employee.upi_id,
+      employee.upi_phone,
+      paymentReference,
+      note,
+      req.user.id,
+    ]);
+
+    const title = 'Listener payout recorded';
+    const body = `Your ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(balancePaise / 100)} wallet balance was marked paid.${paymentReference ? ` Reference: ${paymentReference}` : ''}`;
+    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [employee.id, title, body]);
+    return { employee, payout: payout.rows[0], balancePaise, notification: { title, body } };
+  });
+
+  await req.app.locals.notifyUser?.(output.employee.id, {
+    ...output.notification,
+    url: './',
+    tag: `we-met-listener-payout-${output.payout.id}`,
+  });
+  res.json({
+    payout: { ...output.payout, amount_paise: Number(output.payout.amount_paise) },
+    paidPaise: output.balancePaise,
+    balancePaise: 0,
+  });
+}));
+
+router.post('/listener-wallets/:id/adjust', asyncHandler(async (req, res) => {
+  const amountPaise = integer(req.body.amountPaise, { min: -100_000_000, max: 100_000_000 });
+  const note = text(req.body.note, 500);
+  if (amountPaise === null || amountPaise === 0) {
+    return res.status(400).json({ error: 'Enter a non-zero wallet adjustment.' });
+  }
+  if (note.length < 3) return res.status(400).json({ error: 'Add a reason for this wallet adjustment.' });
+
+  const output = await db.transaction(async (client) => {
+    const employeeResult = await client.query(`
+      SELECT id,name FROM users
+      WHERE id=$1 AND role='employee'
+      FOR UPDATE
+    `, [req.params.id]);
+    const employee = employeeResult.rows[0];
+    if (!employee) throw Object.assign(new Error('Listener not found.'), { status: 404 });
+
+    const balanceResult = await client.query(`
+      SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+      FROM listener_wallet_transactions
+      WHERE employee_id=$1
+    `, [employee.id]);
+    const currentBalance = Number(balanceResult.rows[0].balance_paise || 0);
+    const nextBalance = currentBalance + amountPaise;
+    if (nextBalance < 0) {
+      throw Object.assign(new Error('This adjustment would make the listener wallet negative.'), { status: 409 });
+    }
+
+    const transaction = await client.query(`
+      INSERT INTO listener_wallet_transactions(employee_id,type,amount_paise,note,created_by)
+      VALUES($1,'admin_adjustment',$2,$3,$4)
+      RETURNING *
+    `, [employee.id, amountPaise, note, req.user.id]);
+    const title = 'Listener wallet adjusted';
+    const direction = amountPaise > 0 ? 'added to' : 'removed from';
+    const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Math.abs(amountPaise) / 100);
+    const body = `${formatted} was ${direction} your listener wallet. ${note}`;
+    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [employee.id, title, body]);
+    return { employee, transaction: transaction.rows[0], nextBalance, notification: { title, body } };
+  });
+
+  await req.app.locals.notifyUser?.(output.employee.id, {
+    ...output.notification,
+    url: './',
+    tag: `we-met-listener-adjustment-${output.transaction.id}`,
+  });
+  res.json({
+    transaction: { ...output.transaction, amount_paise: Number(output.transaction.amount_paise) },
+    balancePaise: output.nextBalance,
   });
 }));
 

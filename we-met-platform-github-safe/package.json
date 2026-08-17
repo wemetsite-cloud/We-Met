@@ -1,8 +1,8 @@
 {
   "name": "we-met-platform",
-  "version": "6.1.0",
+  "version": "6.3.0",
   "private": true,
-  "description": "Production-ready customer, listener and admin PWAs for private multi-language conversations, direct UPI verification, connected-second billing and secure account operations.",
+  "description": "Production-ready We Met platform with premium UPI checkout, live listener discovery, connected-second billing, listener earnings and payout wallets.",
   "scripts": {
     "install:backend": "npm --prefix backend ci --registry=https://registry.npmjs.org/",
     "start": "npm --prefix backend run start:production",
