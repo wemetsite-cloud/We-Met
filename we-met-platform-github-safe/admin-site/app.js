@@ -6,6 +6,10 @@
   const $$ = selector => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const NAVIGATION_MARKER = 'we-met-admin-navigation';
+  window.addEventListener('portal:session-invalid', (event) => {
+    P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
+    setTimeout(() => location.reload(), 700);
+  });
 
   let me = null;
   let users = [];
@@ -13,8 +17,8 @@
   let reports = [];
   let tickets = [];
   let resets = [];
-  let payments = [];
   let listenerWallets = [];
+  let withdrawalRequests = [];
   let auditEntries = [];
   const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let activePage = 'overview';
@@ -24,9 +28,8 @@
     overview: ['Overview', 'Live service health and operational summary'],
     customers: ['Customers', 'Accounts, contact records and wallet controls'],
     employees: ['Listeners', 'Presence, connected work time and call performance'],
-    payouts: ['Listener payouts', 'Individual rates, exact unpaid balances and withdrawal history'],
+    payouts: ['Listener payouts', 'Review ₹100+ withdrawal requests and monitor wallet balances'],
     plans: ['Plans', 'Talk-time pricing available after customer sign-in'],
-    payments: ['UPI payments', 'Verify direct UPI references and proof before wallet credit'],
     coupons: ['Coupons', 'Create and control wallet redeem codes'],
     calls: ['Calls', 'Every call, participant and connected duration'],
     reports: ['Reports', 'Safety review and account actions'],
@@ -95,7 +98,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.6.1', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.8.0', { updateViaCache: 'none' });
       await registration.update();
     } catch { }
   }
@@ -144,7 +147,6 @@
     $('#reloadCustomers').onclick = () => loadUsers();
     $('#reloadEmployees').onclick = () => loadUsers();
     $('#reloadPayouts').onclick = loadListenerWallets;
-    $('#reloadPayments').onclick = loadPayments;
     $('#reloadCoupons').onclick = loadCoupons;
     $('#reloadCalls').onclick = loadCalls;
     $('#reloadReports').onclick = loadReports;
@@ -174,7 +176,7 @@
     const d = target.dataset;
     if (d.editListener) return editListener(d.editListener);
     if (d.walletRate) return listenerRateModal(d.walletRate);
-    if (d.walletPaid) return markListenerPaid(d.walletPaid);
+    if (d.withdrawalReview) return reviewWithdrawalModal(d.withdrawalReview);
     if (d.walletAdjust) return adjustListenerWallet(d.walletAdjust);
     if (d.minutes) return minutesModal(d.minutes);
     if (d.suspend) return suspendModal(d.suspend);
@@ -190,9 +192,6 @@
     if (d.reply) return replySupport(d.reply);
     if (d.resetApprove) return reviewReset(d.resetApprove, 'approved');
     if (d.resetDecline) return reviewReset(d.resetDecline, 'declined');
-    if (d.paymentProof) return viewPaymentProof(d.paymentProof);
-    if (d.paymentApprove) return reviewPayment(d.paymentApprove, 'approved');
-    if (d.paymentDecline) return reviewPayment(d.paymentDecline, 'declined');
     if (d.userProfile) return showDetails(d.userProfile);
   }
 
@@ -263,7 +262,6 @@
       employees: loadUsers,
       payouts: loadListenerWallets,
       plans: loadPlans,
-      payments: loadPayments,
       coupons: loadCoupons,
       calls: loadCalls,
       reports: loadReports,
@@ -280,7 +278,7 @@
       const count = role => data.users.find(item => item.role === role)?.count || 0;
       $('#mCustomers').textContent = count('customer');
       $('#mTalk').textContent = P.duration(data.totalTalkSeconds);
-      $('#mAttention').textContent = Number(data.openReports || 0) + Number(data.openTickets || 0) + Number(data.pendingPayments || 0);
+      $('#mAttention').textContent = Number(data.openReports || 0) + Number(data.openTickets || 0) + Number(data.pendingWithdrawals || 0);
       $('#callSummary').innerHTML = (data.calls || []).map(item => `<div><small>${P.esc(item.status)}</small><strong>${item.count}</strong><span>${P.duration(item.seconds)}</span></div>`).join('') || '<p class="empty-copy">No calls yet.</p>';
     } catch (error) { P.toast(error.message, 'error'); }
   }
@@ -346,7 +344,8 @@
       const listenerWalletSummary = data.listenerWalletSummary || {};
       const employeeMetrics = user.role === 'employee' ? `<section class="profile-section"><h3>Listener performance</h3><div class="profile-metrics"><article><small>Work today</small><strong>${P.duration(workStats.today_work_seconds)}</strong></article><article><small>Work this week</small><strong>${P.duration(workStats.week_work_seconds)}</strong></article><article><small>Total work</small><strong>${P.duration(workStats.total_work_seconds)}</strong></article><article><small>Break today</small><strong>${P.duration(workStats.today_break_seconds)}</strong></article><article><small>Talk today</small><strong>${P.duration(callStats.today_talk_seconds)}</strong></article><article><small>Talk this week</small><strong>${P.duration(callStats.week_talk_seconds)}</strong></article><article><small>Total talk</small><strong>${P.duration(callStats.total_talk_seconds)}</strong></article><article><small>Connected calls</small><strong>${Number(callStats.connected_calls || 0)}</strong></article></div></section><section class="profile-section"><h3>Recent availability sessions</h3><div class="activity-table">${(data.activitySessions || []).slice(0, 25).map(session => `<div><span class="pill ${session.state === 'online' ? 'available' : 'break'}">${P.esc(session.state)}</span><span><b>${P.duration(session.duration_seconds)}</b><small>${P.date(session.started_at)} → ${session.ended_at ? P.date(session.ended_at) : 'Now'}</small></span><small>${P.esc(session.end_reason || (session.ended_at ? 'Status changed' : 'Current session'))}</small></div>`).join('') || '<p>No availability sessions recorded.</p>'}</div></section>` : '';
       const listenerLedger = (data.listenerWallet || []).slice(0, 50).map(entry => `<div class="profile-row"><strong>${Number(entry.amount_paise) >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(Number(entry.amount_paise)))}</strong><span>${P.esc(entry.note || entry.type)}${entry.payment_reference ? ` • Ref ${P.esc(entry.payment_reference)}` : ''}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No listener wallet entries.</p>';
-      const listenerFinance = user.role === 'employee' ? `<section class="profile-section"><h3>Listener wallet</h3><div class="profile-metrics"><article><small>Current balance</small><strong>${P.moneyExact(listenerWalletSummary.balance_paise)}</strong></article><article><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></article><article><small>Earned today</small><strong>${P.moneyExact(listenerWalletSummary.today_earnings_paise)}</strong></article><article><small>Earned this week</small><strong>${P.moneyExact(listenerWalletSummary.week_earnings_paise)}</strong></article><article><small>Lifetime earned</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_earnings_paise)}</strong></article><article><small>Lifetime paid</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_paid_paise)}</strong></article></div><div class="profile-list">${listenerLedger}</div></section>` : '';
+      const withdrawalLedger = (data.listenerWithdrawals || []).slice(0, 30).map(request => `<div class="profile-row"><strong>${P.moneyExact(request.amount_paise)}</strong><span><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span>${request.payment_reference ? ` • Ref ${P.esc(request.payment_reference)}` : ''}${request.admin_note ? ` • ${P.esc(request.admin_note)}` : ''}</span><small>${P.date(request.requested_at)}</small></div>`).join('') || '<p>No withdrawal requests.</p>';
+      const listenerFinance = user.role === 'employee' ? `<section class="profile-section"><h3>Listener wallet</h3><div class="profile-metrics"><article><small>Current balance</small><strong>${P.moneyExact(listenerWalletSummary.balance_paise)}</strong></article><article><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></article><article><small>Earned today</small><strong>${P.moneyExact(listenerWalletSummary.today_earnings_paise)}</strong></article><article><small>Earned this week</small><strong>${P.moneyExact(listenerWalletSummary.week_earnings_paise)}</strong></article><article><small>Lifetime earned</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_earnings_paise)}</strong></article><article><small>Lifetime paid</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_paid_paise)}</strong></article></div><h3 class="profile-subtitle">Wallet ledger</h3><div class="profile-list">${listenerLedger}</div><h3 class="profile-subtitle">Withdrawal requests</h3><div class="profile-list">${withdrawalLedger}</div></section>` : '';
       const recentCalls = (data.calls || []).slice(0, 20).map(call => `<div class="profile-row"><div>${profileLink(call.customer_id, call.customer_name)} <span class="connection-arrow">↔</span> ${profileLink(call.employee_id, call.employee_name)}</div><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span><small>${P.duration(call.billed_seconds)}${user.role === 'employee' ? ` • ${P.moneyExact(call.listener_earnings_paise)}` : ''} • ${P.date(call.started_at || call.created_at)}</small></div>`).join('') || '<p>No calls recorded.</p>';
       const wallet = (data.wallet || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${Number(entry.seconds_delta) >= 0 ? '+' : '−'}${P.duration(Math.abs(Number(entry.seconds_delta)))}</strong><span>${P.esc(entry.note || entry.type)}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No wallet entries.</p>';
       const audit = (data.audits || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${P.esc(entry.action)}</strong><span>${P.esc(entry.admin_name || 'Administrator')}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No administrator changes recorded for this account.</p>';
@@ -380,7 +379,12 @@
 
   async function loadListenerWallets() {
     try {
-      listenerWallets = (await P.api('/api/admin/listener-wallets')).wallets || [];
+      const [walletData, withdrawalData] = await Promise.all([
+        P.api('/api/admin/listener-wallets'),
+        P.api('/api/admin/withdrawals'),
+      ]);
+      listenerWallets = walletData.wallets || [];
+      withdrawalRequests = withdrawalData.requests || [];
       renderListenerWallets();
     } catch (error) {
       P.toast(error.message, 'error');
@@ -390,15 +394,27 @@
   function renderListenerWallets() {
     const query = ($('#payoutSearch')?.value || '').trim().toLowerCase();
     const list = listenerWallets.filter(item => `${item.name} ${item.email || ''} ${item.employee_code || ''} ${item.upi_id || ''} ${item.upi_phone || ''}`.toLowerCase().includes(query));
+    const requestList = withdrawalRequests.filter(item => `${item.listener_name} ${item.listener_email || ''} ${item.employee_code || ''} ${item.payout_upi_id || ''} ${item.payout_upi_phone || ''}`.toLowerCase().includes(query));
     const total = field => listenerWallets.reduce((sum, item) => sum + Number(item[field] || 0), 0);
+    const pending = withdrawalRequests.filter(request => request.status === 'pending');
+    $('#payoutPendingCount').textContent = pending.length;
+    $('#payoutPendingTotal').textContent = P.moneyExact(pending.reduce((sum, request) => sum + Number(request.amount_paise || 0), 0));
     $('#payoutDueTotal').textContent = P.moneyExact(total('balance_paise'));
-    $('#payoutTodayTotal').textContent = P.moneyExact(total('today_earnings_paise'));
-    $('#payoutLifetimeTotal').textContent = P.moneyExact(total('lifetime_earnings_paise'));
     $('#payoutPaidTotal').textContent = P.moneyExact(total('lifetime_paid_paise'));
+    $('#withdrawalRequests').innerHTML = requestList.length ? requestList.map(request => {
+      const destination = [request.payout_upi_id, request.payout_upi_phone].filter(Boolean).join(' • ');
+      const detail = request.status === 'paid'
+        ? `Paid ${P.date(request.paid_at)}${request.payment_reference ? ` · Ref ${P.esc(request.payment_reference)}` : ''}`
+        : request.status === 'declined'
+          ? `Declined ${P.date(request.reviewed_at)}`
+          : `Requested ${P.date(request.requested_at)}`;
+      return `<article class="withdrawal-queue-card ${P.esc(request.status)}"><div class="withdrawal-identity">${listenerAvatarMarkup({ id: request.employee_id, name: request.listener_name, profile_image: request.profile_image })}<div>${profileLink(request.employee_id, request.listener_name, request.employee_code || request.listener_email)}<p>${P.esc(destination)}</p></div></div><div class="withdrawal-request-amount"><small>Requested</small><strong>${P.moneyExact(request.amount_paise)}</strong><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span></div><div class="withdrawal-request-meta"><span>${detail}</span>${request.listener_note ? `<p><b>Listener:</b> ${P.esc(request.listener_note)}</p>` : ''}${request.admin_note ? `<p><b>Admin:</b> ${P.esc(request.admin_note)}</p>` : ''}</div>${request.status === 'pending' ? `<button class="primary" data-withdrawal-review="${request.id}">Review request</button>` : '<span class="review-complete">Review complete</span>'}</article>`;
+    }).join('') : '<p class="empty-copy">No withdrawal requests match this search.</p>';
     $('#listenerWalletCards').innerHTML = list.length ? list.map(item => {
       const payoutMethod = [item.upi_id, item.upi_phone].filter(Boolean).join(' • ') || 'Payout details not added';
       const balance = Number(item.balance_paise || 0);
-      return `<article class="listener-wallet-card"><header>${listenerAvatarMarkup(item)}<div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(payoutMethod)}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span></div></header><div class="wallet-due"><small>Exact balance to pay</small><strong>${P.moneyExact(balance)}</strong><span>${balance > 0 ? 'Unpaid listener earnings' : 'Nothing due now'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Paid out</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last paid</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions"><button class="primary" data-wallet-paid="${item.id}" ${balance <= 0 ? 'disabled' : ''}>Mark paid</button><button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
+      const reserved = Number(item.pending_withdrawal_paise || 0);
+      return `<article class="listener-wallet-card"><header>${listenerAvatarMarkup(item)}<div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(payoutMethod)}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span>${reserved ? '<span class="pill pending">withdrawal pending</span>' : `<span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span>`}</div></header><div class="wallet-due"><small>Current wallet balance</small><strong>${P.moneyExact(balance)}</strong><span>${reserved ? `${P.moneyExact(reserved)} reserved by listener request` : balance >= 10000 ? 'Listener can request a withdrawal' : '₹100 minimum before withdrawal'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Paid out</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last paid</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions">${item.pending_withdrawal_id ? `<button class="primary" data-withdrawal-review="${item.pending_withdrawal_id}">Review request</button>` : ''}<button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
     }).join('') : '<p class="empty-copy">No listener wallets match this search.</p>';
   }
 
@@ -422,21 +438,26 @@
     };
   }
 
-  function markListenerPaid(id) {
-    const listener = listenerWallets.find(item => item.id === id);
-    if (!listener || Number(listener.balance_paise || 0) <= 0) return;
-    const destination = [listener.upi_id, listener.upi_phone].filter(Boolean).join(' • ');
-    if (!destination) return P.toast('Add this listener’s UPI ID or UPI-linked mobile number first.', 'error');
-    modal(`Mark paid — ${listener.name}`, `<form id="listenerPaidForm" class="stack"><div class="exact-payout"><small>Exact amount being cleared</small><strong>${P.moneyExact(listener.balance_paise)}</strong><span>Pay to ${P.esc(destination)}</span></div><label>UPI transaction reference / UTR<input id="listenerPaymentReference" maxlength="160" placeholder="Recommended for payout audit"></label><label>Administrator note<textarea id="listenerPaymentNote" maxlength="500" placeholder="Optional payout note"></textarea></label><p class="modal-copy">Only click the button after this exact amount has actually been paid. The balance will move to withdrawal history and become ₹0.00.</p><button class="primary">Confirm exact payout paid</button></form>`);
-    $('#listenerPaidForm').onsubmit = async event => {
+  function reviewWithdrawalModal(id) {
+    const request = withdrawalRequests.find(item => item.id === id && item.status === 'pending');
+    if (!request) return P.toast('This withdrawal request is no longer pending.', 'error');
+    const destination = [request.payout_upi_id, request.payout_upi_phone].filter(Boolean).join(' • ');
+    modal(`Review withdrawal — ${request.listener_name}`, `<form id="withdrawalReviewForm" class="stack"><div class="exact-payout"><small>Exact requested amount</small><strong>${P.moneyExact(request.amount_paise)}</strong><span>Send to ${P.esc(destination)}</span></div>${request.listener_note ? `<p class="modal-copy"><b>Listener note:</b> ${P.esc(request.listener_note)}</p>` : ''}<label>UPI transaction reference / UTR<input id="withdrawalPaymentReference" maxlength="160" placeholder="Required when confirming payment"></label><label>Administrator note<textarea id="withdrawalAdminNote" maxlength="500" placeholder="Optional for paid, recommended when declining"></textarea></label><p class="modal-copy">Confirm paid only after the exact amount has been sent. The wallet is debited once and the listener is notified.</p><div class="withdrawal-review-actions"><button class="primary" data-review-action="paid">Confirm paid</button><button class="danger" data-review-action="declined">Decline request</button></div></form>`);
+    $('#withdrawalReviewForm').onsubmit = async event => {
       event.preventDefault();
+      const action = event.submitter?.dataset.reviewAction;
+      if (!action) return;
+      if (action === 'paid' && !$('#withdrawalPaymentReference').value.trim()) {
+        return P.toast('Enter the payment reference before confirming.', 'error');
+      }
+      if (action === 'declined' && !confirm('Decline this withdrawal request? The reserved amount will become available again.')) return;
       const button = event.submitter;
       button?.setAttribute('disabled', '');
       try {
-        await P.api(`/api/admin/listener-wallets/${id}/mark-paid`, { method: 'POST', body: JSON.stringify({ paymentReference: $('#listenerPaymentReference').value, note: $('#listenerPaymentNote').value }) });
+        await P.api(`/api/admin/withdrawals/${id}`, { method: 'PATCH', body: JSON.stringify({ action, paymentReference: $('#withdrawalPaymentReference').value, adminNote: $('#withdrawalAdminNote').value }) });
         closeAdminModal();
-        P.toast(`${P.moneyExact(listener.balance_paise)} marked paid and moved to history.`, 'success');
-        loadListenerWallets(); loadUsers(); loadAudit();
+        P.toast(action === 'paid' ? `${P.moneyExact(request.amount_paise)} recorded as paid.` : 'Withdrawal request declined.', 'success');
+        loadListenerWallets(); loadDashboard(); loadUsers(); loadAudit();
       } catch (error) {
         button?.removeAttribute('disabled');
         P.toast(error.message, 'error');
@@ -620,36 +641,6 @@
     const message = prompt(`Optional message for the user (${action}):`) || '';
     try { await P.api(`/api/admin/password-resets/${id}`, { method: 'PATCH', body: JSON.stringify({ action, adminMessage: message }) }); P.toast(`Recovery request ${action}.`, 'success'); loadResets(); }
     catch (error) { P.toast(error.message, 'error'); }
-  }
-
-  async function loadPayments() {
-    try {
-      payments = (await P.api('/api/admin/payments')).payments || [];
-      $('#paymentsList').innerHTML = payments.map(payment => `<article class="ticket payment-review"><div><span class="pill ${P.esc(payment.status)}">${P.esc(payment.status)}</span><strong>${profileLink(payment.customer_id, payment.customer_name, payment.customer_email)} — ${P.esc(payment.plan_name)}</strong><p>${P.money(payment.amount_paise)} • ${Math.round(payment.seconds / 60)} minutes • Direct UPI • ${P.date(payment.created_at)}</p><p>${payment.customer_phone ? `<a class="phone-link" href="tel:${P.esc(payment.customer_phone)}">${P.esc(payment.customer_phone)}</a>` : 'Phone not provided'}</p><p class="payment-utr"><b>UPI transaction ID / UTR</b><strong>${P.esc(payment.utr_reference || 'Missing')}</strong></p>${payment.customer_note ? `<p><b>Customer note:</b> ${P.esc(payment.customer_note)}</p>` : ''}${payment.admin_message ? `<p><b>Admin message:</b> ${P.esc(payment.admin_message)}</p>` : ''}</div><div class="actions payment-review-actions">${payment.proof_size ? `<button class="ghost" data-payment-proof="${payment.id}">View screenshot</button>` : '<span class="payment-note-label">Screenshot missing</span>'}${payment.status === 'pending' ? `<button class="primary" data-payment-approve="${payment.id}" ${!payment.proof_size || !payment.utr_reference ? 'disabled' : ''}>Approve</button><button class="danger" data-payment-decline="${payment.id}">Decline</button>` : ''}</div></article>`).join('') || '<p>No UPI submissions yet.</p>';
-    } catch (error) { P.toast(error.message, 'error'); }
-  }
-
-  async function viewPaymentProof(id) {
-    try {
-      const payment = payments.find(item => item.id === id);
-      const blob = await P.file(`/api/admin/payments/${id}/proof`);
-      const url = URL.createObjectURL(blob);
-      modal(`Payment screenshot — ${payment?.customer_name || ''}`, `<img id="paymentProofImage" class="proof-image" alt="Uploaded payment screenshot"><p><b>Submitted UTR:</b> ${P.esc(payment?.utr_reference || 'Missing')}</p>`);
-      $('#paymentProofImage').src = url;
-      $('#paymentProofImage').onload = () => URL.revokeObjectURL(url);
-    } catch (error) { P.toast(error.message, 'error'); }
-  }
-
-  async function reviewPayment(id, action) {
-    const payment = payments.find(item => item.id === id);
-    if (!payment) return;
-    if (action === 'approved' && !confirm(`Approve ${P.money(payment.amount_paise)} and credit ${Math.round(payment.seconds / 60)} minutes to ${payment.customer_name}?`)) return;
-    const message = action === 'declined' ? (prompt('Reason shown to the customer (optional):') || '') : '';
-    try {
-      await P.api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action, adminMessage: message }) });
-      P.toast(action === 'approved' ? 'UPI payment approved and talk-time credited once.' : 'Payment declined.', 'success');
-      loadPayments(); loadDashboard(); loadUsers(); loadAudit();
-    } catch (error) { P.toast(error.message, 'error'); }
   }
 
   async function loadAudit() {

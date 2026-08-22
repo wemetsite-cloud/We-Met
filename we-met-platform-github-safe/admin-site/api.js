@@ -3,10 +3,31 @@
 
   const config = window.PORTAL_CONFIG || {};
   const base = String(config.API_BASE_URL || '').replace(/\/$/, '');
-  const tokenKey = config.TOKEN_KEY || 'we_met_customer_token';
+  const tokenKey = config.TOKEN_KEY || 'we_met_admin_token';
+  const expectedRole = config.EXPECTED_ROLE || 'admin';
+
+  function tokenRole(token) {
+    try {
+      const payload = String(token || '').split('.')[1];
+      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))).role || null;
+    } catch { return null; }
+  }
+
+  function invalidateSession(message) {
+    localStorage.removeItem(tokenKey);
+    window.dispatchEvent(new CustomEvent('portal:session-invalid', { detail: { message } }));
+  }
 
   const Store = {
-    get token() { return localStorage.getItem(tokenKey); },
+    get token() {
+      const token = localStorage.getItem(tokenKey);
+      if (token && tokenRole(token) !== expectedRole) {
+        invalidateSession(`Please sign in to the ${expectedRole} portal again.`);
+        return null;
+      }
+      return token;
+    },
     set token(value) { value ? localStorage.setItem(tokenKey, value) : localStorage.removeItem(tokenKey); },
     clear() { localStorage.removeItem(tokenKey); },
   };
@@ -14,7 +35,8 @@
   async function api(path, options = {}) {
     const headers = { Accept: 'application/json', ...(options.headers || {}) };
     if (options.body !== undefined && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-    if (Store.token) headers.Authorization = `Bearer ${Store.token}`;
+    const sessionToken = Store.token;
+    if (sessionToken) headers.Authorization = `Bearer ${sessionToken}`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
@@ -22,7 +44,10 @@
       const response = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
       const isJson = (response.headers.get('content-type') || '').includes('json');
       const data = isJson ? await response.json() : await response.text();
-      if (!response.ok) throw Object.assign(new Error(data?.error || data || 'The request could not be completed.'), { status: response.status });
+      if (!response.ok) {
+        if ((sessionToken && response.status === 401) || data?.code === 'ROLE_MISMATCH') invalidateSession(data?.error || 'Your session has expired.');
+        throw Object.assign(new Error(data?.error || data || 'The request could not be completed.'), { status: response.status, code: data?.code });
+      }
       return data;
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('The server is taking too long to respond. Please try again.');
@@ -30,18 +55,6 @@
     } finally {
       clearTimeout(timer);
     }
-  }
-
-  async function file(path) {
-    const headers = {};
-    if (Store.token) headers.Authorization = `Bearer ${Store.token}`;
-    const response = await fetch(`${base}${path}`, { headers });
-    if (!response.ok) {
-      let message = 'The file could not be loaded.';
-      try { message = (await response.json()).error || message; } catch {}
-      throw new Error(message);
-    }
-    return response.blob();
   }
 
   function escapeHtml(value = '') {
@@ -108,7 +121,6 @@
     base,
     Store,
     api,
-    file,
     esc: escapeHtml,
     duration,
     date,

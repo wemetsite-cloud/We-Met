@@ -2,8 +2,8 @@
 set -eu
 cd "$(dirname "$0")"
 
-if [ ! -f backend/.env ]; then
-  echo "backend/.env is missing. Copy backend/.env.example to backend/.env and enter your production values."
+if [ ! -f .env ]; then
+  echo ".env is missing. Copy .env.example to .env and enter your local values."
   exit 1
 fi
 

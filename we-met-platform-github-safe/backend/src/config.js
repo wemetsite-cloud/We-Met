@@ -1,8 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const envPath = path.join(__dirname, '..', '.env');
-if (fs.existsSync(envPath)) {
+const envPaths = [
+  path.join(__dirname, '..', '.env'),
+  path.join(__dirname, '..', '..', '.env'),
+];
+for (const envPath of envPaths) {
+  if (!fs.existsSync(envPath)) continue;
   for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -35,11 +39,6 @@ const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
 const razorpayKeyId = String(process.env.RAZORPAY_KEY_ID || '').trim();
 const razorpayKeySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
-const upiPaymentId = String(process.env.UPI_PAYMENT_ID || 'paytm.s3hc53w@pty').trim();
-const configuredUpiPayeeName = String(process.env.UPI_PAYMENT_PAYEE_NAME || '').trim();
-const upiPaymentPayeeName = (!configuredUpiPayeeName || /^paytm$/i.test(configuredUpiPayeeName))
-  ? 'Sabith Salah K P'
-  : configuredUpiPayeeName;
 const publicUrl = (
   process.env.PUBLIC_URL
   || process.env.RENDER_EXTERNAL_URL
@@ -66,10 +65,10 @@ const config = {
     keySecret: razorpayKeySecret,
   },
   upiPayment: {
-    enabled: true,
-    payeeName: upiPaymentPayeeName,
-    upiId: upiPaymentId,
-    intentMinutes: number(process.env.UPI_PAYMENT_INTENT_MINUTES, 1440),
+    enabled: false,
+    payeeName: '',
+    upiId: '',
+    intentMinutes: 1440,
   },
   webPush: {
     enabled: Boolean(vapidPublicKey && vapidPrivateKey),
@@ -130,15 +129,6 @@ function validateConfig() {
   }
   if (config.initialListener.password && !/^\S+@\S+\.\S+$/.test(config.initialListener.email)) {
     problems.push('INITIAL_LISTENER_EMAIL is required when an initial listener password is configured.');
-  }
-  if (config.upiPayment.payeeName.length < 2) {
-    problems.push('UPI_PAYMENT_PAYEE_NAME must exactly match the receiving UPI account name.');
-  }
-  if (!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(config.upiPayment.upiId)) {
-    problems.push('UPI_PAYMENT_ID must be a valid receiving UPI ID.');
-  }
-  if (!Number.isInteger(config.upiPayment.intentMinutes) || config.upiPayment.intentMinutes < 15 || config.upiPayment.intentMinutes > 10080) {
-    problems.push('UPI_PAYMENT_INTENT_MINUTES must be between 15 and 10080.');
   }
   if (!Number.isInteger(config.listenerDisconnectGraceSeconds)
       || config.listenerDisconnectGraceSeconds < 10

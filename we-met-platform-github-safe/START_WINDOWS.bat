@@ -1,9 +1,9 @@
 @echo off
 cd /d "%~dp0"
 title We Met 6 Server
-if not exist backend\.env (
-  echo backend\.env is missing.
-  echo Copy backend\.env.example to backend\.env and enter your production values.
+if not exist .env (
+  echo .env is missing.
+  echo Copy .env.example to .env and enter your local values.
   pause
   exit /b 1
 )

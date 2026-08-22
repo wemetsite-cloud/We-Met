@@ -63,7 +63,7 @@ function upiPhone(value) {
 }
 
 router.get('/dashboard', asyncHandler(async (_req, res) => {
-  const [users, calls, reports, tickets, coupons, minutes, payments] = await Promise.all([
+  const [users, calls, reports, tickets, coupons, minutes, withdrawals] = await Promise.all([
     db.query(`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role`),
     db.query(`
       SELECT status, COUNT(*)::int AS count,
@@ -75,7 +75,10 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     db.query(`SELECT COUNT(*)::int AS count FROM support_tickets WHERE status = 'open'`),
     db.query(`SELECT COUNT(*)::int AS count FROM coupons WHERE active = true`),
     db.query(`SELECT COALESCE(SUM(billed_seconds), 0)::bigint AS seconds FROM calls`),
-    db.query(`SELECT COUNT(*)::int AS count FROM payment_submissions WHERE status='pending'`),
+    db.query(`
+      SELECT COUNT(*)::int AS count,COALESCE(SUM(amount_paise),0)::bigint AS amount_paise
+      FROM listener_withdrawal_requests WHERE status='pending'
+    `),
   ]);
 
   res.json({
@@ -85,7 +88,8 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     openTickets: tickets.rows[0].count,
     activeCoupons: coupons.rows[0].count,
     totalTalkSeconds: Number(minutes.rows[0].seconds),
-    pendingPayments: payments.rows[0].count,
+    pendingWithdrawals: withdrawals.rows[0].count,
+    pendingWithdrawalPaise: Number(withdrawals.rows[0].amount_paise || 0),
   });
 }));
 
@@ -404,6 +408,7 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     wallet,
     listenerWallet,
     listenerWalletSummary,
+    listenerWithdrawals,
     reports,
     support,
     callAnalytics,
@@ -454,6 +459,14 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
              ),0)::bigint AS week_earnings_paise
       FROM listener_wallet_transactions
       WHERE employee_id=$1
+    `, [req.params.id]),
+    db.query(`
+      SELECT id,amount_paise,payout_upi_id,payout_upi_phone,listener_note,status,
+             payment_reference,admin_note,requested_at,reviewed_at,paid_at
+      FROM listener_withdrawal_requests
+      WHERE employee_id=$1
+      ORDER BY requested_at DESC
+      LIMIT 100
     `, [req.params.id]),
     db.query(`
       SELECT r.*, reporter.name AS reporter_name, target.name AS target_name
@@ -522,6 +535,7 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     wallet: wallet.rows,
     listenerWallet: listenerWallet.rows,
     listenerWalletSummary: listenerWalletSummary.rows[0],
+    listenerWithdrawals: listenerWithdrawals.rows,
     reports: reports.rows,
     support: support.rows,
     callAnalytics: callAnalytics.rows[0],
@@ -540,7 +554,10 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
            COALESCE(wallet.lifetime_paid_paise,0)::bigint AS lifetime_paid_paise,
            COALESCE(wallet.today_earnings_paise,0)::bigint AS today_earnings_paise,
            COALESCE(wallet.week_earnings_paise,0)::bigint AS week_earnings_paise,
-           wallet.last_paid_at
+           wallet.last_paid_at,
+           pending.id AS pending_withdrawal_id,
+           pending.amount_paise::bigint AS pending_withdrawal_paise,
+           pending.requested_at AS pending_withdrawal_requested_at
     FROM users u
     LEFT JOIN LATERAL (
       SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
@@ -556,6 +573,12 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
       FROM listener_wallet_transactions t
       WHERE t.employee_id=u.id
     ) wallet ON true
+    LEFT JOIN LATERAL (
+      SELECT id,amount_paise,requested_at
+      FROM listener_withdrawal_requests
+      WHERE employee_id=u.id AND status='pending'
+      LIMIT 1
+    ) pending ON true
     WHERE u.role='employee'
     ORDER BY COALESCE(wallet.balance_paise,0) DESC,u.name
   `);
@@ -569,7 +592,33 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
       lifetime_paid_paise: Number(row.lifetime_paid_paise || 0),
       today_earnings_paise: Number(row.today_earnings_paise || 0),
       week_earnings_paise: Number(row.week_earnings_paise || 0),
+      pending_withdrawal_paise: Number(row.pending_withdrawal_paise || 0),
     })),
+  });
+}));
+
+router.get('/withdrawals', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT request.id,request.employee_id,request.amount_paise,request.payout_upi_id,
+           request.payout_upi_phone,request.listener_note,request.status,
+           request.payment_reference,request.admin_note,request.requested_at,
+           request.reviewed_at,request.paid_at,listener.name AS listener_name,
+           listener.email AS listener_email,listener.employee_code,
+           CASE WHEN listener.profile_image LIKE 'data:image/%' THEN 'photo:'||listener.id::text ELSE listener.profile_image END AS profile_image,
+           reviewer.name AS reviewer_name
+    FROM listener_withdrawal_requests request
+    JOIN users listener ON listener.id=request.employee_id
+    LEFT JOIN users reviewer ON reviewer.id=request.reviewed_by
+    ORDER BY CASE request.status WHEN 'pending' THEN 0 WHEN 'paid' THEN 1 ELSE 2 END,
+             request.requested_at DESC
+    LIMIT 1000
+  `);
+  res.json({
+    requests: result.rows.map((request) => ({
+      ...request,
+      amount_paise: Number(request.amount_paise || 0),
+    })),
+    minimumWithdrawalPaise: 10_000,
   });
 }));
 
@@ -593,66 +642,97 @@ router.patch('/listener-wallets/:id/rate', asyncHandler(async (req, res) => {
   res.json({ listener: { ...listener, listener_rate_paise: Number(listener.listener_rate_paise) } });
 }));
 
-router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => {
+router.patch('/withdrawals/:id', asyncHandler(async (req, res) => {
+  const action = text(req.body.action, 20).toLowerCase();
   const paymentReference = text(req.body.paymentReference, 160) || null;
-  const note = text(req.body.note, 500) || 'Full listener balance marked paid by administrator';
+  const adminNote = text(req.body.adminNote, 500) || null;
+  if (!['paid', 'declined'].includes(action)) {
+    return res.status(400).json({ error: 'Choose paid or declined.' });
+  }
+  if (action === 'paid' && (!paymentReference || paymentReference.length < 3)) {
+    return res.status(400).json({ error: 'Enter the UPI transaction reference before confirming payment.' });
+  }
 
   const output = await db.transaction(async (client) => {
-    const employeeResult = await client.query(`
-      SELECT id,name,upi_id,upi_phone
-      FROM users
-      WHERE id=$1 AND role='employee'
-      FOR UPDATE
+    const preliminary = await client.query(`
+      SELECT employee_id FROM listener_withdrawal_requests WHERE id=$1
     `, [req.params.id]);
-    const employee = employeeResult.rows[0];
-    if (!employee) throw Object.assign(new Error('Listener not found.'), { status: 404 });
-    if (!employee.upi_id && !employee.upi_phone) {
-      throw Object.assign(new Error('Add a UPI ID or UPI-linked mobile number before marking this balance paid.'), { status: 400 });
+    if (!preliminary.rows[0]) throw Object.assign(new Error('Withdrawal request not found.'), { status: 404 });
+    const listener = await client.query(`
+      SELECT id FROM users WHERE id=$1 AND role='employee' FOR UPDATE
+    `, [preliminary.rows[0].employee_id]);
+    if (!listener.rows[0]) throw Object.assign(new Error('Listener account not found.'), { status: 404 });
+    const found = await client.query(`
+      SELECT request.*,listener.name AS listener_name
+      FROM listener_withdrawal_requests request
+      JOIN users listener ON listener.id=request.employee_id
+      WHERE request.id=$1
+      FOR UPDATE OF request
+    `, [req.params.id]);
+    const request = found.rows[0];
+    if (!request) throw Object.assign(new Error('Withdrawal request not found.'), { status: 404 });
+    if (request.status !== 'pending') {
+      throw Object.assign(new Error('This withdrawal request has already been reviewed.'), { status: 409 });
     }
 
-    const balanceResult = await client.query(`
-      SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
-      FROM listener_wallet_transactions
-      WHERE employee_id=$1
-    `, [employee.id]);
-    const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
-    if (balancePaise <= 0) {
-      throw Object.assign(new Error('This listener has no unpaid wallet balance.'), { status: 409 });
+    if (action === 'paid') {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext(lower($1)))', [paymentReference]);
+      const duplicateReference = await client.query(`
+        SELECT id FROM listener_withdrawal_requests
+        WHERE id<>$1 AND status='paid' AND lower(payment_reference)=lower($2)
+        LIMIT 1
+      `, [request.id, paymentReference]);
+      if (duplicateReference.rows[0]) {
+        throw Object.assign(new Error('This payment reference was already used for another withdrawal.'), { status: 409 });
+      }
+      const balanceResult = await client.query(`
+        SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+        FROM listener_wallet_transactions WHERE employee_id=$1
+      `, [request.employee_id]);
+      const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
+      const amountPaise = Number(request.amount_paise || 0);
+      if (amountPaise > balancePaise) {
+        throw Object.assign(new Error('The listener wallet no longer has enough balance for this withdrawal.'), { status: 409 });
+      }
+      await client.query(`
+        INSERT INTO listener_wallet_transactions(
+          employee_id,type,amount_paise,reference_id,payout_upi_id,payout_upi_phone,
+          payment_reference,note,created_by
+        ) VALUES($1,'payout',$2,$3,$4,$5,$6,$7,$8)
+      `, [
+        request.employee_id,
+        -amountPaise,
+        request.id,
+        request.payout_upi_id,
+        request.payout_upi_phone,
+        paymentReference,
+        adminNote || 'Listener withdrawal paid',
+        req.user.id,
+      ]);
     }
 
-    const payout = await client.query(`
-      INSERT INTO listener_wallet_transactions(
-        employee_id,type,amount_paise,payout_upi_id,payout_upi_phone,
-        payment_reference,note,created_by
-      )
-      VALUES($1,'payout',$2,$3,$4,$5,$6,$7)
+    const updated = await client.query(`
+      UPDATE listener_withdrawal_requests
+      SET status=$2,payment_reference=$3,admin_note=$4,reviewed_by=$5,
+          reviewed_at=now(),paid_at=CASE WHEN $2='paid' THEN now() ELSE NULL END,updated_at=now()
+      WHERE id=$1
       RETURNING *
-    `, [
-      employee.id,
-      -balancePaise,
-      employee.upi_id,
-      employee.upi_phone,
-      paymentReference,
-      note,
-      req.user.id,
-    ]);
-
-    const title = 'Listener payout recorded';
-    const body = `Your ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(balancePaise / 100)} wallet balance was marked paid.${paymentReference ? ` Reference: ${paymentReference}` : ''}`;
-    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [employee.id, title, body]);
-    return { employee, payout: payout.rows[0], balancePaise, notification: { title, body } };
+    `, [request.id, action, action === 'paid' ? paymentReference : null, adminNote, req.user.id]);
+    const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(request.amount_paise) / 100);
+    const title = action === 'paid' ? 'Withdrawal paid' : 'Withdrawal declined';
+    const body = action === 'paid'
+      ? `${formatted} was paid to your saved payout method. Reference: ${paymentReference}.`
+      : `Your ${formatted} withdrawal request was declined.${adminNote ? ` ${adminNote}` : ''}`;
+    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.employee_id, title, body]);
+    return { request: updated.rows[0], employeeId: request.employee_id, notification: { title, body } };
   });
 
-  await req.app.locals.notifyUser?.(output.employee.id, {
+  await req.app.locals.notifyUser?.(output.employeeId, {
     ...output.notification,
     url: './',
-    tag: `we-met-listener-payout-${output.payout.id}`,
+    tag: `we-met-withdrawal-${output.request.id}`,
   });
-  res.json({
-    payout: { ...output.payout, amount_paise: Number(output.payout.amount_paise) },
-    paidPaise: output.balancePaise,
-    balancePaise: 0,
-  });
+  res.json({ request: { ...output.request, amount_paise: Number(output.request.amount_paise) } });
 }));
 
 router.post('/listener-wallets/:id/adjust', asyncHandler(async (req, res) => {
@@ -681,6 +761,15 @@ router.post('/listener-wallets/:id/adjust', asyncHandler(async (req, res) => {
     const nextBalance = currentBalance + amountPaise;
     if (nextBalance < 0) {
       throw Object.assign(new Error('This adjustment would make the listener wallet negative.'), { status: 409 });
+    }
+    const pendingResult = await client.query(`
+      SELECT COALESCE(SUM(amount_paise),0)::bigint AS reserved_paise
+      FROM listener_withdrawal_requests
+      WHERE employee_id=$1 AND status='pending'
+    `, [employee.id]);
+    const reservedPaise = Number(pendingResult.rows[0].reserved_paise || 0);
+    if (nextBalance < reservedPaise) {
+      throw Object.assign(new Error('This adjustment would reduce the wallet below the amount reserved by a pending withdrawal.'), { status: 409 });
     }
 
     const transaction = await client.query(`
@@ -960,113 +1049,6 @@ router.patch('/password-resets/:id', asyncHandler(async (req, res) => {
   await db.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.user_id, title, body]);
   await req.app.locals.notifyUser?.(request.user_id, { title, body, url: './', tag: `we-met-recovery-${request.id}` });
   res.json({ request });
-}));
-
-router.get('/payments', asyncHandler(async (_req, res) => {
-  const manual = await db.query(`
-      SELECT payment.id,payment.customer_id,payment.plan_id,payment.plan_name,
-             payment.amount_paise,payment.seconds,payment.payee_upi_id,
-             payment.payment_method,payment.checkout_reference,payment.destination_last4,
-             payment.utr_reference,payment.customer_note,payment.proof_size,payment.status,
-             payment.admin_message,payment.reviewed_at,payment.created_at,
-             customer.name AS customer_name,customer.email AS customer_email,
-             customer.phone AS customer_phone
-      FROM payment_submissions payment
-      JOIN users customer ON customer.id=payment.customer_id
-      ORDER BY CASE payment.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
-               payment.created_at DESC
-      LIMIT 1000
-  `);
-  res.json({ payments: manual.rows });
-}));
-
-router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
-  const result = await db.query('SELECT proof_mime,proof_data FROM payment_submissions WHERE id=$1', [req.params.id]);
-  const proof = result.rows[0];
-  if (!proof?.proof_data || !proof?.proof_mime) {
-    return res.status(404).json({ error: 'No payment screenshot was attached.' });
-  }
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(proof.proof_mime)) {
-    return res.status(415).json({ error: 'This older attachment is not a supported safe image format.' });
-  }
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.type(proof.proof_mime).send(proof.proof_data);
-}));
-
-router.patch('/payments/:id', asyncHandler(async (req, res) => {
-  const action = String(req.body.action || '');
-  if (!['approved', 'declined'].includes(action)) {
-    return res.status(400).json({ error: 'Choose approve or decline.' });
-  }
-  const adminMessage = text(req.body.adminMessage, 1000) || null;
-
-  const payment = await db.transaction(async (client) => {
-    const found = await client.query(`
-      SELECT * FROM payment_submissions WHERE id=$1 FOR UPDATE
-    `, [req.params.id]);
-    const record = found.rows[0];
-    if (!record) throw Object.assign(new Error('Payment submission not found.'), { status: 404 });
-    if (record.status !== 'pending') throw Object.assign(new Error('This payment has already been reviewed.'), { status: 409 });
-    if (action === 'approved' && record.manual_intent_id && !record.utr_reference) {
-      throw Object.assign(new Error('This payment has no UTR and cannot be approved.'), { status: 400 });
-    }
-    if (action === 'approved' && record.manual_intent_id && (!record.proof_data || !record.proof_mime)) {
-      throw Object.assign(new Error('This payment has no screenshot and cannot be approved.'), { status: 400 });
-    }
-    if (action === 'approved' && record.utr_reference) {
-      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [record.utr_reference]);
-      const duplicate = await client.query(`
-        SELECT id FROM payment_submissions
-        WHERE id<>$1
-          AND lower(regexp_replace(utr_reference, '\\s+', '', 'g'))=lower(regexp_replace($2, '\\s+', '', 'g'))
-          AND status='approved'
-        LIMIT 1
-        FOR UPDATE
-      `, [record.id, record.utr_reference]);
-      if (duplicate.rows[0]) {
-        throw Object.assign(new Error('This transfer reference was already approved for another submission.'), { status: 409 });
-      }
-    }
-
-    const updated = await client.query(`
-      UPDATE payment_submissions
-      SET status=$2,admin_message=$3,reviewed_by=$4,reviewed_at=now(),updated_at=now()
-      WHERE id=$1
-      RETURNING id,customer_id,plan_id,plan_name,amount_paise,seconds,payee_upi_id,
-                utr_reference,customer_note,status,admin_message,reviewed_at,created_at,updated_at
-    `, [record.id, action, adminMessage, req.user.id]);
-
-    if (action === 'approved') {
-      await client.query(`
-        UPDATE users
-        SET balance_seconds=balance_seconds+$2,updated_at=now()
-        WHERE id=$1 AND role='customer'
-      `, [record.customer_id, record.seconds]);
-      await client.query(`
-        INSERT INTO wallet_transactions(customer_id,seconds_delta,type,note,reference_id)
-        VALUES($1,$2,'payment',$3,$4)
-      `, [
-        record.customer_id,
-        record.seconds,
-        `${record.plan_name} · administrator-approved ${record.payment_method === 'bank_transfer' ? 'older bank transfer' : 'direct UPI payment'}`,
-        record.id,
-      ]);
-    }
-
-    const title = action === 'approved' ? 'Payment approved' : 'Payment declined';
-    const body = action === 'approved'
-      ? `${Math.round(record.seconds / 60)} minutes were added to your wallet.${adminMessage ? ` ${adminMessage}` : ''}`
-      : `Your ${record.plan_name} payment proof was declined.${adminMessage ? ` ${adminMessage}` : ''}`;
-    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [record.customer_id, title, body]);
-    return { ...updated.rows[0], notification: { title, body } };
-  });
-
-  await req.app.locals.notifyUser?.(payment.customer_id, {
-    ...payment.notification,
-    url: './',
-    tag: `we-met-payment-${payment.id}`,
-  });
-  res.json({ payment });
 }));
 
 router.post('/notifications', asyncHandler(async (req, res) => {

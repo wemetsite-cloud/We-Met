@@ -11,6 +11,7 @@ test('ships authenticated Razorpay checkout without exposing the secret to the f
   const server = read('backend', 'server.js');
   const customerHtml = read('customer-site', 'index.html');
   const customerApp = read('customer-site', 'app.js');
+  const backendConfig = read('backend', 'src', 'config.js');
   const packageJson = JSON.parse(read('backend', 'package.json'));
   assert.ok(packageJson.dependencies.razorpay);
   assert.match(server, /app\.use\('\/api', require\('\.\/src\/routes\/razorpay'\)\)/);
@@ -22,6 +23,7 @@ test('ships authenticated Razorpay checkout without exposing the secret to the f
   assert.match(customerHtml, /https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js/);
   assert.match(customerApp, /razorpay_payment_id/);
   assert.doesNotMatch(customerApp, /RAZORPAY_KEY_SECRET|keySecret/);
+  assert.match(backendConfig, /path\.join\(__dirname, '\.\.', '\.\.', '\.env'\)/);
   assert.match(read('.gitignore'), /^\.env$/m);
 });
 
@@ -45,25 +47,56 @@ test('keeps listener work-session analytics private to admin while listener sees
   assert.match(read('backend', 'src', 'socket.js'), /currentRuntime\s*\?\s*\(currentRuntime\.status === 'ringing' \? 'ringing' : 'busy'\)/);
 });
 
-test('ships listener earnings, individual rates, exact payouts and immutable wallet history', () => {
+test('ships listener earnings, ₹100 withdrawal requests and immutable wallet history', () => {
   const schema = read('backend', 'database', 'schema.sql');
   const adminRoutes = read('backend', 'src', 'routes', 'admin.js');
   const employeeRoutes = read('backend', 'src', 'routes', 'employee.js');
   const listenerHtml = read('employee-site', 'index.html');
   const adminHtml = read('admin-site', 'index.html');
   assert.match(schema, /listener_wallet_transactions/);
+  assert.match(schema, /listener_withdrawal_requests/);
   assert.match(schema, /uq_listener_wallet_call_credit/);
+  assert.match(schema, /uq_listener_wallet_payout/);
+  assert.match(schema, /uq_listener_pending_withdrawal/);
   assert.match(schema, /listener_rate_paise/);
   assert.match(schema, /IF NOT earnings_column_exists THEN/);
   assert.doesNotMatch(schema, /WHERE earnings_settled_at IS NULL\s+AND status IN/);
-  assert.match(adminRoutes, /\/listener-wallets\/:id\/mark-paid/);
+  assert.match(adminRoutes, /router\.get\('\/withdrawals'/);
+  assert.match(adminRoutes, /router\.patch\('\/withdrawals\/:id'/);
+  assert.doesNotMatch(adminRoutes, /\/listener-wallets\/:id\/mark-paid/);
   assert.match(adminRoutes, /FOR UPDATE/);
   assert.match(employeeRoutes, /router\.get\(['"]\/wallet/);
+  assert.match(employeeRoutes, /MIN_WITHDRAWAL_PAISE = 10_000/);
+  assert.match(employeeRoutes, /router\.post\('\/wallet\/withdrawals'/);
   assert.match(employeeRoutes, /\/wallet\/payout-details/);
   assert.match(listenerHtml, /id="tab-wallet"/);
   assert.match(listenerHtml, /id="walletBalance"/);
+  assert.match(listenerHtml, /id="withdrawalForm"/);
   assert.match(adminHtml, /id="page-payouts"/);
   assert.match(adminHtml, /id="payoutDueTotal"/);
+  assert.match(adminHtml, /id="withdrawalRequests"/);
+  assert.doesNotMatch(adminHtml, /id="page-payments"|UPI payments/);
+});
+
+test('isolates portal sessions by role and clears stale mismatched tokens', () => {
+  const middleware = read('backend', 'src', 'middleware.js');
+  const portals = [
+    ['admin-site', 'admin', 'we_met_admin_token'],
+    ['employee-site', 'employee', 'we_met_listener_token'],
+    ['customer-site', 'customer', 'we_met_customer_token'],
+  ];
+  assert.match(middleware, /code: 'ROLE_MISMATCH'/);
+  assert.match(middleware, /actualRole/);
+  for (const [site, role, tokenKey] of portals) {
+    const api = read(site, 'api.js');
+    const config = read(site, 'config.js');
+    const serviceWorker = read(site, 'service-worker.js');
+    assert.match(api, new RegExp(tokenKey));
+    assert.match(api, /tokenRole\(token\)/);
+    assert.match(api, /portal:session-invalid/);
+    assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
+    assert.match(serviceWorker, /const VERSION = '6\.8\.0'/);
+  }
 });
 
 test('provides full clickable admin profiles and administrator audit history', () => {
@@ -102,24 +135,17 @@ test('uses unique element ids in each primary interface', () => {
 });
 
 
-test('ships the premium UPI checkout and customer listener privacy polish', () => {
+test('retires manual UPI uploads while preserving customer privacy polish', () => {
   const customerHtml = read('customer-site', 'index.html');
   const customerApp = read('customer-site', 'app.js');
-  const paymentRoutes = read('backend', 'src', 'routes', 'manual-payments.js');
+  const server = read('backend', 'server.js');
   const schema = read('backend', 'database', 'schema.sql');
-  const render = read('render.yaml');
-  assert.match(customerHtml, /id="payWithGooglePay"/);
-  assert.match(customerHtml, /id="payWithAnyUpi"/);
   assert.match(customerHtml, /id="listenerDiscovery"/);
   assert.match(customerApp, /Listeners are available now/);
   assert.doesNotMatch(customerApp, /\$\{malayalamAvailable\} Malayalam listener/);
-  assert.match(paymentRoutes, /errorCorrectionLevel: 'H'/);
-  assert.match(paymentRoutes, /dark: '#000000'/);
-  assert.doesNotMatch(paymentRoutes, /OFFICIAL_PAYTM_/);
-  assert.match(paymentRoutes, /reference: intent\.checkout_reference/);
+  assert.doesNotMatch(server, /routes\/manual-payments/);
+  assert.doesNotMatch(customerHtml, /manualPaymentForm|manualProof|payWithGooglePay|page-payments/);
+  assert.doesNotMatch(customerApp, /manual-payments|submitManualPayment|loadPayments/);
   assert.match(customerApp, /show\('#listenerDiscovery', false\)/);
-  assert.match(render, /UPI_PAYMENT_PAYEE_NAME[\s\S]*Sabith Salah K P/);
-  assert.match(customerApp, /package=com\.google\.android\.apps\.nbu\.paisa\.user/);
   assert.match(schema, /\('Long Connect',199900,14400,false,true,60\)/);
-  assert.match(render, /UPI_PAYMENT_ID[\s\S]*paytm\.s3hc53w@pty/);
 });

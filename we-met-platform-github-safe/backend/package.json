@@ -1,8 +1,8 @@
 {
   "name": "we-met-backend",
-  "version": "6.7.0",
+  "version": "6.8.0",
   "private": true,
-  "description": "We Met backend for browser calls, connected-second billing, listener earnings, payouts and verified Razorpay payments.",
+  "description": "We Met backend for browser calls, role-safe access, listener withdrawal requests and verified Razorpay payments.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

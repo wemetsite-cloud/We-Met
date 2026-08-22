@@ -1,11 +1,11 @@
 {
-  "version": "6.7.0",
-  "name": "We Met v6.7.0 Razorpay Standard Checkout",
+  "version": "6.8.0",
+  "name": "We Met v6.8.0 Secure Withdrawals & Portal Reliability",
   "changes": [
-    "Creates authenticated Razorpay orders from server-validated talk-time pack prices",
-    "Opens Razorpay Standard Web Checkout from each customer pack button",
-    "Verifies the Razorpay HMAC-SHA256 signature on the backend",
-    "Credits each verified payment to the wallet exactly once",
-    "Handles checkout cancellation, payment failures and verification errors"
+    "Prevents stale customer sessions from being used in listener or administrator portals",
+    "Adds listener withdrawal requests with an enforced ₹100 minimum",
+    "Adds atomic administrator review, payout reference tracking and listener notifications",
+    "Removes the obsolete administrator UPI proof and upload-history workspace",
+    "Refreshes all portal caches and polishes wallet, payout and accessibility surfaces"
   ]
 }

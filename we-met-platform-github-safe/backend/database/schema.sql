@@ -116,6 +116,24 @@ CREATE TABLE IF NOT EXISTS listener_wallet_transactions (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS listener_withdrawal_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount_paise bigint NOT NULL CHECK (amount_paise >= 10000),
+  payout_upi_id text,
+  payout_upi_phone text,
+  listener_note text,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','declined')),
+  payment_reference text,
+  admin_note text,
+  reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz,
+  paid_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (payout_upi_id IS NOT NULL OR payout_upi_phone IS NOT NULL)
+);
+
 CREATE TABLE IF NOT EXISTS favorites (
   customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -378,6 +396,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_open_listener_activity ON listener_activity
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_call_credit ON listener_wallet_transactions(reference_id) WHERE type='call_credit' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_payout ON listener_wallet_transactions(reference_id) WHERE type='payout' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_pending_withdrawal ON listener_withdrawal_requests(employee_id) WHERE status='pending';
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role,status);
 CREATE INDEX IF NOT EXISTS idx_listener_availability ON users(listener_availability) WHERE role='employee' AND status='active';
 CREATE INDEX IF NOT EXISTS idx_calls_customer ON calls(customer_id,created_at DESC);
@@ -388,6 +408,8 @@ CREATE INDEX IF NOT EXISTS idx_listener_activity_started ON listener_activity_se
 CREATE INDEX IF NOT EXISTS idx_wallet_customer ON wallet_transactions(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_wallet_employee ON listener_wallet_transactions(employee_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_wallet_type ON listener_wallet_transactions(type,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_withdrawal_employee ON listener_withdrawal_requests(employee_id,requested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_withdrawal_status ON listener_withdrawal_requests(status,requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);

@@ -66,7 +66,6 @@ app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
 app.use('/api', require('./src/routes/razorpay'));
-app.use('/api/customer/manual-payments', require('./src/routes/manual-payments'));
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/employee', require('./src/routes/employee'));
 app.use('/api/admin', require('./src/routes/admin'));

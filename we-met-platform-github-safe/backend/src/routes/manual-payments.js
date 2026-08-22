@@ -76,6 +76,11 @@ function publicIntent(intent) {
 
 router.use(authenticate, requireRole('customer'));
 
+router.post(['/intents', '/submissions'], (_req, res) => res.status(410).json({
+  code: 'MANUAL_UPI_RETIRED',
+  error: 'Manual UPI proof uploads have been retired. Use the secure Razorpay checkout instead.',
+}));
+
 router.get('/submissions', asyncHandler(async (req, res) => {
   const result = await db.query(`
     SELECT id,plan_id,plan_name,amount_paise,seconds,payment_method,

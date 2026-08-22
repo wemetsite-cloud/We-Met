@@ -54,9 +54,17 @@ async function authenticate(req, res, next) {
   }
 }
 
-const requireRole = (...roles) => (req, res, next) => (
-  roles.includes(req.user?.role) ? next() : res.status(403).json({ error: 'You do not have permission to do that.' })
-);
+const requireRole = (...roles) => (req, res, next) => {
+  if (roles.includes(req.user?.role)) return next();
+  const expected = roles.map((role) => (role === 'employee' ? 'listener' : role)).join(' or ');
+  const actual = req.user?.role === 'employee' ? 'listener' : (req.user?.role || 'unknown');
+  return res.status(403).json({
+    code: 'ROLE_MISMATCH',
+    expectedRoles: roles,
+    actualRole: req.user?.role || null,
+    error: `This is a ${actual} session. Please sign in to the ${expected} portal again.`,
+  });
+};
 
 const asyncHandler = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 

@@ -65,30 +65,6 @@ router.post('/redeem', asyncHandler(async (req, res) => {
   res.json(output);
 }));
 
-router.get('/payments', asyncHandler(async (req, res) => {
-  const result = await db.query(`
-    SELECT id,plan_id,plan_name,amount_paise,seconds,payee_upi_id,utr_reference,
-           customer_note,status,admin_message,reviewed_at,created_at,updated_at
-    FROM payment_submissions
-    WHERE customer_id=$1
-    ORDER BY created_at DESC
-    LIMIT 100
-  `, [req.user.id]);
-  res.json({ payments: result.rows });
-}));
-
-router.get('/payments/:id/proof', asyncHandler(async (req, res) => {
-  const result = await db.query(`
-    SELECT proof_mime,proof_data
-    FROM payment_submissions
-    WHERE id=$1 AND customer_id=$2
-  `, [req.params.id, req.user.id]);
-  const proof = result.rows[0];
-  if (!proof) return res.status(404).json({ error: 'Payment screenshot not found.' });
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.type(proof.proof_mime).send(proof.proof_data);
-}));
-
 router.get('/favorites', asyncHandler(async (req, res) => {
   const result = await db.query(
     `SELECT f.employee_id,f.created_at,u.name,u.bio,u.status,u.listener_language

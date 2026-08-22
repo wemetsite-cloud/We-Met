@@ -6,6 +6,8 @@ const { normalizeProfileImage } = require('../profile-image');
 const router = express.Router();
 router.use(authenticate, requireRole('employee'));
 
+const MIN_WITHDRAWAL_PAISE = 10_000;
+
 function normaliseUpiId(value) {
   const upiId = String(value || '').trim().toLowerCase().slice(0, 120);
   if (!upiId) return null;
@@ -53,7 +55,7 @@ router.get('/stats', asyncHandler(async (req, res) => {
 }));
 
 router.get('/wallet', asyncHandler(async (req, res) => {
-  const [summaryResult, transactionsResult] = await Promise.all([
+  const [summaryResult, transactionsResult, withdrawalsResult] = await Promise.all([
     db.query(`
       SELECT u.upi_id,u.upi_phone,u.listener_rate_paise,
              COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
@@ -80,16 +82,33 @@ router.get('/wallet', asyncHandler(async (req, res) => {
       ORDER BY t.created_at DESC
       LIMIT 250
     `, [req.user.id]),
+    db.query(`
+      SELECT id,amount_paise,payout_upi_id,payout_upi_phone,listener_note,status,
+             payment_reference,admin_note,requested_at,reviewed_at,paid_at
+      FROM listener_withdrawal_requests
+      WHERE employee_id=$1
+      ORDER BY requested_at DESC
+      LIMIT 50
+    `, [req.user.id]),
   ]);
 
   const row = summaryResult.rows[0];
   if (!row) return res.status(404).json({ error: 'Listener wallet not found.' });
+  const balancePaise = Number(row.balance_paise || 0);
+  const withdrawals = withdrawalsResult.rows.map((entry) => ({
+    ...entry,
+    amount_paise: Number(entry.amount_paise || 0),
+  }));
+  const pendingWithdrawal = withdrawals.find((entry) => entry.status === 'pending') || null;
   res.json({
     summary: {
       upiId: row.upi_id,
       upiPhone: row.upi_phone,
       ratePaisePerMinute: Number(row.listener_rate_paise || 0),
-      balancePaise: Number(row.balance_paise || 0),
+      balancePaise,
+      availablePaise: pendingWithdrawal ? Math.max(0, balancePaise - pendingWithdrawal.amount_paise) : balancePaise,
+      minimumWithdrawalPaise: MIN_WITHDRAWAL_PAISE,
+      canWithdraw: !pendingWithdrawal && balancePaise >= MIN_WITHDRAWAL_PAISE && Boolean(row.upi_id || row.upi_phone),
       lifetimeEarningsPaise: Number(row.lifetime_earnings_paise || 0),
       lifetimePaidPaise: Number(row.lifetime_paid_paise || 0),
       todayEarningsPaise: Number(row.today_earnings_paise || 0),
@@ -101,6 +120,79 @@ router.get('/wallet', asyncHandler(async (req, res) => {
       billed_seconds: entry.billed_seconds === null ? null : Number(entry.billed_seconds),
       rate_paise_per_minute: entry.rate_paise_per_minute === null ? null : Number(entry.rate_paise_per_minute),
     })),
+    pendingWithdrawal,
+    withdrawals,
+  });
+}));
+
+router.post('/wallet/withdrawals', asyncHandler(async (req, res) => {
+  const amountPaise = Number(req.body.amountPaise);
+  const listenerNote = String(req.body.note || '').trim().slice(0, 500) || null;
+  if (!Number.isSafeInteger(amountPaise)) {
+    return res.status(400).json({ error: 'Enter a valid withdrawal amount.' });
+  }
+  if (amountPaise < MIN_WITHDRAWAL_PAISE) {
+    return res.status(400).json({ error: 'The minimum withdrawal amount is ₹100.' });
+  }
+
+  const output = await db.transaction(async (client) => {
+    const listenerResult = await client.query(`
+      SELECT id,name,upi_id,upi_phone
+      FROM users
+      WHERE id=$1 AND role='employee'
+      FOR UPDATE
+    `, [req.user.id]);
+    const listener = listenerResult.rows[0];
+    if (!listener) throw Object.assign(new Error('Listener account not found.'), { status: 404 });
+    if (!listener.upi_id && !listener.upi_phone) {
+      throw Object.assign(new Error('Save a UPI ID or UPI-linked mobile number before requesting a withdrawal.'), { status: 400 });
+    }
+
+    const pending = await client.query(`
+      SELECT id FROM listener_withdrawal_requests
+      WHERE employee_id=$1 AND status='pending'
+      FOR UPDATE
+    `, [listener.id]);
+    if (pending.rows[0]) {
+      throw Object.assign(new Error('You already have a withdrawal request waiting for review.'), { status: 409 });
+    }
+
+    const balanceResult = await client.query(`
+      SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+      FROM listener_wallet_transactions
+      WHERE employee_id=$1
+    `, [listener.id]);
+    const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
+    if (amountPaise > balancePaise) {
+      throw Object.assign(new Error('The withdrawal amount is higher than your available wallet balance.'), { status: 409 });
+    }
+
+    const requestResult = await client.query(`
+      INSERT INTO listener_withdrawal_requests(
+        employee_id,amount_paise,payout_upi_id,payout_upi_phone,listener_note
+      ) VALUES($1,$2,$3,$4,$5)
+      RETURNING *
+    `, [listener.id, amountPaise, listener.upi_id, listener.upi_phone, listenerNote]);
+    const request = requestResult.rows[0];
+    const admins = await client.query(`SELECT id FROM users WHERE role='admin' AND status='active'`);
+    const title = 'New listener withdrawal';
+    const body = `${listener.name} requested ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amountPaise / 100)}.`;
+    if (admins.rows.length) {
+      await client.query(`
+        INSERT INTO notifications(user_id,title,body)
+        SELECT id,$1,$2 FROM users WHERE role='admin' AND status='active'
+      `, [title, body]);
+    }
+    return { listener, request, adminIds: admins.rows.map((admin) => admin.id), notification: { title, body } };
+  });
+
+  await Promise.all(output.adminIds.map((adminId) => req.app.locals.notifyUser?.(adminId, {
+    ...output.notification,
+    url: './',
+    tag: `we-met-withdrawal-${output.request.id}`,
+  })));
+  res.status(201).json({
+    request: { ...output.request, amount_paise: Number(output.request.amount_paise) },
   });
 }));
 

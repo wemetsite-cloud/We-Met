@@ -63,12 +63,6 @@ services:
         value: "0"
       - key: STUN_URL
         value: "stun:stun.l.google.com:19302"
-      - key: UPI_PAYMENT_PAYEE_NAME
-        value: "Sabith Salah K P"
-      - key: UPI_PAYMENT_ID
-        value: "paytm.s3hc53w@pty"
-      - key: UPI_PAYMENT_INTENT_MINUTES
-        value: "1440"
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY

@@ -1,8 +1,8 @@
 {
   "name": "we-met-platform",
-  "version": "6.7.0",
+  "version": "6.8.0",
   "private": true,
-  "description": "We Met platform with Razorpay checkout, live listener discovery, connected-second billing and payout wallets.",
+  "description": "We Met platform with Razorpay checkout, role-safe portals, connected-second billing and secure listener withdrawals.",
   "scripts": {
     "install:backend": "npm --prefix backend ci --registry=https://registry.npmjs.org/",
     "start": "npm --prefix backend run start:production",
