@@ -1,4 +1,4 @@
-const VERSION = '6.8.0';
+const VERSION = '6.8.1';
 const CACHE_PREFIX = 'we-met-listener-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = ['./','index.html','style.css','app.js','api.js','socket-loader.js','webrtc.js','config.js','manifest.webmanifest','assets/logo.svg','assets/favicon.png','assets/icon-192.png','assets/icon-512.png','assets/avatar-01.svg','assets/avatar-02.svg','assets/avatar-03.svg','assets/avatar-04.svg','assets/avatar-05.svg','assets/avatar-06.svg','assets/avatar-07.svg','assets/avatar-08.svg','assets/avatar-09.svg','assets/avatar-10.svg','assets/avatar-11.svg','assets/avatar-12.svg','assets/avatar-13.svg','assets/avatar-14.svg','assets/avatar-15.svg','assets/avatar-16.svg','assets/avatar-17.svg','assets/avatar-18.svg','assets/avatar-19.svg','assets/avatar-20.svg'];
@@ -14,11 +14,6 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys();
     await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE).map((key) => caches.delete(key)));
     await self.clients.claim();
-    const scopePath = new URL(self.registration.scope).pathname;
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    await Promise.all(windows
-      .filter((client) => new URL(client.url).pathname.startsWith(scopePath))
-      .map((client) => client.navigate(client.url).catch(() => null)));
   })());
 });
 
@@ -28,6 +23,10 @@ async function networkFirst(request, navigation = false) {
     if (response.ok && response.type === 'basic') {
       const cache = await caches.open(CACHE);
       await cache.put(request, response.clone());
+    }
+    if (!response.ok) {
+      const cached = await caches.match(request, { ignoreSearch: true });
+      if (cached) return cached;
     }
     return response;
   } catch {

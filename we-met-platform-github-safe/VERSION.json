@@ -1,11 +1,11 @@
 {
-  "version": "6.8.0",
-  "name": "We Met v6.8.0 Secure Withdrawals & Portal Reliability",
+  "version": "6.8.1",
+  "name": "We Met v6.8.1 One-Tap Portal Stability",
   "changes": [
-    "Prevents stale customer sessions from being used in listener or administrator portals",
-    "Adds listener withdrawal requests with an enforced ₹100 minimum",
-    "Adds atomic administrator review, payout reference tracking and listener notifications",
-    "Removes the obsolete administrator UPI proof and upload-history workspace",
-    "Refreshes all portal caches and polishes wallet, payout and accessibility surfaces"
+    "Removes service-worker forced reloads that could swallow the first tap",
+    "Keeps valid sessions during temporary network or server failures",
+    "Signs out expired or wrong-role sessions cleanly without reload loops",
+    "Adds a stable same-origin /listener/ portal route alongside /admin/",
+    "Retires the final manual-UPI public flags and stale payment-policy text"
   ]
 }

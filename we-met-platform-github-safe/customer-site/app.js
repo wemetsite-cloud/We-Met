@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   window.addEventListener('portal:session-invalid', (event) => {
     P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
-    setTimeout(() => location.reload(), 700);
+    setTimeout(() => logout(false), 0);
   });
 
   let me = null;
@@ -128,11 +128,10 @@
     deferredInstallPrompt = null;
     syncInstallControls();
   }
-  async function registerFreshServiceWorker() {
+  async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.8.0', { updateViaCache: 'none' });
-      await serviceWorkerRegistration.update();
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.8.1', { updateViaCache: 'none' });
       return serviceWorkerRegistration;
     } catch {}
   }
@@ -158,7 +157,7 @@
     initNavigation();
     bind();
     syncInstallControls();
-    await registerFreshServiceWorker();
+    registerServiceWorker();
     try {
       publicConfig = await P.api('/api/public/config');
     } catch (error) {
@@ -404,9 +403,9 @@
       if (response.user.role !== 'customer') throw new Error('Wrong account type.');
       me = response.user;
       enterApp();
-    } catch {
-      P.Store.clear();
-      logout(false);
+    } catch (error) {
+      if (P.isAuthError(error)) return;
+      P.toast('The server is temporarily unavailable. Your login is still saved; try again shortly.', 'error');
     }
   }
 

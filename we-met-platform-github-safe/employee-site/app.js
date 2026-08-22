@@ -5,9 +5,12 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
+  let sessionResetPending = false;
   window.addEventListener('portal:session-invalid', (event) => {
+    if (sessionResetPending) return;
+    sessionResetPending = true;
     P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
-    setTimeout(() => location.reload(), 700);
+    setTimeout(leaveListenerSession, 0);
   });
 
   let me = null;
@@ -108,12 +111,34 @@
     });
   }
 
-  async function registerFreshServiceWorker() {
+  async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.8.0', { updateViaCache: 'none' });
-      await registration.update();
+      return await navigator.serviceWorker.register('service-worker.js?v=6.8.1', { updateViaCache: 'none' });
     } catch {}
+  }
+
+  function leaveListenerSession() {
+    P.Store.clear();
+    socket?.disconnect();
+    audioCall?.stop();
+    stopRing();
+    ringContext?.close().catch(() => {});
+    ringContext = null;
+    clearInterval(statsRefreshTimer);
+    me = null;
+    currentCall = null;
+    status = 'offline';
+    show('#loginView');
+    show('#appView', false);
+    show('#incomingModal', false);
+    show('#callView', false);
+    show('#recoveryModal', false);
+    show('#restoreListenerCall', false);
+    if ($('#loginPassword')) $('#loginPassword').value = '';
+    activeTab = 'desk';
+    history.replaceState(navigationState('desk', null), document.title);
+    sessionResetPending = false;
   }
 
   function profileImageSrc(value, name = 'Listener', userId = me?.id) {
@@ -193,7 +218,7 @@
   async function init() {
     initNavigation();
     bind();
-    await registerFreshServiceWorker();
+    registerServiceWorker();
     try { publicConfig = await P.api('/api/public/config'); } catch {}
     ringSecondsLeft = publicConfig?.ringSeconds || 30;
     if (P.Store.token) await loadMe();
@@ -349,12 +374,14 @@
       if (response.user.role !== 'employee') throw new Error('Wrong account type.');
       me = response.user;
       enter();
-    } catch {
-      P.Store.clear();
+    } catch (error) {
+      if (P.isAuthError(error)) return;
+      P.toast('The server is temporarily unavailable. Your listener login is still saved; try again shortly.', 'error');
     }
   }
 
   function enter() {
+    sessionResetPending = false;
     show('#loginView', false);
     show('#appView');
     $('#hello').textContent = `Hello, ${me.name}`;
@@ -396,18 +423,12 @@
 
   async function logout() {
     await sendAvailabilityCommand('employee:offline').catch(() => null);
-    socket?.disconnect();
-    audioCall?.stop();
-    stopRing();
-    ringContext?.close().catch(() => {});
-    ringContext = null;
-    P.Store.clear();
-    clearInterval(statsRefreshTimer);
-    location.reload();
+    leaveListenerSession();
   }
 
   async function connect() {
     try { await window.SocketIOReady; } catch (error) { P.toast(error.message, 'error'); return; }
+    if (!me || !P.Store.token) return;
     socket = io(P.socketUrl, {
       auth: { token: P.Store.token },
       transports: ['websocket', 'polling'],

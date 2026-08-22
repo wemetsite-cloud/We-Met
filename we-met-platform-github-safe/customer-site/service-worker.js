@@ -1,4 +1,4 @@
-const VERSION = '6.8.0';
+const VERSION = '6.8.1';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -61,13 +61,6 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys();
     await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE).map((key) => caches.delete(key)));
     await self.clients.claim();
-
-    // Reload controlled pages once so an already-open device cannot keep running old JS.
-    const scopePath = new URL(self.registration.scope).pathname;
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    await Promise.all(windows
-      .filter((client) => new URL(client.url).pathname.startsWith(scopePath))
-      .map((client) => client.navigate(client.url).catch(() => null)));
   })());
 });
 
@@ -77,6 +70,10 @@ async function networkFirst(request, navigation = false) {
     if (response.ok && response.type === 'basic') {
       const cache = await caches.open(CACHE);
       await cache.put(request, response.clone());
+    }
+    if (!response.ok) {
+      const cached = await caches.match(request, { ignoreSearch: true });
+      if (cached) return cached;
     }
     return response;
   } catch {
@@ -92,6 +89,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return;
+  if (['/admin/', '/employee/', '/listener/'].some((prefix) => url.pathname.startsWith(prefix))) return;
   event.respondWith(networkFirst(request, request.mode === 'navigate'));
 });
 
