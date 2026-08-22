@@ -329,6 +329,6 @@ main,.tab,.panel,.payment-card,.payment-step,.payment-methods>*,.grid-two>*,.lis
 /* v6.8 premium interaction and accessibility refinement */
 .button:focus-visible,.tabs button:focus-visible,.listener-card:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid rgba(240,68,143,.28);outline-offset:3px}.welcome-card,.call-hero,.panel,.plan-card,.listener-card,.trust-showcase{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}.panel:hover,.welcome-card:hover{border-color:rgba(201,47,120,.17);box-shadow:0 22px 55px rgba(66,31,49,.085)}.toast{backdrop-filter:blur(14px)}@media(prefers-reduced-motion:reduce){.welcome-card,.call-hero,.panel,.plan-card,.listener-card,.trust-showcase{transition:none}}
 
-/* v6.9.0 one-tap controls */
+/* v6.9.1 one-tap controls */
 button{touch-action:manipulation}
 @media(hover:none),(pointer:coarse){.button:hover,.listener-card:hover,.plan-card:hover,.panel:hover,.welcome-card:hover,.upi-app-button:hover{transform:none}.button,.tabs button{min-height:42px}}

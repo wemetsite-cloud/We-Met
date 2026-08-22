@@ -1,7 +1,8 @@
 {
-  "version": "6.9.0",
-  "name": "We Met v6.9.0 Collection-Only Wallets",
+  "version": "6.9.1",
+  "name": "We Met v6.9.1 Portal Access Fix",
   "changes": [
+    "Prevents Razorpay customer authorization from intercepting admin and listener APIs",
     "Uses Razorpay Standard Checkout only for verified customer talk-time top-ups",
     "Removes listener payment requests and bank-detail forms from the active product",
     "Adds atomic admin-only wallet adjustments and manual payment records",

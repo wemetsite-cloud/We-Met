@@ -1,4 +1,4 @@
-# We Met v6.9.0 deployment
+# We Met v6.9.1 deployment
 
 Deploy the repository root with `render.yaml`. The supported same-origin staff URLs are:
 
@@ -16,7 +16,7 @@ Razorpay Standard Checkout is used only to collect customer talk-time top-ups. T
 
 ## Deferred features
 
-SMS OTP sign-in and automated listener payments are intentionally not active in v6.9.0. Add them only after selecting an SMS provider and completing the separate payment-provider onboarding required for automated listener transfers. The current email/username-and-password login and admin-managed listener ledger remain the supported production paths.
+SMS OTP sign-in and automated listener payments are intentionally not active in v6.9.1. Add them only after selecting an SMS provider and completing the separate payment-provider onboarding required for automated listener transfers. The current email/username-and-password login and admin-managed listener ledger remain the supported production paths.
 
 ## Optional staff subdomains
 
@@ -26,5 +26,5 @@ To use `admin.wemet.xyz` and `listener.wemet.xyz`, add both as custom domains on
 
 1. Open `https://wemet.xyz/api/health` and confirm it returns `ok: true`.
 2. Open the admin and listener path URLs above.
-3. Refresh each portal once after deploying v6.9.0 so the new service worker replaces the old cache.
+3. Refresh each portal once after deploying v6.9.1 so the new service worker replaces the old cache.
 4. Confirm one tap changes a page or tab and that a temporary network interruption does not sign the user out.
