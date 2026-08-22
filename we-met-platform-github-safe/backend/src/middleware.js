@@ -56,13 +56,14 @@ async function authenticate(req, res, next) {
 
 const requireRole = (...roles) => (req, res, next) => {
   if (roles.includes(req.user?.role)) return next();
-  const expected = roles.map((role) => (role === 'employee' ? 'listener' : role)).join(' or ');
-  const actual = req.user?.role === 'employee' ? 'listener' : (req.user?.role || 'unknown');
+  const portalName = (role) => ({ admin: 'administrator', employee: 'listener', customer: 'customer' }[role] || 'unknown');
+  const expected = roles.map(portalName).join(' or ');
+  const actual = portalName(req.user?.role);
   return res.status(403).json({
     code: 'ROLE_MISMATCH',
     expectedRoles: roles,
     actualRole: req.user?.role || null,
-    error: `This is a ${actual} session. Please sign in to the ${expected} portal again.`,
+    error: `The active session belongs to the ${actual} portal. Please sign in through the ${expected} portal.`,
   });
 };
 

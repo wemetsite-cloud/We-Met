@@ -41,9 +41,7 @@ function providerStatus(error) {
   return Number(error?.statusCode || error?.status || error?.error?.statusCode || 0);
 }
 
-router.use(authenticate, requireRole('customer'));
-
-router.post('/create-order', createOrderLimit, asyncHandler(async (req, res) => {
+router.post('/create-order', authenticate, requireRole('customer'), createOrderLimit, asyncHandler(async (req, res) => {
   if (!razorpay) {
     return res.status(503).json({ error: 'Online checkout is not configured on the server.' });
   }
@@ -123,7 +121,7 @@ router.post('/create-order', createOrderLimit, asyncHandler(async (req, res) => 
   });
 }));
 
-router.post('/verify-payment', verifyPaymentLimit, asyncHandler(async (req, res) => {
+router.post('/verify-payment', authenticate, requireRole('customer'), verifyPaymentLimit, asyncHandler(async (req, res) => {
   if (!razorpay) {
     return res.status(503).json({ error: 'Online checkout is not configured on the server.' });
   }

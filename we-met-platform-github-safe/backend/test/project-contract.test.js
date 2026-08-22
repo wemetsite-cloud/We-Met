@@ -15,9 +15,9 @@ test('ships authenticated Razorpay checkout without exposing the secret to the f
   const packageJson = JSON.parse(read('backend', 'package.json'));
   assert.ok(packageJson.dependencies.razorpay);
   assert.match(server, /app\.use\('\/api', require\('\.\/src\/routes\/razorpay'\)\)/);
-  assert.match(routes, /router\.post\('\/create-order'/);
-  assert.match(routes, /router\.post\('\/verify-payment'/);
-  assert.match(routes, /requireRole\('customer'\)/);
+  assert.match(routes, /router\.post\('\/create-order', authenticate, requireRole\('customer'\),/);
+  assert.match(routes, /router\.post\('\/verify-payment', authenticate, requireRole\('customer'\),/);
+  assert.doesNotMatch(routes, /router\.use\(authenticate, requireRole\('customer'\)\)/);
   assert.match(routes, /verifyPaymentSignature/);
   assert.match(routes, /status='paid'/);
   assert.match(customerHtml, /https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js/);
@@ -25,6 +25,13 @@ test('ships authenticated Razorpay checkout without exposing the secret to the f
   assert.doesNotMatch(customerApp, /RAZORPAY_KEY_SECRET|keySecret/);
   assert.match(backendConfig, /path\.join\(__dirname, '\.\.', '\.\.', '\.env'\)/);
   assert.match(read('.gitignore'), /^\.env$/m);
+});
+
+test('limits Razorpay customer-role checks to payment endpoints', () => {
+  const routes = read('backend', 'src', 'routes', 'razorpay.js');
+  const protectedPaymentRoutes = routes.match(/router\.post\([^\n]+authenticate, requireRole\('customer'\)/g) || [];
+  assert.equal(protectedPaymentRoutes.length, 2);
+  assert.doesNotMatch(routes, /router\.use\([^\n]*requireRole\('customer'\)/);
 });
 
 test('keeps talk-time plans behind customer authentication', () => {
@@ -99,7 +106,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '6\.9\.0'/);
+    assert.match(serviceWorker, /const VERSION = '6\.9\.1'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }
