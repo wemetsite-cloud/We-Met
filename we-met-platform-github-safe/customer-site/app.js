@@ -139,7 +139,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.6.1', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.7.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -907,9 +907,9 @@
 
   function renderPlans(plans = []) {
     paymentPlans = plans;
-    const planDescription = 'Secure UPI checkout · exact amount · billed by connected second.';
-    $('#walletPaymentIntro').textContent = 'Choose a pack, pay securely with Google Pay or another UPI app, then submit the successful transaction details.';
-    $('#paymentHistoryIntro').textContent = 'UPI submissions remain pending until an administrator verifies the UTR and screenshot.';
+    const planDescription = 'Secure Razorpay checkout · UPI, cards and supported methods · billed by connected second.';
+    $('#walletPaymentIntro').textContent = 'Choose a pack and complete the secure Razorpay checkout. Verified payments add talk-time automatically.';
+    $('#paymentHistoryIntro').textContent = 'Razorpay payments appear in Wallet activity after verification. Older manual UPI submissions remain below.';
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
         ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
@@ -919,7 +919,9 @@
         <p>${P.esc(planDescription)}</p>
         <button class="button button-primary" type="button" data-buy-plan="${plan.id}">Get this pack <span>→</span></button>
       </article>`).join('');
-    $$('[data-buy-plan]').forEach((button) => button.addEventListener('click', () => openPayment(button.dataset.buyPlan)));
+    $$('[data-buy-plan]').forEach((button) => button.addEventListener('click', (event) => {
+      openPayment(button.dataset.buyPlan, event.currentTarget);
+    }));
   }
 
   async function copyValue(value, message = 'Copied.') {
@@ -997,34 +999,102 @@
     try { return localStorage.getItem(ACTIVE_PAYMENT_KEY) || ''; } catch { return ''; }
   }
 
-  async function openPayment(planId) {
+  async function verifyRazorpayCheckout(payment) {
+    const body = JSON.stringify({
+      razorpay_payment_id: payment.razorpay_payment_id,
+      razorpay_order_id: payment.razorpay_order_id,
+      razorpay_signature: payment.razorpay_signature,
+    });
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await P.api('/api/verify-payment', { method: 'POST', body, timeout: 30000 });
+      } catch (error) {
+        lastError = error;
+        if (error.status !== 425 || attempt === 2) throw error;
+        await new Promise((resolve) => window.setTimeout(resolve, 1200 * (attempt + 1)));
+      }
+    }
+    throw lastError;
+  }
+
+  async function openPayment(planId, button = null) {
     if (!me) {
       P.toast('Sign in before starting a payment.', 'info');
       return setAuth('login');
     }
-    const mode = 'upi_direct';
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
-    resetPaymentCheckout(mode);
-    currentCheckout = { mode, plan };
-    $('#paymentTitle').textContent = 'Secure UPI payment';
-    $('#paymentEyebrow').textContent = 'WE MET CHECKOUT';
-    $('#paymentSubtitle').textContent = 'Choose a UPI app or scan the QR. Confirm Sabith Salah K P as the payee before completing payment.';
-    openManagedOverlay('#paymentModal', 'paymentModal');
-    setPaymentStep('pay');
+    if (typeof window.Razorpay !== 'function') {
+      return P.toast('Secure checkout could not load. Check your connection and try again.', 'error');
+    }
+
+    button?.setAttribute('disabled', '');
     try {
-      const checkout = await P.api('/api/customer/manual-payments/intents', {
+      const order = await P.api('/api/create-order', {
         method: 'POST',
-        body: JSON.stringify({ planId: plan.id }),
+        body: JSON.stringify({
+          planId: plan.id,
+          amount: Number(plan.price_paise),
+          currency: 'INR',
+          receipt: `checkout_${Date.now()}`,
+        }),
       });
-      if (!currentCheckout || currentCheckout.plan.id !== plan.id) return;
-      currentCheckout = { mode, plan, intent: checkout.intent };
-      renderDirectUpiIntent(checkout.intent);
-      show('#paymentLoading', false);
-      show('#paymentPayContent');
+
+      let paymentHandled = false;
+      let paymentFailureShown = false;
+      const checkout = new window.Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: publicConfig?.appName || 'We Met',
+        description: `${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
+        image: new URL('assets/logo.svg', window.location.href).href,
+        order_id: order.order_id,
+        prefill: {
+          name: me.name || '',
+          email: me.email || '',
+          contact: me.phone || '',
+        },
+        notes: { plan_id: plan.id },
+        theme: { color: '#f0448f' },
+        retry: { enabled: true },
+        modal: {
+          ondismiss: () => {
+            button?.removeAttribute('disabled');
+            if (!paymentHandled && !paymentFailureShown) {
+              P.toast('Payment cancelled. No talk-time was added.', 'info');
+            }
+          },
+        },
+        handler: async (payment) => {
+          paymentHandled = true;
+          try {
+            const verified = await verifyRazorpayCheckout(payment);
+            updateBalance(verified.balance_seconds);
+            await loadHistory();
+            P.toast(verified.message || 'Payment verified and talk-time added.', 'success');
+          } catch (error) {
+            const reference = payment.razorpay_payment_id || 'unavailable';
+            P.toast(
+              `${error.message || 'Payment verification failed.'} Payment reference: ${reference}`,
+              'error',
+            );
+          } finally {
+            button?.removeAttribute('disabled');
+          }
+        },
+      });
+
+      checkout.on('payment.failed', (response) => {
+        paymentFailureShown = true;
+        const reason = response?.error?.description || response?.error?.reason || 'Payment failed. Try again.';
+        P.toast(reason, 'error');
+      });
+      checkout.open();
     } catch (error) {
-      closePaymentCheckout();
-      P.toast(error.message || 'The payment checkout could not be prepared.', 'error');
+      button?.removeAttribute('disabled');
+      P.toast(error.message || 'The Razorpay checkout could not be prepared.', 'error');
     }
   }
 
