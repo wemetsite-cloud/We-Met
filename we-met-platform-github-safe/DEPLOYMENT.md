@@ -1,4 +1,4 @@
-# We Met v6.8.1 deployment
+# We Met v6.9.0 deployment
 
 Deploy the repository root with `render.yaml`. The supported same-origin staff URLs are:
 
@@ -12,6 +12,12 @@ These path-based URLs work without separate subdomain routing and should be used
 
 Keep the existing environment variables configured in the Render service. In particular, do not put `JWT_SECRET`, `ADMIN_PASSWORD`, `DATABASE_URL`, or `RAZORPAY_KEY_SECRET` in frontend files. The current Razorpay key starts with `rzp_test_`, so payments remain in Razorpay test mode until both server-side Razorpay variables are replaced with live credentials.
 
+Razorpay Standard Checkout is used only to collect customer talk-time top-ups. This build does not call RazorpayX or any automated listener-payment API. Listener earnings are paid separately and then recorded by an administrator from **Listener wallets → Record paid**.
+
+## Deferred features
+
+SMS OTP sign-in and automated listener payments are intentionally not active in v6.9.0. Add them only after selecting an SMS provider and completing the separate payment-provider onboarding required for automated listener transfers. The current email/username-and-password login and admin-managed listener ledger remain the supported production paths.
+
 ## Optional staff subdomains
 
 To use `admin.wemet.xyz` and `listener.wemet.xyz`, add both as custom domains on the same Render web service, then point their Cloudflare DNS records to the hostname Render provides. Remove any Cloudflare Origin Rule that sends either hostname to a different origin or port. Wait until Render shows the custom domain certificate as active before using those URLs.
@@ -20,5 +26,5 @@ To use `admin.wemet.xyz` and `listener.wemet.xyz`, add both as custom domains on
 
 1. Open `https://wemet.xyz/api/health` and confirm it returns `ok: true`.
 2. Open the admin and listener path URLs above.
-3. Refresh each portal once after deploying v6.8.1 so the new service worker replaces the old cache.
+3. Refresh each portal once after deploying v6.9.0 so the new service worker replaces the old cache.
 4. Confirm one tap changes a page or tab and that a temporary network interruption does not sign the user out.

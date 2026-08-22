@@ -8,8 +8,8 @@
   <title>We Met Listener Workspace</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=6.8.1">
-  <link rel="stylesheet" href="style.css?v=6.8.1">
+  <link rel="manifest" href="manifest.webmanifest?v=6.9.0">
+  <link rel="stylesheet" href="style.css?v=6.9.0">
 </head>
 <body>
   <div id="loginView" class="login-view">
@@ -43,16 +43,13 @@
 
       <section id="tab-wallet" class="tab">
         <section class="wallet-hero">
-          <div><span class="eyebrow">LISTENER EARNINGS</span><h2>Available to be paid</h2><strong id="walletBalance">₹0.00</strong><p id="walletPayoutStatus">Call earnings will appear here after each connected call.</p></div>
+          <div><span class="eyebrow">LISTENER EARNINGS</span><h2>Current unpaid earnings</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus">Call earnings will appear here after each connected call.</p></div>
           <div class="wallet-rate-card"><small>Your rate</small><strong id="walletRate">₹0.00/min</strong><span>The administrator sets this rate. Every call is calculated by connected second.</span></div>
         </section>
-        <div class="wallet-metrics"><article><small>Earned today</small><strong id="walletToday">₹0.00</strong></article><article><small>Earned this week</small><strong id="walletWeek">₹0.00</strong></article><article><small>Lifetime earnings</small><strong id="walletLifetime">₹0.00</strong></article><article><small>Paid out</small><strong id="walletPaid">₹0.00</strong></article></div>
+        <div class="wallet-metrics"><article><small>Earned today</small><strong id="walletToday">₹0.00</strong></article><article><small>Earned this week</small><strong id="walletWeek">₹0.00</strong></article><article><small>Lifetime earnings</small><strong id="walletLifetime">₹0.00</strong></article><article><small>Paid to date</small><strong id="walletPaid">₹0.00</strong></article></div>
         <div class="wallet-grid">
-          <div class="wallet-tools">
-            <section class="panel withdrawal-panel"><span class="eyebrow">WITHDRAW YOUR EARNINGS</span><h2>Request a payout</h2><div id="withdrawalStatus" class="withdrawal-status"><b>₹100 minimum</b><p>Save your payout details, then request any amount up to your wallet balance.</p></div><form id="withdrawalForm" class="stack"><label>Amount in rupees<input id="withdrawalAmount" type="number" min="100" step="0.01" inputmode="decimal" required placeholder="Minimum ₹100"></label><label>Note for the administrator (optional)<textarea id="withdrawalNote" maxlength="500" placeholder="Optional payout note"></textarea></label><small id="withdrawalHint" class="withdrawal-hint">Minimum withdrawal: ₹100.00</small><button id="withdrawalSubmit" class="button button-primary">Request withdrawal</button></form><div class="withdrawal-history-head"><strong>Request history</strong><small>Pending, paid and declined requests</small></div><div id="withdrawalHistory" class="withdrawal-history"></div></section>
-            <form id="payoutDetailsForm" class="panel payout-form"><details class="settings-fold"><summary><span><small>PAYOUT DETAILS</small><b>Payment details</b></span><i aria-hidden="true">⌄</i></summary><div class="settings-fold-body stack"><p>Add or change the UPI details used for your next withdrawal.</p><label>UPI ID<input id="walletUpiId" autocomplete="off" placeholder="name@bank"></label><label>UPI-linked mobile number<input id="walletUpiPhone" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number"></label><button class="button button-primary">Save payout details</button></div></details></form>
-          </div>
-          <section class="panel wallet-history-panel"><div class="section-head"><div><span class="eyebrow">COMPLETE LEDGER</span><h2>Earnings and paid withdrawals</h2><p>Call credits, administrator adjustments and completed payouts stay in this immutable history.</p></div><button id="refreshWallet" class="button button-quiet" type="button">Refresh</button></div><div id="walletHistory" class="wallet-history"></div></section>
+          <section class="panel settlement-panel"><span class="settlement-icon" aria-hidden="true">✓</span><span class="eyebrow">ADMIN-MANAGED WALLET</span><h2>Simple payment tracking</h2><p>You do not need to submit a payment request or add bank details. Your administrator handles payments separately and records them here.</p><ol><li><b>Earn</b><span>Connected-call earnings are credited automatically.</span></li><li><b>Get paid</b><span>The administrator pays you using the agreed method.</span></li><li><b>Track</b><span>The recorded payment reduces this wallet balance and stays in your ledger.</span></li></ol><small>Automated listener payments may be added in a future version.</small></section>
+          <section class="panel wallet-history-panel"><div class="section-head"><div><span class="eyebrow">COMPLETE LEDGER</span><h2>Earnings and payment history</h2><p>Call credits, administrator adjustments and recorded payments stay in this permanent history.</p></div><button id="refreshWallet" class="button button-quiet" type="button">Refresh</button></div><div id="walletHistory" class="wallet-history"></div></section>
         </div>
       </section>
 
@@ -68,6 +65,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Call active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=6.8.1"></script><script src="socket-loader.js?v=6.8.1"></script><script src="api.js?v=6.8.1"></script><script src="webrtc.js?v=6.8.1"></script><script src="app.js?v=6.8.1"></script>
+  <script src="config.js?v=6.9.0"></script><script src="socket-loader.js?v=6.9.0"></script><script src="api.js?v=6.9.0"></script><script src="webrtc.js?v=6.9.0"></script><script src="app.js?v=6.9.0"></script>
 </body>
 </html>

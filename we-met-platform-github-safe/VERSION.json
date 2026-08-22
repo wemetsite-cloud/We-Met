@@ -1,11 +1,11 @@
 {
-  "version": "6.8.1",
-  "name": "We Met v6.8.1 One-Tap Portal Stability",
+  "version": "6.9.0",
+  "name": "We Met v6.9.0 Collection-Only Wallets",
   "changes": [
-    "Removes service-worker forced reloads that could swallow the first tap",
-    "Keeps valid sessions during temporary network or server failures",
-    "Signs out expired or wrong-role sessions cleanly without reload loops",
-    "Adds a stable same-origin /listener/ portal route alongside /admin/",
-    "Retires the final manual-UPI public flags and stale payment-policy text"
+    "Uses Razorpay Standard Checkout only for verified customer talk-time top-ups",
+    "Removes listener payment requests and bank-detail forms from the active product",
+    "Adds atomic admin-only wallet adjustments and manual payment records",
+    "Keeps listener earnings and payment history visible in a clear permanent ledger",
+    "Preserves one-tap portal navigation and role-safe session recovery"
   ]
 }

@@ -114,7 +114,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=6.8.1', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=6.9.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -204,8 +204,6 @@
     $('#profilePhotoFile').addEventListener('change', async (event) => { try { profileImageDraft = await compressProfilePhoto(event.target.files?.[0]); renderProfileImageEditor(); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
     $('#profileAutoAvatar').addEventListener('click', () => { profileImageDraft = ''; renderProfileImageEditor(); });
     $('#profileAvatarGrid').addEventListener('click', (event) => { const button = event.target.closest('[data-profile-avatar]'); if (!button) return; profileImageDraft = button.dataset.profileAvatar; renderProfileImageEditor(); });
-    $('#payoutDetailsForm').addEventListener('submit', savePayoutDetails);
-    $('#withdrawalForm').addEventListener('submit', requestWithdrawal);
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#employeeEmailForm').addEventListener('submit', changeEmail);
     $('#refreshHistory').addEventListener('click', loadHistory);
@@ -549,7 +547,7 @@
     socket.on('chat:message', addChat);
     socket.on('notification:new', (notification) => {
       P.toast(`${notification.title}: ${notification.body}`, 'info');
-      if (/wallet|payout/i.test(`${notification.title} ${notification.body}`)) loadWallet();
+      if (/wallet|payment|earning/i.test(`${notification.title} ${notification.body}`)) loadWallet();
     });
     socket.on('account:restricted', (data) => {
       P.toast(data.reason || 'Your account has been restricted.', 'error');
@@ -710,51 +708,18 @@
       $('#walletWeek').textContent = P.moneyExact(summary.weekEarningsPaise);
       $('#walletLifetime').textContent = P.moneyExact(summary.lifetimeEarningsPaise);
       $('#walletPaid').textContent = P.moneyExact(summary.lifetimePaidPaise);
-      if (!$('#payoutDetailsForm').contains(document.activeElement)) {
-        $('#walletUpiId').value = summary.upiId || '';
-        $('#walletUpiPhone').value = summary.upiPhone || '';
-      }
-
-      const hasPayoutDetails = Boolean(summary.upiId || summary.upiPhone);
-      const pendingWithdrawal = response.pendingWithdrawal;
-      const minimumPaise = Number(summary.minimumWithdrawalPaise || 10_000);
       const balancePaise = Number(summary.balancePaise || 0);
-      $('#walletPayoutStatus').textContent = pendingWithdrawal
-        ? `${P.moneyExact(pendingWithdrawal.amount_paise)} is reserved while your withdrawal is reviewed.`
-        : Number(summary.ratePaisePerMinute || 0) <= 0
+      $('#walletPaymentStatus').textContent = Number(summary.ratePaisePerMinute || 0) <= 0
         ? 'Your rate has not been set yet. Ask the administrator to set it before taking paid calls.'
-        : balancePaise >= minimumPaise
-          ? (hasPayoutDetails ? 'You can request a secure withdrawal now.' : 'Add payout details to unlock withdrawals.')
-          : balancePaise > 0
-            ? `Earn ${P.moneyExact(minimumPaise - balancePaise)} more to reach the ₹100 minimum.`
-          : 'Call earnings are credited automatically after each connected call.';
-
-      const amountInput = $('#withdrawalAmount');
-      amountInput.min = String(minimumPaise / 100);
-      amountInput.max = String(Math.max(0, balancePaise) / 100);
-      $('#withdrawalSubmit').disabled = !summary.canWithdraw;
-      $('#withdrawalSubmit').textContent = pendingWithdrawal ? 'Request under review' : 'Request withdrawal';
-      $('#withdrawalHint').textContent = pendingWithdrawal
-        ? `${P.moneyExact(pendingWithdrawal.amount_paise)} requested ${P.date(pendingWithdrawal.requested_at)}. Your balance is reserved until review.`
-        : `Minimum ${P.moneyExact(minimumPaise)} · Available ${P.moneyExact(balancePaise)}`;
-      $('#withdrawalStatus').className = `withdrawal-status ${pendingWithdrawal ? 'pending' : summary.canWithdraw ? 'ready' : 'locked'}`;
-      $('#withdrawalStatus').innerHTML = pendingWithdrawal
-        ? `<b>Withdrawal pending</b><p>${P.moneyExact(pendingWithdrawal.amount_paise)} is waiting for administrator review. You can make another request after this one is paid or declined.</p>`
-        : summary.canWithdraw
-          ? `<b>Ready to withdraw</b><p>Request from ${P.moneyExact(minimumPaise)} up to ${P.moneyExact(balancePaise)} using your saved payout details.</p>`
-          : `<b>${balancePaise < minimumPaise ? '₹100 minimum' : 'Add payout details'}</b><p>${balancePaise < minimumPaise ? `Your balance needs ${P.moneyExact(minimumPaise - balancePaise)} more before withdrawal.` : 'Save a UPI ID or UPI-linked mobile number to continue.'}</p>`;
-      $('#withdrawalHistory').innerHTML = response.withdrawals?.length
-        ? response.withdrawals.map((request) => {
-          const destination = request.payout_upi_id || request.payout_upi_phone || 'Saved payout method';
-          const reference = request.payment_reference ? ` · Ref ${request.payment_reference}` : '';
-          const note = request.admin_note || request.listener_note || '';
-          return `<article class="withdrawal-request"><div><span class="request-pill ${P.esc(request.status)}">${P.esc(request.status)}</span><strong>${P.moneyExact(request.amount_paise)}</strong><p>${P.esc(destination)}${P.esc(reference)}</p><small>${P.date(request.requested_at)}${note ? ` · ${P.esc(note)}` : ''}</small></div></article>`;
-        }).join('')
-        : '<p class="withdrawal-empty">No withdrawal requests yet.</p>';
+        : balancePaise > 0
+          ? `${P.moneyExact(balancePaise)} is awaiting manual payment by the administrator.`
+          : Number(summary.lifetimePaidPaise || 0) > 0
+            ? 'Your recorded earnings are fully settled. New call earnings will appear here automatically.'
+            : 'Call earnings are credited automatically after each connected call.';
 
       const labels = {
         call_credit: 'Call earnings',
-        payout: 'Paid withdrawal',
+        payout: 'Payment recorded',
         admin_adjustment: 'Administrator adjustment',
       };
       $('#walletHistory').innerHTML = response.transactions?.length
@@ -763,56 +728,15 @@
           const callDetail = entry.type === 'call_credit'
             ? `${P.duration(entry.billed_seconds)} at ${P.moneyExact(entry.rate_paise_per_minute)}/min`
             : '';
-          const payoutDestination = entry.type === 'payout'
-            ? `${entry.payout_upi_id || entry.payout_upi_phone || 'Saved payout method'}${entry.payment_reference ? ` · Ref ${entry.payment_reference}` : ''}`
+          const paymentDetail = entry.type === 'payout'
+            ? `${entry.payment_reference ? `Reference ${entry.payment_reference}` : 'Recorded by administrator'}`
             : '';
-          const detail = [callDetail || payoutDestination, entry.note].filter(Boolean).join(' · ');
+          const detail = [callDetail || paymentDetail, entry.note].filter(Boolean).join(' · ');
           return `<article class="wallet-entry ${amount < 0 ? 'debit' : 'credit'}"><div><strong>${P.esc(labels[entry.type] || entry.type)}</strong><p>${P.esc(detail || 'Wallet entry')}</p><small>${P.date(entry.created_at)}</small></div><b>${amount >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(amount))}</b></article>`;
         }).join('')
-        : emptyState('No wallet activity', 'Connected-call earnings and paid withdrawals will appear here.');
+        : emptyState('No wallet activity', 'Connected-call earnings and recorded payments will appear here.');
     } catch (error) {
       P.toast(error.message, 'error');
-    }
-  }
-
-  async function requestWithdrawal(event) {
-    event.preventDefault();
-    const amountPaise = Math.round(Number($('#withdrawalAmount').value) * 100);
-    if (!Number.isInteger(amountPaise) || amountPaise < 10_000) {
-      return P.toast('The minimum withdrawal amount is ₹100.', 'error');
-    }
-    const button = event.submitter;
-    button?.setAttribute('disabled', '');
-    try {
-      await P.api('/api/employee/wallet/withdrawals', {
-        method: 'POST',
-        body: JSON.stringify({ amountPaise, note: $('#withdrawalNote').value }),
-      });
-      event.target.reset();
-      P.toast('Withdrawal request sent securely.', 'success');
-      await loadWallet();
-    } catch (error) {
-      P.toast(error.message, 'error');
-      button?.removeAttribute('disabled');
-    }
-  }
-
-  async function savePayoutDetails(event) {
-    event.preventDefault();
-    const button = event.submitter;
-    button?.setAttribute('disabled', '');
-    try {
-      const response = await P.api('/api/employee/wallet/payout-details', {
-        method: 'PATCH',
-        body: JSON.stringify({ upiId: $('#walletUpiId').value, upiPhone: $('#walletUpiPhone').value }),
-      });
-      me = { ...me, upiId: response.upiId, upiPhone: response.upiPhone };
-      P.toast('Payout details saved.', 'success');
-      await loadWallet();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    } finally {
-      button?.removeAttribute('disabled');
     }
   }
 
