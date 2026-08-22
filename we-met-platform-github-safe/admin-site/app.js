@@ -21,7 +21,6 @@
   let tickets = [];
   let resets = [];
   let listenerWallets = [];
-  let withdrawalRequests = [];
   let auditEntries = [];
   const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let activePage = 'overview';
@@ -31,7 +30,7 @@
     overview: ['Overview', 'Live service health and operational summary'],
     customers: ['Customers', 'Accounts, contact records and wallet controls'],
     employees: ['Listeners', 'Presence, connected work time and call performance'],
-    payouts: ['Listener payouts', 'Review ₹100+ withdrawal requests and monitor wallet balances'],
+    wallets: ['Listener wallets', 'Adjust earnings balances and record manual payments'],
     plans: ['Plans', 'Talk-time pricing available after customer sign-in'],
     coupons: ['Coupons', 'Create and control wallet redeem codes'],
     calls: ['Calls', 'Every call, participant and connected duration'],
@@ -101,7 +100,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=6.8.1', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=6.9.0', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -163,7 +162,7 @@
     $('#refreshLive').onclick = () => loadLive();
     $('#reloadCustomers').onclick = () => loadUsers();
     $('#reloadEmployees').onclick = () => loadUsers();
-    $('#reloadPayouts').onclick = loadListenerWallets;
+    $('#reloadWallets').onclick = loadListenerWallets;
     $('#reloadCoupons').onclick = loadCoupons;
     $('#reloadCalls').onclick = loadCalls;
     $('#reloadReports').onclick = loadReports;
@@ -174,7 +173,7 @@
     $('#customerSearch').oninput = renderCustomers;
     $('#listenerSearch').oninput = renderEmployees;
     $('#listenerStatusFilter').onchange = renderEmployees;
-    $('#payoutSearch').oninput = renderListenerWallets;
+    $('#walletSearch').oninput = renderListenerWallets;
     $('#callSearch').oninput = renderCalls;
 
     document.addEventListener('click', handleActionClick);
@@ -193,8 +192,8 @@
     const d = target.dataset;
     if (d.editListener) return editListener(d.editListener);
     if (d.walletRate) return listenerRateModal(d.walletRate);
-    if (d.withdrawalReview) return reviewWithdrawalModal(d.withdrawalReview);
     if (d.walletAdjust) return adjustListenerWallet(d.walletAdjust);
+    if (d.walletPaid) return recordListenerPayment(d.walletPaid);
     if (d.minutes) return minutesModal(d.minutes);
     if (d.suspend) return suspendModal(d.suspend);
     if (d.block) return setUserStatus(d.block, d.status === 'blocked' ? 'active' : 'blocked');
@@ -287,7 +286,7 @@
       overview: () => { loadDashboard(); loadLive(); },
       customers: loadUsers,
       employees: loadUsers,
-      payouts: loadListenerWallets,
+      wallets: loadListenerWallets,
       plans: loadPlans,
       coupons: loadCoupons,
       calls: loadCalls,
@@ -305,7 +304,7 @@
       const count = role => data.users.find(item => item.role === role)?.count || 0;
       $('#mCustomers').textContent = count('customer');
       $('#mTalk').textContent = P.duration(data.totalTalkSeconds);
-      $('#mAttention').textContent = Number(data.openReports || 0) + Number(data.openTickets || 0) + Number(data.pendingWithdrawals || 0);
+      $('#mAttention').textContent = Number(data.openReports || 0) + Number(data.openTickets || 0);
       $('#callSummary').innerHTML = (data.calls || []).map(item => `<div><small>${P.esc(item.status)}</small><strong>${item.count}</strong><span>${P.duration(item.seconds)}</span></div>`).join('') || '<p class="empty-copy">No calls yet.</p>';
     } catch (error) { P.toast(error.message, 'error'); }
   }
@@ -371,12 +370,11 @@
       const listenerWalletSummary = data.listenerWalletSummary || {};
       const employeeMetrics = user.role === 'employee' ? `<section class="profile-section"><h3>Listener performance</h3><div class="profile-metrics"><article><small>Work today</small><strong>${P.duration(workStats.today_work_seconds)}</strong></article><article><small>Work this week</small><strong>${P.duration(workStats.week_work_seconds)}</strong></article><article><small>Total work</small><strong>${P.duration(workStats.total_work_seconds)}</strong></article><article><small>Break today</small><strong>${P.duration(workStats.today_break_seconds)}</strong></article><article><small>Talk today</small><strong>${P.duration(callStats.today_talk_seconds)}</strong></article><article><small>Talk this week</small><strong>${P.duration(callStats.week_talk_seconds)}</strong></article><article><small>Total talk</small><strong>${P.duration(callStats.total_talk_seconds)}</strong></article><article><small>Connected calls</small><strong>${Number(callStats.connected_calls || 0)}</strong></article></div></section><section class="profile-section"><h3>Recent availability sessions</h3><div class="activity-table">${(data.activitySessions || []).slice(0, 25).map(session => `<div><span class="pill ${session.state === 'online' ? 'available' : 'break'}">${P.esc(session.state)}</span><span><b>${P.duration(session.duration_seconds)}</b><small>${P.date(session.started_at)} → ${session.ended_at ? P.date(session.ended_at) : 'Now'}</small></span><small>${P.esc(session.end_reason || (session.ended_at ? 'Status changed' : 'Current session'))}</small></div>`).join('') || '<p>No availability sessions recorded.</p>'}</div></section>` : '';
       const listenerLedger = (data.listenerWallet || []).slice(0, 50).map(entry => `<div class="profile-row"><strong>${Number(entry.amount_paise) >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(Number(entry.amount_paise)))}</strong><span>${P.esc(entry.note || entry.type)}${entry.payment_reference ? ` • Ref ${P.esc(entry.payment_reference)}` : ''}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No listener wallet entries.</p>';
-      const withdrawalLedger = (data.listenerWithdrawals || []).slice(0, 30).map(request => `<div class="profile-row"><strong>${P.moneyExact(request.amount_paise)}</strong><span><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span>${request.payment_reference ? ` • Ref ${P.esc(request.payment_reference)}` : ''}${request.admin_note ? ` • ${P.esc(request.admin_note)}` : ''}</span><small>${P.date(request.requested_at)}</small></div>`).join('') || '<p>No withdrawal requests.</p>';
-      const listenerFinance = user.role === 'employee' ? `<section class="profile-section"><h3>Listener wallet</h3><div class="profile-metrics"><article><small>Current balance</small><strong>${P.moneyExact(listenerWalletSummary.balance_paise)}</strong></article><article><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></article><article><small>Earned today</small><strong>${P.moneyExact(listenerWalletSummary.today_earnings_paise)}</strong></article><article><small>Earned this week</small><strong>${P.moneyExact(listenerWalletSummary.week_earnings_paise)}</strong></article><article><small>Lifetime earned</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_earnings_paise)}</strong></article><article><small>Lifetime paid</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_paid_paise)}</strong></article></div><h3 class="profile-subtitle">Wallet ledger</h3><div class="profile-list">${listenerLedger}</div><h3 class="profile-subtitle">Withdrawal requests</h3><div class="profile-list">${withdrawalLedger}</div></section>` : '';
+      const listenerFinance = user.role === 'employee' ? `<section class="profile-section"><h3>Listener wallet</h3><div class="profile-metrics"><article><small>Current balance</small><strong>${P.moneyExact(listenerWalletSummary.balance_paise)}</strong></article><article><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></article><article><small>Earned today</small><strong>${P.moneyExact(listenerWalletSummary.today_earnings_paise)}</strong></article><article><small>Earned this week</small><strong>${P.moneyExact(listenerWalletSummary.week_earnings_paise)}</strong></article><article><small>Lifetime earned</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_earnings_paise)}</strong></article><article><small>Lifetime recorded paid</small><strong>${P.moneyExact(listenerWalletSummary.lifetime_paid_paise)}</strong></article></div><h3 class="profile-subtitle">Wallet ledger</h3><div class="profile-list">${listenerLedger}</div></section>` : '';
       const recentCalls = (data.calls || []).slice(0, 20).map(call => `<div class="profile-row"><div>${profileLink(call.customer_id, call.customer_name)} <span class="connection-arrow">↔</span> ${profileLink(call.employee_id, call.employee_name)}</div><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span><small>${P.duration(call.billed_seconds)}${user.role === 'employee' ? ` • ${P.moneyExact(call.listener_earnings_paise)}` : ''} • ${P.date(call.started_at || call.created_at)}</small></div>`).join('') || '<p>No calls recorded.</p>';
       const wallet = (data.wallet || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${Number(entry.seconds_delta) >= 0 ? '+' : '−'}${P.duration(Math.abs(Number(entry.seconds_delta)))}</strong><span>${P.esc(entry.note || entry.type)}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No wallet entries.</p>';
       const audit = (data.audits || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${P.esc(entry.action)}</strong><span>${P.esc(entry.admin_name || 'Administrator')}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No administrator changes recorded for this account.</p>';
-      modal(`${user.name} — full profile`, `<div class="full-profile"><section class="profile-identity">${user.role === 'employee' ? listenerAvatarMarkup(user, 'profile-avatar') : `<span class="customer-avatar profile-avatar">${P.esc(initials(user.name))}</span>`}<div><span class="eyebrow">${P.esc(user.role)} PROFILE</span><h2>${P.esc(user.name)}</h2><p>${P.esc(user.email || user.username || 'No login identifier')}</p></div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></section><div class="profile-facts"><div><small>Phone</small><strong>${user.phone ? `<a href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : 'Not provided'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div><div><small>Last login</small><strong>${user.last_login_at ? P.date(user.last_login_at) : 'Not recorded'}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div>${user.role === 'customer' ? `<div><small>Wallet</small><strong>${P.duration(user.balance_seconds)}</strong></div>` : ''}${user.role === 'employee' ? `<div><small>Employee ID</small><strong>${P.esc(user.employee_code || 'Not set')}</strong></div><div><small>Language</small><strong>${P.esc(user.listener_language || 'Malayalam')}</strong></div><div><small>Availability</small><strong>${P.esc(user.listener_availability || 'offline')}</strong></div><div><small>UPI ID</small><strong>${P.esc(user.upi_id || 'Not set')}</strong></div><div><small>UPI mobile</small><strong>${P.esc(user.upi_phone || 'Not set')}</strong></div><div><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div>` : ''}</div>${user.bio ? `<p class="profile-bio">${P.esc(user.bio)}</p>` : ''}${user.suspension_reason ? `<p class="profile-warning"><b>Restriction:</b> ${P.esc(user.suspension_reason)}${user.suspended_until ? ` until ${P.date(user.suspended_until)}` : ''}</p>` : ''}${employeeMetrics}${listenerFinance}<section class="profile-section"><h3>Recent calls</h3><div class="profile-list">${recentCalls}</div></section>${user.role === 'customer' ? `<section class="profile-section"><h3>Wallet activity</h3><div class="profile-list">${wallet}</div></section>` : ''}<section class="profile-section"><h3>Safety and support</h3><p>${(data.reports || []).length} report(s) • ${(data.support || []).length} support ticket(s)</p></section><section class="profile-section"><h3>Administrator history</h3><div class="profile-list">${audit}</div></section></div>`);
+      modal(`${user.name} — full profile`, `<div class="full-profile"><section class="profile-identity">${user.role === 'employee' ? listenerAvatarMarkup(user, 'profile-avatar') : `<span class="customer-avatar profile-avatar">${P.esc(initials(user.name))}</span>`}<div><span class="eyebrow">${P.esc(user.role)} PROFILE</span><h2>${P.esc(user.name)}</h2><p>${P.esc(user.email || user.username || 'No login identifier')}</p></div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></section><div class="profile-facts"><div><small>Phone</small><strong>${user.phone ? `<a href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : 'Not provided'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div><div><small>Last login</small><strong>${user.last_login_at ? P.date(user.last_login_at) : 'Not recorded'}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div>${user.role === 'customer' ? `<div><small>Wallet</small><strong>${P.duration(user.balance_seconds)}</strong></div>` : ''}${user.role === 'employee' ? `<div><small>Employee ID</small><strong>${P.esc(user.employee_code || 'Not set')}</strong></div><div><small>Language</small><strong>${P.esc(user.listener_language || 'Malayalam')}</strong></div><div><small>Availability</small><strong>${P.esc(user.listener_availability || 'offline')}</strong></div><div><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div>` : ''}</div>${user.bio ? `<p class="profile-bio">${P.esc(user.bio)}</p>` : ''}${user.suspension_reason ? `<p class="profile-warning"><b>Restriction:</b> ${P.esc(user.suspension_reason)}${user.suspended_until ? ` until ${P.date(user.suspended_until)}` : ''}</p>` : ''}${employeeMetrics}${listenerFinance}<section class="profile-section"><h3>Recent calls</h3><div class="profile-list">${recentCalls}</div></section>${user.role === 'customer' ? `<section class="profile-section"><h3>Wallet activity</h3><div class="profile-list">${wallet}</div></section>` : ''}<section class="profile-section"><h3>Safety and support</h3><p>${(data.reports || []).length} report(s) • ${(data.support || []).length} support ticket(s)</p></section><section class="profile-section"><h3>Administrator history</h3><div class="profile-list">${audit}</div></section></div>`);
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
@@ -385,7 +383,7 @@
     if (!user) return;
     let profileImageDraft = user.profile_image || '';
     const avatarOptions = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-admin-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="assets/${avatar}" alt=""></button>`).join('');
-    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><div class="admin-profile-photo-editor"><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(profileImageDraft,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Customer-facing profile photo</strong><p>Upload a photo or choose one of the built-in We Met avatars.</p><div class="profile-photo-actions"><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload photo</button><button id="adminAutoListenerAvatar" class="ghost" type="button">Automatic avatar</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div id="adminAvatarGrid" class="avatar-picker">${avatarOptions}</div></div><label>Name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Username<input id="editListenerUsername" value="${P.esc(user.username || '')}"></label><label>Email<input id="editListenerEmail" type="email" value="${P.esc(user.email || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Phone<input id="editListenerPhone" value="${P.esc(user.phone || '')}"></label><label>UPI ID<input id="editListenerUpi" value="${P.esc(user.upi_id || '')}" placeholder="name@bank"></label><label>UPI-linked mobile<input id="editListenerUpiPhone" inputmode="tel" value="${P.esc(user.upi_phone || '')}"></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
+    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><div class="admin-profile-photo-editor"><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(profileImageDraft,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Customer-facing profile photo</strong><p>Upload a photo or choose one of the built-in We Met avatars.</p><div class="profile-photo-actions"><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload photo</button><button id="adminAutoListenerAvatar" class="ghost" type="button">Automatic avatar</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div id="adminAvatarGrid" class="avatar-picker">${avatarOptions}</div></div><label>Name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Username<input id="editListenerUsername" value="${P.esc(user.username || '')}"></label><label>Email<input id="editListenerEmail" type="email" value="${P.esc(user.email || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Phone<input id="editListenerPhone" value="${P.esc(user.phone || '')}"></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
     const renderAvatarState = () => {
       $('#editListenerPhotoPreview').src = profileImageSrc(profileImageDraft, $('#editListenerName').value || user.name, user.id);
       $$('#adminAvatarGrid [data-admin-avatar]').forEach(button => button.classList.toggle('selected', button.dataset.adminAvatar === profileImageDraft));
@@ -398,7 +396,7 @@
     $('#editListenerForm').onsubmit = async event => {
       event.preventDefault();
       try {
-        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, email: $('#editListenerEmail').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, upiId: $('#editListenerUpi').value, upiPhone: $('#editListenerUpiPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value, profileImage: profileImageDraft }) });
+        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, email: $('#editListenerEmail').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value, profileImage: profileImageDraft }) });
         closeAdminModal(); P.toast('Listener updated.', 'success'); loadUsers(); loadListenerWallets(); loadLive(true);
       } catch (error) { P.toast(error.message, 'error'); }
     };
@@ -406,12 +404,8 @@
 
   async function loadListenerWallets() {
     try {
-      const [walletData, withdrawalData] = await Promise.all([
-        P.api('/api/admin/listener-wallets'),
-        P.api('/api/admin/withdrawals'),
-      ]);
+      const walletData = await P.api('/api/admin/listener-wallets');
       listenerWallets = walletData.wallets || [];
-      withdrawalRequests = withdrawalData.requests || [];
       renderListenerWallets();
     } catch (error) {
       P.toast(error.message, 'error');
@@ -419,29 +413,16 @@
   }
 
   function renderListenerWallets() {
-    const query = ($('#payoutSearch')?.value || '').trim().toLowerCase();
-    const list = listenerWallets.filter(item => `${item.name} ${item.email || ''} ${item.employee_code || ''} ${item.upi_id || ''} ${item.upi_phone || ''}`.toLowerCase().includes(query));
-    const requestList = withdrawalRequests.filter(item => `${item.listener_name} ${item.listener_email || ''} ${item.employee_code || ''} ${item.payout_upi_id || ''} ${item.payout_upi_phone || ''}`.toLowerCase().includes(query));
+    const query = ($('#walletSearch')?.value || '').trim().toLowerCase();
+    const list = listenerWallets.filter(item => `${item.name} ${item.email || ''} ${item.employee_code || ''} ${item.listener_language || ''}`.toLowerCase().includes(query));
     const total = field => listenerWallets.reduce((sum, item) => sum + Number(item[field] || 0), 0);
-    const pending = withdrawalRequests.filter(request => request.status === 'pending');
-    $('#payoutPendingCount').textContent = pending.length;
-    $('#payoutPendingTotal').textContent = P.moneyExact(pending.reduce((sum, request) => sum + Number(request.amount_paise || 0), 0));
-    $('#payoutDueTotal').textContent = P.moneyExact(total('balance_paise'));
-    $('#payoutPaidTotal').textContent = P.moneyExact(total('lifetime_paid_paise'));
-    $('#withdrawalRequests').innerHTML = requestList.length ? requestList.map(request => {
-      const destination = [request.payout_upi_id, request.payout_upi_phone].filter(Boolean).join(' • ');
-      const detail = request.status === 'paid'
-        ? `Paid ${P.date(request.paid_at)}${request.payment_reference ? ` · Ref ${P.esc(request.payment_reference)}` : ''}`
-        : request.status === 'declined'
-          ? `Declined ${P.date(request.reviewed_at)}`
-          : `Requested ${P.date(request.requested_at)}`;
-      return `<article class="withdrawal-queue-card ${P.esc(request.status)}"><div class="withdrawal-identity">${listenerAvatarMarkup({ id: request.employee_id, name: request.listener_name, profile_image: request.profile_image })}<div>${profileLink(request.employee_id, request.listener_name, request.employee_code || request.listener_email)}<p>${P.esc(destination)}</p></div></div><div class="withdrawal-request-amount"><small>Requested</small><strong>${P.moneyExact(request.amount_paise)}</strong><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span></div><div class="withdrawal-request-meta"><span>${detail}</span>${request.listener_note ? `<p><b>Listener:</b> ${P.esc(request.listener_note)}</p>` : ''}${request.admin_note ? `<p><b>Admin:</b> ${P.esc(request.admin_note)}</p>` : ''}</div>${request.status === 'pending' ? `<button class="primary" data-withdrawal-review="${request.id}">Review request</button>` : '<span class="review-complete">Review complete</span>'}</article>`;
-    }).join('') : '<p class="empty-copy">No withdrawal requests match this search.</p>';
+    $('#listenerWalletCount').textContent = listenerWallets.length;
+    $('#listenerWalletBalance').textContent = P.moneyExact(total('balance_paise'));
+    $('#listenerWalletEarned').textContent = P.moneyExact(total('lifetime_earnings_paise'));
+    $('#listenerWalletPaid').textContent = P.moneyExact(total('lifetime_paid_paise'));
     $('#listenerWalletCards').innerHTML = list.length ? list.map(item => {
-      const payoutMethod = [item.upi_id, item.upi_phone].filter(Boolean).join(' • ') || 'Payout details not added';
       const balance = Number(item.balance_paise || 0);
-      const reserved = Number(item.pending_withdrawal_paise || 0);
-      return `<article class="listener-wallet-card"><header>${listenerAvatarMarkup(item)}<div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(payoutMethod)}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span>${reserved ? '<span class="pill pending">withdrawal pending</span>' : `<span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span>`}</div></header><div class="wallet-due"><small>Current wallet balance</small><strong>${P.moneyExact(balance)}</strong><span>${reserved ? `${P.moneyExact(reserved)} reserved by listener request` : balance >= 10000 ? 'Listener can request a withdrawal' : '₹100 minimum before withdrawal'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Paid out</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last paid</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions">${item.pending_withdrawal_id ? `<button class="primary" data-withdrawal-review="${item.pending_withdrawal_id}">Review request</button>` : ''}<button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
+      return `<article class="listener-wallet-card"><header>${listenerAvatarMarkup(item)}<div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(item.email || 'No email recorded')}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span></div></header><div class="wallet-due"><small>Current unpaid balance</small><strong>${P.moneyExact(balance)}</strong><span>${balance > 0 ? 'Record a payment only after the listener has been paid separately' : 'No unpaid listener earnings'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Recorded paid</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last payment</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions"><button class="primary" data-wallet-paid="${item.id}" ${balance > 0 ? '' : 'disabled'}>Record paid</button><button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
     }).join('') : '<p class="empty-copy">No listener wallets match this search.</p>';
   }
 
@@ -465,25 +446,22 @@
     };
   }
 
-  function reviewWithdrawalModal(id) {
-    const request = withdrawalRequests.find(item => item.id === id && item.status === 'pending');
-    if (!request) return P.toast('This withdrawal request is no longer pending.', 'error');
-    const destination = [request.payout_upi_id, request.payout_upi_phone].filter(Boolean).join(' • ');
-    modal(`Review withdrawal — ${request.listener_name}`, `<form id="withdrawalReviewForm" class="stack"><div class="exact-payout"><small>Exact requested amount</small><strong>${P.moneyExact(request.amount_paise)}</strong><span>Send to ${P.esc(destination)}</span></div>${request.listener_note ? `<p class="modal-copy"><b>Listener note:</b> ${P.esc(request.listener_note)}</p>` : ''}<label>UPI transaction reference / UTR<input id="withdrawalPaymentReference" maxlength="160" placeholder="Required when confirming payment"></label><label>Administrator note<textarea id="withdrawalAdminNote" maxlength="500" placeholder="Optional for paid, recommended when declining"></textarea></label><p class="modal-copy">Confirm paid only after the exact amount has been sent. The wallet is debited once and the listener is notified.</p><div class="withdrawal-review-actions"><button class="primary" data-review-action="paid">Confirm paid</button><button class="danger" data-review-action="declined">Decline request</button></div></form>`);
-    $('#withdrawalReviewForm').onsubmit = async event => {
+  function recordListenerPayment(id) {
+    const listener = listenerWallets.find(item => item.id === id);
+    if (!listener) return;
+    const balance = Number(listener.balance_paise || 0);
+    if (balance <= 0) return P.toast('This listener has no unpaid wallet balance.', 'error');
+    modal(`Record payment — ${listener.name}`, `<form id="listenerPaymentForm" class="stack"><div class="exact-payment"><small>Current unpaid balance</small><strong>${P.moneyExact(balance)}</strong><span>This action records a manual payment; it does not send money.</span></div><label>Amount paid in rupees<input id="listenerPaymentAmount" type="number" min="0.01" max="${balance / 100}" step="0.01" value="${balance / 100}" required></label><label>Payment reference (optional)<input id="listenerPaymentReference" maxlength="160" placeholder="Bank reference, receipt number or internal reference"></label><label>Administrator note<textarea id="listenerPaymentNote" maxlength="500" placeholder="Optional note shown in the wallet ledger"></textarea></label><p class="modal-copy">Use this only after the listener has been paid separately. The recorded amount is deducted from the listener wallet once and the listener is notified.</p><button class="primary">Record payment</button></form>`);
+    $('#listenerPaymentForm').onsubmit = async event => {
       event.preventDefault();
-      const action = event.submitter?.dataset.reviewAction;
-      if (!action) return;
-      if (action === 'paid' && !$('#withdrawalPaymentReference').value.trim()) {
-        return P.toast('Enter the payment reference before confirming.', 'error');
-      }
-      if (action === 'declined' && !confirm('Decline this withdrawal request? The reserved amount will become available again.')) return;
+      const amountPaise = Math.round(Number($('#listenerPaymentAmount').value) * 100);
+      if (!Number.isInteger(amountPaise) || amountPaise <= 0 || amountPaise > balance) return P.toast('Enter a payment amount up to the current wallet balance.', 'error');
       const button = event.submitter;
       button?.setAttribute('disabled', '');
       try {
-        await P.api(`/api/admin/withdrawals/${id}`, { method: 'PATCH', body: JSON.stringify({ action, paymentReference: $('#withdrawalPaymentReference').value, adminNote: $('#withdrawalAdminNote').value }) });
+        await P.api(`/api/admin/listener-wallets/${id}/mark-paid`, { method: 'POST', body: JSON.stringify({ amountPaise, paymentReference: $('#listenerPaymentReference').value, note: $('#listenerPaymentNote').value }) });
         closeAdminModal();
-        P.toast(action === 'paid' ? `${P.moneyExact(request.amount_paise)} recorded as paid.` : 'Withdrawal request declined.', 'success');
+        P.toast(`${P.moneyExact(amountPaise)} recorded as paid.`, 'success');
         loadListenerWallets(); loadDashboard(); loadUsers(); loadAudit();
       } catch (error) {
         button?.removeAttribute('disabled');
@@ -562,7 +540,7 @@
   async function createEmployee(event) {
     event.preventDefault();
     try {
-      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, email: $('#empEmail').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, upiId: $('#empUpi').value, upiPhone: $('#empUpiPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value }) });
+      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, email: $('#empEmail').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value }) });
       event.target.reset(); $('#empLanguage').value = 'Malayalam'; P.toast('Listener created.', 'success'); loadUsers();
     } catch (error) { P.toast(error.message, 'error'); }
   }

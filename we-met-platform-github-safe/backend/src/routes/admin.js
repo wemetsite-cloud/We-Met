@@ -47,23 +47,8 @@ function integer(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_I
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : null;
 }
 
-function upiId(value) {
-  const normalized = text(value, 120).toLowerCase();
-  if (!normalized) return null;
-  return /^[a-z0-9._-]{2,100}@[a-z0-9.-]{2,40}$/.test(normalized) ? normalized : false;
-}
-
-function upiPhone(value) {
-  const original = text(value, 40);
-  if (!original) return null;
-  const digits = original.replace(/\D/g, '');
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
-  return false;
-}
-
 router.get('/dashboard', asyncHandler(async (_req, res) => {
-  const [users, calls, reports, tickets, coupons, minutes, withdrawals] = await Promise.all([
+  const [users, calls, reports, tickets, coupons, minutes] = await Promise.all([
     db.query(`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role`),
     db.query(`
       SELECT status, COUNT(*)::int AS count,
@@ -75,10 +60,6 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     db.query(`SELECT COUNT(*)::int AS count FROM support_tickets WHERE status = 'open'`),
     db.query(`SELECT COUNT(*)::int AS count FROM coupons WHERE active = true`),
     db.query(`SELECT COALESCE(SUM(billed_seconds), 0)::bigint AS seconds FROM calls`),
-    db.query(`
-      SELECT COUNT(*)::int AS count,COALESCE(SUM(amount_paise),0)::bigint AS amount_paise
-      FROM listener_withdrawal_requests WHERE status='pending'
-    `),
   ]);
 
   res.json({
@@ -88,8 +69,6 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     openTickets: tickets.rows[0].count,
     activeCoupons: coupons.rows[0].count,
     totalTalkSeconds: Number(minutes.rows[0].seconds),
-    pendingWithdrawals: withdrawals.rows[0].count,
-    pendingWithdrawalPaise: Number(withdrawals.rows[0].amount_paise || 0),
   });
 }));
 
@@ -105,7 +84,7 @@ router.get('/users', asyncHandler(async (req, res) => {
 
   const result = await db.query(`
     SELECT u.id, u.role, u.name, u.username, u.email, u.phone, u.bio, CASE WHEN u.profile_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.profile_image END AS profile_image,
-           u.employee_code, u.upi_id, u.upi_phone, u.listener_rate_paise,
+           u.employee_code, u.listener_rate_paise,
            u.listener_availability, u.listener_language,
            u.balance_seconds, u.status, u.suspended_until, u.suspension_reason,
            u.last_login_at, u.last_seen_at, u.created_at,
@@ -161,8 +140,6 @@ router.post('/employees', asyncHandler(async (req, res) => {
   const email = text(req.body.email, 180).toLowerCase();
   const password = String(req.body.password || '');
   const phone = text(req.body.phone, 30) || null;
-  const listenerUpiId = upiId(req.body.upiId);
-  const listenerUpiPhone = upiPhone(req.body.upiPhone);
   const bio = text(req.body.bio, 500) || null;
   const language = text(req.body.language, 60) || 'Malayalam';
   const ratePaise = integer(req.body.ratePaise, { min: 0, max: 10_000_000 });
@@ -175,8 +152,6 @@ router.post('/employees', asyncHandler(async (req, res) => {
       error: 'Enter a valid name, email address, and a password with at least 8 characters.',
     });
   }
-  if (listenerUpiId === false) return res.status(400).json({ error: 'Enter a valid listener UPI ID.' });
-  if (listenerUpiPhone === false) return res.status(400).json({ error: 'Enter a valid UPI-linked mobile number.' });
   if (ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
   if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
@@ -188,11 +163,11 @@ router.post('/employees', asyncHandler(async (req, res) => {
   try {
     const result = await db.query(`
       INSERT INTO users (
-        role, name, username, email, phone, upi_id, upi_phone, bio, employee_code,
+        role, name, username, email, phone, bio, employee_code,
         listener_language, listener_rate_paise, password_hash
       )
-      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING id, role, name, username, email, phone, upi_id, upi_phone, bio,
+      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, role, name, username, email, phone, bio,
                 employee_code, listener_availability, listener_language,
                 listener_rate_paise, status, created_at
     `, [
@@ -200,8 +175,6 @@ router.post('/employees', asyncHandler(async (req, res) => {
       username,
       email,
       phone,
-      listenerUpiId,
-      listenerUpiPhone,
       bio,
       employeeCode,
       language,
@@ -225,9 +198,6 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   const username = text(req.body.username, 80).toLowerCase() || null;
   const email = text(req.body.email, 180).toLowerCase();
   const phone = text(req.body.phone, 30) || null;
-  const listenerUpiId = upiId(req.body.upiId);
-  const hasUpiPhone = Object.hasOwn(req.body, 'upiPhone');
-  const listenerUpiPhone = hasUpiPhone ? upiPhone(req.body.upiPhone) : null;
   const bio = text(req.body.bio, 500) || null;
   const profileImage = normalizeProfileImage(req.body.profileImage);
   const language = text(req.body.language, 60) || 'Malayalam';
@@ -240,22 +210,18 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
     return res.status(400).json({ error: 'Username may contain only letters, numbers, dots, underscores, and hyphens.' });
   }
-  if (listenerUpiId === false) return res.status(400).json({ error: 'Enter a valid listener UPI ID.' });
-  if (listenerUpiPhone === false) return res.status(400).json({ error: 'Enter a valid UPI-linked mobile number.' });
   if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
   if (hasRate && ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
   try {
     const result = await db.query(`
       UPDATE users
-      SET name=$2,username=$3,email=$4,phone=$5,upi_id=$6,
-          upi_phone=CASE WHEN $9::boolean THEN $7 ELSE upi_phone END,
-          bio=$8,listener_language=$10,
-          listener_rate_paise=CASE WHEN $11::boolean THEN $12 ELSE listener_rate_paise END,
-          profile_image=CASE WHEN $13::boolean THEN $14 ELSE profile_image END,
+      SET name=$2,username=$3,email=$4,phone=$5,bio=$6,listener_language=$7,
+          listener_rate_paise=CASE WHEN $8::boolean THEN $9 ELSE listener_rate_paise END,
+          profile_image=CASE WHEN $10::boolean THEN $11 ELSE profile_image END,
           updated_at=now()
       WHERE id=$1 AND role='employee'
-      RETURNING id,role,name,username,email,phone,upi_id,upi_phone,bio,profile_image,employee_code,
+      RETURNING id,role,name,username,email,phone,bio,profile_image,employee_code,
                 listener_availability,listener_language,listener_rate_paise,status,created_at
     `, [
       req.params.id,
@@ -263,10 +229,7 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
       username,
       email,
       phone,
-      listenerUpiId,
-      listenerUpiPhone,
       bio,
-      hasUpiPhone,
       language,
       hasRate,
       ratePaise,
@@ -408,7 +371,6 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     wallet,
     listenerWallet,
     listenerWalletSummary,
-    listenerWithdrawals,
     reports,
     support,
     callAnalytics,
@@ -418,7 +380,7 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
   ] = await Promise.all([
     db.query(`
       SELECT id, role, name, username, email, phone, bio, CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
-             employee_code, upi_id, upi_phone, listener_rate_paise,
+             employee_code, listener_rate_paise,
              listener_availability, listener_language,
              balance_seconds, status, suspended_until, suspension_reason,
              last_login_at, last_seen_at, created_at, updated_at
@@ -459,14 +421,6 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
              ),0)::bigint AS week_earnings_paise
       FROM listener_wallet_transactions
       WHERE employee_id=$1
-    `, [req.params.id]),
-    db.query(`
-      SELECT id,amount_paise,payout_upi_id,payout_upi_phone,listener_note,status,
-             payment_reference,admin_note,requested_at,reviewed_at,paid_at
-      FROM listener_withdrawal_requests
-      WHERE employee_id=$1
-      ORDER BY requested_at DESC
-      LIMIT 100
     `, [req.params.id]),
     db.query(`
       SELECT r.*, reporter.name AS reporter_name, target.name AS target_name
@@ -535,7 +489,6 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     wallet: wallet.rows,
     listenerWallet: listenerWallet.rows,
     listenerWalletSummary: listenerWalletSummary.rows[0],
-    listenerWithdrawals: listenerWithdrawals.rows,
     reports: reports.rows,
     support: support.rows,
     callAnalytics: callAnalytics.rows[0],
@@ -547,17 +500,14 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
 
 router.get('/listener-wallets', asyncHandler(async (_req, res) => {
   const result = await db.query(`
-    SELECT u.id,u.name,u.email,u.phone,CASE WHEN u.profile_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.profile_image END AS profile_image,u.employee_code,u.upi_id,u.upi_phone,
+    SELECT u.id,u.name,u.email,u.phone,CASE WHEN u.profile_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.profile_image END AS profile_image,u.employee_code,
            u.listener_rate_paise,u.listener_language,u.listener_availability,u.status,
            COALESCE(wallet.balance_paise,0)::bigint AS balance_paise,
            COALESCE(wallet.lifetime_earnings_paise,0)::bigint AS lifetime_earnings_paise,
            COALESCE(wallet.lifetime_paid_paise,0)::bigint AS lifetime_paid_paise,
            COALESCE(wallet.today_earnings_paise,0)::bigint AS today_earnings_paise,
            COALESCE(wallet.week_earnings_paise,0)::bigint AS week_earnings_paise,
-           wallet.last_paid_at,
-           pending.id AS pending_withdrawal_id,
-           pending.amount_paise::bigint AS pending_withdrawal_paise,
-           pending.requested_at AS pending_withdrawal_requested_at
+           wallet.last_paid_at
     FROM users u
     LEFT JOIN LATERAL (
       SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
@@ -573,12 +523,6 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
       FROM listener_wallet_transactions t
       WHERE t.employee_id=u.id
     ) wallet ON true
-    LEFT JOIN LATERAL (
-      SELECT id,amount_paise,requested_at
-      FROM listener_withdrawal_requests
-      WHERE employee_id=u.id AND status='pending'
-      LIMIT 1
-    ) pending ON true
     WHERE u.role='employee'
     ORDER BY COALESCE(wallet.balance_paise,0) DESC,u.name
   `);
@@ -592,33 +536,7 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
       lifetime_paid_paise: Number(row.lifetime_paid_paise || 0),
       today_earnings_paise: Number(row.today_earnings_paise || 0),
       week_earnings_paise: Number(row.week_earnings_paise || 0),
-      pending_withdrawal_paise: Number(row.pending_withdrawal_paise || 0),
     })),
-  });
-}));
-
-router.get('/withdrawals', asyncHandler(async (_req, res) => {
-  const result = await db.query(`
-    SELECT request.id,request.employee_id,request.amount_paise,request.payout_upi_id,
-           request.payout_upi_phone,request.listener_note,request.status,
-           request.payment_reference,request.admin_note,request.requested_at,
-           request.reviewed_at,request.paid_at,listener.name AS listener_name,
-           listener.email AS listener_email,listener.employee_code,
-           CASE WHEN listener.profile_image LIKE 'data:image/%' THEN 'photo:'||listener.id::text ELSE listener.profile_image END AS profile_image,
-           reviewer.name AS reviewer_name
-    FROM listener_withdrawal_requests request
-    JOIN users listener ON listener.id=request.employee_id
-    LEFT JOIN users reviewer ON reviewer.id=request.reviewed_by
-    ORDER BY CASE request.status WHEN 'pending' THEN 0 WHEN 'paid' THEN 1 ELSE 2 END,
-             request.requested_at DESC
-    LIMIT 1000
-  `);
-  res.json({
-    requests: result.rows.map((request) => ({
-      ...request,
-      amount_paise: Number(request.amount_paise || 0),
-    })),
-    minimumWithdrawalPaise: 10_000,
   });
 }));
 
@@ -642,97 +560,84 @@ router.patch('/listener-wallets/:id/rate', asyncHandler(async (req, res) => {
   res.json({ listener: { ...listener, listener_rate_paise: Number(listener.listener_rate_paise) } });
 }));
 
-router.patch('/withdrawals/:id', asyncHandler(async (req, res) => {
-  const action = text(req.body.action, 20).toLowerCase();
+router.post('/listener-wallets/:id/mark-paid', asyncHandler(async (req, res) => {
+  const requestedAmount = req.body.amountPaise === undefined || req.body.amountPaise === null || req.body.amountPaise === ''
+    ? null
+    : integer(req.body.amountPaise, { min: 1, max: 100_000_000 });
   const paymentReference = text(req.body.paymentReference, 160) || null;
-  const adminNote = text(req.body.adminNote, 500) || null;
-  if (!['paid', 'declined'].includes(action)) {
-    return res.status(400).json({ error: 'Choose paid or declined.' });
+  const note = text(req.body.note, 500) || 'Manual listener payment recorded by administrator';
+  if (req.body.amountPaise !== undefined && requestedAmount === null) {
+    return res.status(400).json({ error: 'Enter a valid positive payment amount.' });
   }
-  if (action === 'paid' && (!paymentReference || paymentReference.length < 3)) {
-    return res.status(400).json({ error: 'Enter the UPI transaction reference before confirming payment.' });
+  if (paymentReference && paymentReference.length < 3) {
+    return res.status(400).json({ error: 'Payment reference must contain at least 3 characters.' });
   }
 
   const output = await db.transaction(async (client) => {
-    const preliminary = await client.query(`
-      SELECT employee_id FROM listener_withdrawal_requests WHERE id=$1
+    const employeeResult = await client.query(`
+      SELECT id,name FROM users
+      WHERE id=$1 AND role='employee'
+      FOR UPDATE
     `, [req.params.id]);
-    if (!preliminary.rows[0]) throw Object.assign(new Error('Withdrawal request not found.'), { status: 404 });
-    const listener = await client.query(`
-      SELECT id FROM users WHERE id=$1 AND role='employee' FOR UPDATE
-    `, [preliminary.rows[0].employee_id]);
-    if (!listener.rows[0]) throw Object.assign(new Error('Listener account not found.'), { status: 404 });
-    const found = await client.query(`
-      SELECT request.*,listener.name AS listener_name
-      FROM listener_withdrawal_requests request
-      JOIN users listener ON listener.id=request.employee_id
-      WHERE request.id=$1
-      FOR UPDATE OF request
-    `, [req.params.id]);
-    const request = found.rows[0];
-    if (!request) throw Object.assign(new Error('Withdrawal request not found.'), { status: 404 });
-    if (request.status !== 'pending') {
-      throw Object.assign(new Error('This withdrawal request has already been reviewed.'), { status: 409 });
-    }
+    const employee = employeeResult.rows[0];
+    if (!employee) throw Object.assign(new Error('Listener not found.'), { status: 404 });
 
-    if (action === 'paid') {
+    if (paymentReference) {
       await client.query('SELECT pg_advisory_xact_lock(hashtext(lower($1)))', [paymentReference]);
       const duplicateReference = await client.query(`
-        SELECT id FROM listener_withdrawal_requests
-        WHERE id<>$1 AND status='paid' AND lower(payment_reference)=lower($2)
+        SELECT id FROM listener_wallet_transactions
+        WHERE type='payout' AND lower(payment_reference)=lower($1)
         LIMIT 1
-      `, [request.id, paymentReference]);
+      `, [paymentReference]);
       if (duplicateReference.rows[0]) {
-        throw Object.assign(new Error('This payment reference was already used for another withdrawal.'), { status: 409 });
+        throw Object.assign(new Error('This payment reference was already recorded.'), { status: 409 });
       }
-      const balanceResult = await client.query(`
-        SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
-        FROM listener_wallet_transactions WHERE employee_id=$1
-      `, [request.employee_id]);
-      const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
-      const amountPaise = Number(request.amount_paise || 0);
-      if (amountPaise > balancePaise) {
-        throw Object.assign(new Error('The listener wallet no longer has enough balance for this withdrawal.'), { status: 409 });
-      }
-      await client.query(`
-        INSERT INTO listener_wallet_transactions(
-          employee_id,type,amount_paise,reference_id,payout_upi_id,payout_upi_phone,
-          payment_reference,note,created_by
-        ) VALUES($1,'payout',$2,$3,$4,$5,$6,$7,$8)
-      `, [
-        request.employee_id,
-        -amountPaise,
-        request.id,
-        request.payout_upi_id,
-        request.payout_upi_phone,
-        paymentReference,
-        adminNote || 'Listener withdrawal paid',
-        req.user.id,
-      ]);
     }
 
-    const updated = await client.query(`
-      UPDATE listener_withdrawal_requests
-      SET status=$2,payment_reference=$3,admin_note=$4,reviewed_by=$5,
-          reviewed_at=now(),paid_at=CASE WHEN $2='paid' THEN now() ELSE NULL END,updated_at=now()
-      WHERE id=$1
+    const balanceResult = await client.query(`
+      SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+      FROM listener_wallet_transactions
+      WHERE employee_id=$1
+    `, [employee.id]);
+    const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
+    if (balancePaise <= 0) {
+      throw Object.assign(new Error('This listener has no unpaid wallet balance.'), { status: 409 });
+    }
+    const amountPaise = requestedAmount ?? balancePaise;
+    if (amountPaise > balancePaise) {
+      throw Object.assign(new Error('The payment amount is higher than the listener wallet balance.'), { status: 409 });
+    }
+
+    const transaction = await client.query(`
+      INSERT INTO listener_wallet_transactions(
+        employee_id,type,amount_paise,payment_reference,note,created_by
+      ) VALUES($1,'payout',$2,$3,$4,$5)
       RETURNING *
-    `, [request.id, action, action === 'paid' ? paymentReference : null, adminNote, req.user.id]);
-    const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(request.amount_paise) / 100);
-    const title = action === 'paid' ? 'Withdrawal paid' : 'Withdrawal declined';
-    const body = action === 'paid'
-      ? `${formatted} was paid to your saved payout method. Reference: ${paymentReference}.`
-      : `Your ${formatted} withdrawal request was declined.${adminNote ? ` ${adminNote}` : ''}`;
-    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.employee_id, title, body]);
-    return { request: updated.rows[0], employeeId: request.employee_id, notification: { title, body } };
+    `, [employee.id, -amountPaise, paymentReference, note, req.user.id]);
+
+    const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amountPaise / 100);
+    const title = 'Listener payment recorded';
+    const body = `${formatted} was recorded as paid by the administrator.${paymentReference ? ` Reference: ${paymentReference}.` : ''}`;
+    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [employee.id, title, body]);
+    return {
+      employee,
+      transaction: transaction.rows[0],
+      amountPaise,
+      balancePaise: balancePaise - amountPaise,
+      notification: { title, body },
+    };
   });
 
-  await req.app.locals.notifyUser?.(output.employeeId, {
+  await req.app.locals.notifyUser?.(output.employee.id, {
     ...output.notification,
     url: './',
-    tag: `we-met-withdrawal-${output.request.id}`,
+    tag: `we-met-listener-payment-${output.transaction.id}`,
   });
-  res.json({ request: { ...output.request, amount_paise: Number(output.request.amount_paise) } });
+  res.json({
+    transaction: { ...output.transaction, amount_paise: Number(output.transaction.amount_paise) },
+    paidPaise: output.amountPaise,
+    balancePaise: output.balancePaise,
+  });
 }));
 
 router.post('/listener-wallets/:id/adjust', asyncHandler(async (req, res) => {
@@ -761,15 +666,6 @@ router.post('/listener-wallets/:id/adjust', asyncHandler(async (req, res) => {
     const nextBalance = currentBalance + amountPaise;
     if (nextBalance < 0) {
       throw Object.assign(new Error('This adjustment would make the listener wallet negative.'), { status: 409 });
-    }
-    const pendingResult = await client.query(`
-      SELECT COALESCE(SUM(amount_paise),0)::bigint AS reserved_paise
-      FROM listener_withdrawal_requests
-      WHERE employee_id=$1 AND status='pending'
-    `, [employee.id]);
-    const reservedPaise = Number(pendingResult.rows[0].reserved_paise || 0);
-    if (nextBalance < reservedPaise) {
-      throw Object.assign(new Error('This adjustment would reduce the wallet below the amount reserved by a pending withdrawal.'), { status: 409 });
     }
 
     const transaction = await client.query(`

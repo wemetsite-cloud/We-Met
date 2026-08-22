@@ -410,6 +410,15 @@ CREATE INDEX IF NOT EXISTS idx_listener_wallet_employee ON listener_wallet_trans
 CREATE INDEX IF NOT EXISTS idx_listener_wallet_type ON listener_wallet_transactions(type,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_withdrawal_employee ON listener_withdrawal_requests(employee_id,requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_withdrawal_status ON listener_withdrawal_requests(status,requested_at DESC);
+
+-- Listener-initiated withdrawals were retired in v6.9.0. Keep historical rows for
+-- audit continuity, but close any request left pending by an older deployment.
+UPDATE listener_withdrawal_requests
+SET status='declined',
+    admin_note=COALESCE(admin_note,'Listener withdrawal requests are no longer used. Payments are recorded by an administrator.'),
+    reviewed_at=COALESCE(reviewed_at,now()),
+    updated_at=now()
+WHERE status='pending';
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
