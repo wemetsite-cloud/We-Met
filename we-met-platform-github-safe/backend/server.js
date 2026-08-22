@@ -134,6 +134,7 @@ if (config.serveFrontends) {
       || req.path.startsWith('/socket.io/')
       || req.path.startsWith('/customer')
       || req.path.startsWith('/employee')
+      || req.path.startsWith('/listener')
       || req.path.startsWith('/admin')
     ) return next();
 
@@ -150,10 +151,12 @@ if (config.serveFrontends) {
 
   app.use('/customer', portalStatic.customer);
   app.use('/employee', portalStatic.employee);
+  app.use('/listener', portalStatic.employee);
   app.use('/admin', portalStatic.admin);
 
   app.get('/customer', (_req, res) => res.sendFile(portalIndex.customer));
   app.get('/employee', (_req, res) => res.sendFile(portalIndex.employee));
+  app.get('/listener', (_req, res) => res.sendFile(portalIndex.employee));
   app.get('/admin', (_req, res) => res.sendFile(portalIndex.admin));
   app.get('/', (req, res) => {
     if (String(req.hostname || '').toLowerCase().startsWith('api.')) {
@@ -221,7 +224,7 @@ async function reconcileInterruptedListenerActivity() {
     console.log(`We Met running at ${config.publicUrl}`);
     if (config.serveFrontends) {
       console.log(`Customer: ${config.publicUrl}/customer/`);
-      console.log(`Listener: ${config.publicUrl}/employee/`);
+      console.log(`Listener: ${config.publicUrl}/listener/`);
       console.log(`Admin:    ${config.publicUrl}/admin/`);
     }
   });

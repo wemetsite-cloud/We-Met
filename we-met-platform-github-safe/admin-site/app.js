@@ -6,9 +6,12 @@
   const $$ = selector => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const NAVIGATION_MARKER = 'we-met-admin-navigation';
+  let sessionResetPending = false;
   window.addEventListener('portal:session-invalid', (event) => {
+    if (sessionResetPending) return;
+    sessionResetPending = true;
     P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
-    setTimeout(() => location.reload(), 700);
+    setTimeout(leaveAdminSession, 0);
   });
 
   let me = null;
@@ -95,12 +98,26 @@
     if (opening) history.pushState({ marker: NAVIGATION_MARKER, page: activePage, overlay: 'actionModal' }, document.title);
   }
 
-  async function registerFreshServiceWorker() {
+  async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.8.0', { updateViaCache: 'none' });
-      await registration.update();
+      return await navigator.serviceWorker.register('service-worker.js?v=6.8.1', { updateViaCache: 'none' });
     } catch { }
+  }
+
+  function leaveAdminSession() {
+    P.Store.clear();
+    clearInterval(liveRefreshTimer);
+    me = null;
+    users = [];
+    show('#loginView');
+    show('#appView', false);
+    show('#actionModal', false);
+    $('.layout')?.classList.remove('menu-open');
+    if ($('#password')) $('#password').value = '';
+    activePage = 'overview';
+    history.replaceState({ marker: NAVIGATION_MARKER, page: 'overview' }, document.title);
+    sessionResetPending = false;
   }
 
   async function copyText(value) {
@@ -125,7 +142,7 @@
 
   function bind() {
     $('#loginForm').onsubmit = login;
-    $('#logout').onclick = () => { P.Store.clear(); location.reload(); };
+    $('#logout').onclick = leaveAdminSession;
     $('#adminBackButton').onclick = () => { if (activePage !== 'overview') history.back(); };
     $('#menuBtn').onclick = () => $('.layout').classList.toggle('menu-open');
     $('#closeModal').onclick = () => closeAdminModal();
@@ -203,19 +220,27 @@
       openPage(page, { historyMode: 'none' });
     });
     bind();
-    registerFreshServiceWorker();
+    registerServiceWorker();
     if (P.Store.token) await loadMe();
   }
 
   async function login(event) {
     event.preventDefault();
+    const button = event.submitter;
+    button?.setAttribute('disabled', '');
+    button?.setAttribute('aria-busy', 'true');
     try {
       const data = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: $('#username').value, password: $('#password').value }) });
       if (data.user.role !== 'admin') throw new Error('This account does not have administrator access.');
       P.Store.token = data.token;
       me = data.user;
       enter();
-    } catch (error) { P.toast(error.message, 'error'); }
+    } catch (error) {
+      P.toast(error.message, 'error');
+    } finally {
+      button?.removeAttribute('disabled');
+      button?.removeAttribute('aria-busy');
+    }
   }
 
   async function loadMe() {
@@ -224,12 +249,14 @@
       if (data.user.role !== 'admin') throw new Error('Administrator access required.');
       me = data.user;
       enter();
-    } catch {
-      P.Store.clear();
+    } catch (error) {
+      if (P.isAuthError(error)) return;
+      P.toast('The server is temporarily unavailable. Your admin login is still saved; try again shortly.', 'error');
     }
   }
 
   function enter() {
+    sessionResetPending = false;
     show('#loginView', false);
     show('#appView');
     $('.admin-chip b').textContent = me.name || 'Administrator';
@@ -663,7 +690,7 @@
     try {
       await P.api('/api/auth/change-login', { method: 'POST', body: JSON.stringify({ newUsername: $('#adminNewUsername').value, currentPassword: $('#adminUsernamePassword').value }) });
       P.toast('Administrator username changed. Sign in again.', 'success');
-      setTimeout(() => { P.Store.clear(); location.reload(); }, 900);
+      setTimeout(leaveAdminSession, 900);
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
@@ -672,7 +699,7 @@
     try {
       await P.api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: $('#adminCurrent').value, newPassword: $('#adminNew').value }) });
       event.target.reset(); P.toast('Administrator password changed. All sessions were signed out.', 'success');
-      setTimeout(() => { P.Store.clear(); location.reload(); }, 900);
+      setTimeout(leaveAdminSession, 900);
     } catch (error) { P.toast(error.message, 'error'); }
   }
 

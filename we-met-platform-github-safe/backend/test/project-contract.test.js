@@ -94,9 +94,26 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, new RegExp(tokenKey));
     assert.match(api, /tokenRole\(token\)/);
     assert.match(api, /portal:session-invalid/);
+    assert.match(api, /isAuthError/);
+    assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '6\.8\.0'/);
+    assert.match(serviceWorker, /const VERSION = '6\.8\.1'/);
+    assert.doesNotMatch(serviceWorker, /client\.navigate/);
+    assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }
+});
+
+test('keeps portal startup non-blocking and provides stable same-origin staff URLs', () => {
+  const server = read('backend', 'server.js');
+  const listenerApp = read('employee-site', 'app.js');
+  const customerApp = read('customer-site', 'app.js');
+  const publicRoutes = read('backend', 'src', 'routes', 'public.js');
+  assert.match(server, /app\.use\('\/listener', portalStatic\.employee\)/);
+  assert.match(server, /app\.get\('\/listener'/);
+  assert.doesNotMatch(listenerApp, /await registerServiceWorker\(\)/);
+  assert.doesNotMatch(customerApp, /await registerServiceWorker\(\)/);
+  assert.match(publicRoutes, /directUpiEnabled: false/);
+  assert.doesNotMatch(publicRoutes, /verification screenshots|successful-payment screenshot/);
 });
 
 test('provides full clickable admin profiles and administrator audit history', () => {

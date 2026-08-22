@@ -5,6 +5,7 @@
   const base = String(config.API_BASE_URL || '').replace(/\/$/, '');
   const tokenKey = config.TOKEN_KEY || 'we_met_admin_token';
   const expectedRole = config.EXPECTED_ROLE || 'admin';
+  let sessionInvalidated = false;
 
   function tokenRole(token) {
     try {
@@ -16,6 +17,8 @@
 
   function invalidateSession(message) {
     localStorage.removeItem(tokenKey);
+    if (sessionInvalidated) return;
+    sessionInvalidated = true;
     window.dispatchEvent(new CustomEvent('portal:session-invalid', { detail: { message } }));
   }
 
@@ -28,7 +31,14 @@
       }
       return token;
     },
-    set token(value) { value ? localStorage.setItem(tokenKey, value) : localStorage.removeItem(tokenKey); },
+    set token(value) {
+      if (value) {
+        localStorage.setItem(tokenKey, value);
+        sessionInvalidated = false;
+      } else {
+        localStorage.removeItem(tokenKey);
+      }
+    },
     clear() { localStorage.removeItem(tokenKey); },
   };
 
@@ -51,6 +61,9 @@
       return data;
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('The server is taking too long to respond. Please try again.');
+      if (!error.status && (error instanceof TypeError || /failed to fetch|network error/i.test(error.message || ''))) {
+        throw Object.assign(new Error('Could not reach the We Met server. Check your connection and try again.'), { code: 'NETWORK_ERROR' });
+      }
       throw error;
     } finally {
       clearTimeout(timer);
@@ -91,6 +104,7 @@
   }
 
   function toast(message, type = 'info') {
+    const text = String(message || 'Something went wrong.');
     let box = document.querySelector('.toast-box');
     if (!box) {
       box = document.createElement('div');
@@ -98,9 +112,11 @@
       box.setAttribute('aria-live', 'polite');
       document.body.appendChild(box);
     }
+    if ([...box.children].some((child) => child.dataset.message === text)) return;
     const item = document.createElement('div');
     item.className = `toast ${type}`;
-    item.textContent = message;
+    item.dataset.message = text;
+    item.textContent = text;
     box.appendChild(item);
     requestAnimationFrame(() => item.classList.add('show'));
     setTimeout(() => {
@@ -128,6 +144,7 @@
     moneyExact,
     toast,
     notify,
+    isAuthError: (error) => error?.status === 401 || error?.code === 'ROLE_MISMATCH',
     socketUrl: base || location.origin,
   };
 })();
