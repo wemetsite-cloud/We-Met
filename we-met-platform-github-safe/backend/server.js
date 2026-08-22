@@ -46,7 +46,7 @@ app.use((req, res, next) => {
   }
   res.setHeader(
     'Content-Security-Policy',
-    `default-src 'self'; script-src 'self'; connect-src 'self' https: wss:${config.isProduction ? '' : ' ws:'}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'${config.isProduction ? '; upgrade-insecure-requests' : ''}`,
+    `default-src 'self'; script-src 'self' https://checkout.razorpay.com; connect-src 'self' https: wss:${config.isProduction ? '' : ' ws:'}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; object-src 'none'; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'${config.isProduction ? '; upgrade-insecure-requests' : ''}`,
   );
   next();
 });
@@ -65,6 +65,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
+app.use('/api', require('./src/routes/razorpay'));
 app.use('/api/customer/manual-payments', require('./src/routes/manual-payments'));
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/employee', require('./src/routes/employee'));

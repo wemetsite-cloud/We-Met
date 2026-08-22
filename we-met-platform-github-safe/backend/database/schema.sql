@@ -241,6 +241,24 @@ CREATE TABLE IF NOT EXISTS payment_submissions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS razorpay_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_id uuid REFERENCES plans(id) ON DELETE SET NULL,
+  plan_name text NOT NULL,
+  amount_paise integer NOT NULL CHECK (amount_paise >= 100),
+  currency text NOT NULL CHECK (currency = 'INR'),
+  seconds integer NOT NULL CHECK (seconds > 0),
+  receipt text NOT NULL UNIQUE,
+  razorpay_order_id text NOT NULL UNIQUE,
+  razorpay_payment_id text UNIQUE,
+  razorpay_signature text,
+  status text NOT NULL DEFAULT 'created' CHECK (status IN ('created','paid')),
+  paid_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Safe upgrades from earlier packages.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image text;
@@ -384,6 +402,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_submission_manual_intent ON payment
 CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_utr_live ON payment_submissions((lower(regexp_replace(utr_reference, '\s+', '', 'g')))) WHERE utr_reference IS NOT NULL AND status<>'declined';
 CREATE INDEX IF NOT EXISTS idx_payments_customer ON payment_submissions(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payment_submissions(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_razorpay_orders_customer ON razorpay_orders(customer_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_razorpay_orders_status ON razorpay_orders(status,created_at DESC);
 UPDATE plans SET active=false,updated_at=now()
 WHERE name IN ('Starter','Value','Silver','Gold','Queen','King');
 

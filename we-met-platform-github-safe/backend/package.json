@@ -1,8 +1,8 @@
 {
   "name": "we-met-backend",
-  "version": "6.6.1",
+  "version": "6.7.0",
   "private": true,
-  "description": "We Met backend for browser calls, listener profile photos/avatars, connected-second billing, listener earnings, payouts and verified direct UPI payments.",
+  "description": "We Met backend for browser calls, connected-second billing, listener earnings, payouts and verified Razorpay payments.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -21,6 +21,7 @@
     "multer": "^2.2.0",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
+    "razorpay": "^2.9.8",
     "socket.io": "^4.8.1",
     "web-push": "^3.6.7"
   }

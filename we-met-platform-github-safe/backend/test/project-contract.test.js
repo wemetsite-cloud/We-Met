@@ -6,23 +6,23 @@ const path = require('node:path');
 const projectRoot = path.resolve(__dirname, '..', '..');
 const read = (...parts) => fs.readFileSync(path.join(projectRoot, ...parts), 'utf8');
 
-function sourceFiles(directory) {
-  const files = [];
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === 'node_modules') continue;
-    const target = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...sourceFiles(target));
-    else if (/\.(?:js|json|html|css|xml|txt|yaml|yml|webmanifest)$/.test(entry.name)) files.push(target);
-  }
-  return files;
-}
-
-test('keeps the retired payment provider out of production source and dependencies', () => {
-  const retiredName = ['razor', 'pay'].join('');
-  const matches = sourceFiles(projectRoot).filter((file) => read(path.relative(projectRoot, file)).toLowerCase().includes(retiredName));
-  assert.deepEqual(matches, []);
+test('ships authenticated Razorpay checkout without exposing the secret to the frontend', () => {
+  const routes = read('backend', 'src', 'routes', 'razorpay.js');
+  const server = read('backend', 'server.js');
+  const customerHtml = read('customer-site', 'index.html');
+  const customerApp = read('customer-site', 'app.js');
   const packageJson = JSON.parse(read('backend', 'package.json'));
-  assert.equal(packageJson.dependencies[retiredName], undefined);
+  assert.ok(packageJson.dependencies.razorpay);
+  assert.match(server, /app\.use\('\/api', require\('\.\/src\/routes\/razorpay'\)\)/);
+  assert.match(routes, /router\.post\('\/create-order'/);
+  assert.match(routes, /router\.post\('\/verify-payment'/);
+  assert.match(routes, /requireRole\('customer'\)/);
+  assert.match(routes, /verifyPaymentSignature/);
+  assert.match(routes, /status='paid'/);
+  assert.match(customerHtml, /https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js/);
+  assert.match(customerApp, /razorpay_payment_id/);
+  assert.doesNotMatch(customerApp, /RAZORPAY_KEY_SECRET|keySecret/);
+  assert.match(read('.gitignore'), /^\.env$/m);
 });
 
 test('keeps talk-time plans behind customer authentication', () => {

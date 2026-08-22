@@ -1,11 +1,11 @@
 {
-  "version": "6.6.1",
-  "name": "We Met v6.6.1 listener visibility and UPI identity fix",
+  "version": "6.7.0",
+  "name": "We Met v6.7.0 Razorpay Standard Checkout",
   "changes": [
-    "Hides the customer live-listener discovery section completely when nobody is online",
-    "Uses Sabith Salah K P as the configured UPI payee name instead of forcing a provider name",
-    "Keeps the existing receiving UPI ID while restoring a unique transaction reference in direct UPI payment links",
-    "Keeps the working QR payment flow unchanged",
-    "Keeps Google Pay and generic UPI launch buttons with the corrected UPI payload"
+    "Creates authenticated Razorpay orders from server-validated talk-time pack prices",
+    "Opens Razorpay Standard Web Checkout from each customer pack button",
+    "Verifies the Razorpay HMAC-SHA256 signature on the backend",
+    "Credits each verified payment to the wallet exactly once",
+    "Handles checkout cancellation, payment failures and verification errors"
   ]
 }

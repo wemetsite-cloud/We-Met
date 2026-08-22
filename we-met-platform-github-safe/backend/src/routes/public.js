@@ -9,6 +9,7 @@ const router = express.Router();
 router.get('/config', (_req, res) => res.json({
   appName: config.appName,
   supportEmail: config.supportEmail,
+  razorpayEnabled: config.razorpay.enabled,
   directUpiEnabled: true,
   pushEnabled: config.webPush.enabled,
   vapidPublicKey: config.webPush.enabled ? config.webPush.publicKey : '',

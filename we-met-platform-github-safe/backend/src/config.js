@@ -33,6 +33,8 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const supportEmail = process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com';
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
+const razorpayKeyId = String(process.env.RAZORPAY_KEY_ID || '').trim();
+const razorpayKeySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
 const upiPaymentId = String(process.env.UPI_PAYMENT_ID || 'paytm.s3hc53w@pty').trim();
 const configuredUpiPayeeName = String(process.env.UPI_PAYMENT_PAYEE_NAME || '').trim();
 const upiPaymentPayeeName = (!configuredUpiPayeeName || /^paytm$/i.test(configuredUpiPayeeName))
@@ -58,6 +60,11 @@ const config = {
   publicUrl,
   serveFrontends: bool(process.env.SERVE_FRONTENDS, true),
   supportEmail,
+  razorpay: {
+    enabled: Boolean(razorpayKeyId && razorpayKeySecret),
+    keyId: razorpayKeyId,
+    keySecret: razorpayKeySecret,
+  },
   upiPayment: {
     enabled: true,
     payeeName: upiPaymentPayeeName,
@@ -140,6 +147,9 @@ function validateConfig() {
   }
   if (Boolean(config.webPush.publicKey) !== Boolean(config.webPush.privateKey)) {
     problems.push('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be configured together.');
+  }
+  if (Boolean(config.razorpay.keyId) !== Boolean(config.razorpay.keySecret)) {
+    problems.push('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be configured together.');
   }
   if (config.webPush.enabled && !/^[A-Za-z0-9_-]{80,100}$/.test(config.webPush.publicKey)) {
     problems.push('VAPID_PUBLIC_KEY is not a valid P-256 public key.');
