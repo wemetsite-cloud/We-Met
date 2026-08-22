@@ -5,6 +5,10 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
+  window.addEventListener('portal:session-invalid', (event) => {
+    P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
+    setTimeout(() => location.reload(), 700);
+  });
 
   let me = null;
   let profileImageDraft = '';
@@ -107,7 +111,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.6.1', { updateViaCache: 'none' });
+      const registration = await navigator.serviceWorker.register('service-worker.js?v=6.8.0', { updateViaCache: 'none' });
       await registration.update();
     } catch {}
   }
@@ -176,6 +180,7 @@
     $('#profileAutoAvatar').addEventListener('click', () => { profileImageDraft = ''; renderProfileImageEditor(); });
     $('#profileAvatarGrid').addEventListener('click', (event) => { const button = event.target.closest('[data-profile-avatar]'); if (!button) return; profileImageDraft = button.dataset.profileAvatar; renderProfileImageEditor(); });
     $('#payoutDetailsForm').addEventListener('submit', savePayoutDetails);
+    $('#withdrawalForm').addEventListener('submit', requestWithdrawal);
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#employeeEmailForm').addEventListener('submit', changeEmail);
     $('#refreshHistory').addEventListener('click', loadHistory);
@@ -690,11 +695,41 @@
       }
 
       const hasPayoutDetails = Boolean(summary.upiId || summary.upiPhone);
-      $('#walletPayoutStatus').textContent = Number(summary.ratePaisePerMinute || 0) <= 0
+      const pendingWithdrawal = response.pendingWithdrawal;
+      const minimumPaise = Number(summary.minimumWithdrawalPaise || 10_000);
+      const balancePaise = Number(summary.balancePaise || 0);
+      $('#walletPayoutStatus').textContent = pendingWithdrawal
+        ? `${P.moneyExact(pendingWithdrawal.amount_paise)} is reserved while your withdrawal is reviewed.`
+        : Number(summary.ratePaisePerMinute || 0) <= 0
         ? 'Your rate has not been set yet. Ask the administrator to set it before taking paid calls.'
-        : Number(summary.balancePaise || 0) > 0
-          ? (hasPayoutDetails ? 'This exact amount is ready for the administrator to mark paid.' : 'Add payout details so the administrator can pay this balance.')
+        : balancePaise >= minimumPaise
+          ? (hasPayoutDetails ? 'You can request a secure withdrawal now.' : 'Add payout details to unlock withdrawals.')
+          : balancePaise > 0
+            ? `Earn ${P.moneyExact(minimumPaise - balancePaise)} more to reach the ₹100 minimum.`
           : 'Call earnings are credited automatically after each connected call.';
+
+      const amountInput = $('#withdrawalAmount');
+      amountInput.min = String(minimumPaise / 100);
+      amountInput.max = String(Math.max(0, balancePaise) / 100);
+      $('#withdrawalSubmit').disabled = !summary.canWithdraw;
+      $('#withdrawalSubmit').textContent = pendingWithdrawal ? 'Request under review' : 'Request withdrawal';
+      $('#withdrawalHint').textContent = pendingWithdrawal
+        ? `${P.moneyExact(pendingWithdrawal.amount_paise)} requested ${P.date(pendingWithdrawal.requested_at)}. Your balance is reserved until review.`
+        : `Minimum ${P.moneyExact(minimumPaise)} · Available ${P.moneyExact(balancePaise)}`;
+      $('#withdrawalStatus').className = `withdrawal-status ${pendingWithdrawal ? 'pending' : summary.canWithdraw ? 'ready' : 'locked'}`;
+      $('#withdrawalStatus').innerHTML = pendingWithdrawal
+        ? `<b>Withdrawal pending</b><p>${P.moneyExact(pendingWithdrawal.amount_paise)} is waiting for administrator review. You can make another request after this one is paid or declined.</p>`
+        : summary.canWithdraw
+          ? `<b>Ready to withdraw</b><p>Request from ${P.moneyExact(minimumPaise)} up to ${P.moneyExact(balancePaise)} using your saved payout details.</p>`
+          : `<b>${balancePaise < minimumPaise ? '₹100 minimum' : 'Add payout details'}</b><p>${balancePaise < minimumPaise ? `Your balance needs ${P.moneyExact(minimumPaise - balancePaise)} more before withdrawal.` : 'Save a UPI ID or UPI-linked mobile number to continue.'}</p>`;
+      $('#withdrawalHistory').innerHTML = response.withdrawals?.length
+        ? response.withdrawals.map((request) => {
+          const destination = request.payout_upi_id || request.payout_upi_phone || 'Saved payout method';
+          const reference = request.payment_reference ? ` · Ref ${request.payment_reference}` : '';
+          const note = request.admin_note || request.listener_note || '';
+          return `<article class="withdrawal-request"><div><span class="request-pill ${P.esc(request.status)}">${P.esc(request.status)}</span><strong>${P.moneyExact(request.amount_paise)}</strong><p>${P.esc(destination)}${P.esc(reference)}</p><small>${P.date(request.requested_at)}${note ? ` · ${P.esc(note)}` : ''}</small></div></article>`;
+        }).join('')
+        : '<p class="withdrawal-empty">No withdrawal requests yet.</p>';
 
       const labels = {
         call_credit: 'Call earnings',
@@ -716,6 +751,28 @@
         : emptyState('No wallet activity', 'Connected-call earnings and paid withdrawals will appear here.');
     } catch (error) {
       P.toast(error.message, 'error');
+    }
+  }
+
+  async function requestWithdrawal(event) {
+    event.preventDefault();
+    const amountPaise = Math.round(Number($('#withdrawalAmount').value) * 100);
+    if (!Number.isInteger(amountPaise) || amountPaise < 10_000) {
+      return P.toast('The minimum withdrawal amount is ₹100.', 'error');
+    }
+    const button = event.submitter;
+    button?.setAttribute('disabled', '');
+    try {
+      await P.api('/api/employee/wallet/withdrawals', {
+        method: 'POST',
+        body: JSON.stringify({ amountPaise, note: $('#withdrawalNote').value }),
+      });
+      event.target.reset();
+      P.toast('Withdrawal request sent securely.', 'success');
+      await loadWallet();
+    } catch (error) {
+      P.toast(error.message, 'error');
+      button?.removeAttribute('disabled');
     }
   }
 

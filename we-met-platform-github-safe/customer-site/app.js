@@ -4,6 +4,10 @@
   const P = window.Portal;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
+  window.addEventListener('portal:session-invalid', (event) => {
+    P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
+    setTimeout(() => location.reload(), 700);
+  });
 
   let me = null;
   let publicConfig = null;
@@ -14,18 +18,12 @@
   let deferredInstallPrompt = null;
   let historyCalls = [];
   let paymentPlans = [];
-  let paymentSubmissions = [];
-  let currentCheckout = null;
-  let paymentPollTimer = null;
-  let proofPreviewUrl = '';
-  const paymentStatusSeen = new Map();
   let favoriteIds = new Set();
   let activeTab = 'home';
   let serviceWorkerRegistration = null;
   let pushSubscriptionActive = false;
   let otherLanguagesEnabled = localStorage.getItem('we_met_other_languages') === '1';
 
-  const ACTIVE_PAYMENT_KEY = 'we_met_active_payment';
   const NAVIGATION_MARKER = 'we-met-customer-navigation';
   const VALID_TABS = new Set(['home', 'wallet', 'history', 'favorites', 'notifications', 'support', 'profile']);
 
@@ -41,7 +39,6 @@
 
   function currentOverlay() {
     if (!$('#authModal')?.classList.contains('hidden')) return 'authModal';
-    if (!$('#paymentModal')?.classList.contains('hidden')) return 'paymentModal';
     if (!$('#legalModal')?.classList.contains('hidden')) return 'legalModal';
     if (!$('#callModal')?.classList.contains('hidden')) return 'callModal';
     return null;
@@ -69,10 +66,6 @@
 
   function hideManagedOverlays({ preserveCall = false } = {}) {
     show('#authModal', false);
-    if (!$('#paymentModal')?.classList.contains('hidden')) {
-      show('#paymentModal', false);
-      resetPaymentCheckout();
-    }
     show('#legalModal', false);
     if (!preserveCall && !$('#callModal')?.classList.contains('hidden')) minimizeCall({ historyMode: 'none' });
     setModalState();
@@ -83,7 +76,6 @@
       history.back();
       return;
     }
-    if (overlay === 'paymentModal') resetPaymentCheckout();
     if (overlay === 'callModal') minimizeCall({ historyMode: 'none' });
     else show(`#${overlay}`, false);
     setNavigationState({ overlay: null }, 'replace');
@@ -139,7 +131,7 @@
   async function registerFreshServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.7.0', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.8.0', { updateViaCache: 'none' });
       await serviceWorkerRegistration.update();
       return serviceWorkerRegistration;
     } catch {}
@@ -196,7 +188,6 @@
     $('#forgotForm').addEventListener('submit', forgot);
     $('#logoutBtn').addEventListener('click', () => logout());
     $('#notificationPermission').addEventListener('click', requestNotifications);
-    $('#paymentEnableAlerts').addEventListener('click', requestNotifications);
     $('#tabs').addEventListener('click', (event) => {
       const button = event.target.closest('[data-tab]');
       if (button) selectTab(button.dataset.tab, button);
@@ -208,21 +199,6 @@
     $('#callNow').addEventListener('click', () => requestCall());
     $('#refreshListeners').addEventListener('click', () => socket?.emit('listeners:get'));
     $('#couponForm').addEventListener('submit', redeem);
-    $('#refreshPayments').addEventListener('click', loadPayments);
-    $('#downloadUpiQr').addEventListener('click', saveUpiQr);
-    $('#payWithGooglePay').addEventListener('click', () => openUpiApp('google'));
-    $('#payWithAnyUpi').addEventListener('click', () => openUpiApp('upi'));
-    $('#manualTransferContinue').addEventListener('click', () => setPaymentStep('submit'));
-    $('#manualBackToTransfer').addEventListener('click', () => setPaymentStep('pay'));
-    $('#manualPaymentForm').addEventListener('submit', submitManualPayment);
-    $('#manualProof').addEventListener('change', previewManualProof);
-    $$('[data-copy-payment]').forEach((button) => button.addEventListener('click', () => {
-      copyValue($(`#${button.dataset.copyPayment}`)?.textContent?.trim(), 'Payment detail copied.');
-    }));
-    $('#checkPaymentNow').addEventListener('click', checkPaymentNow);
-    $('#paymentBackWallet').addEventListener('click', () => {
-      closePaymentCheckout();
-    });
     $('#copyRecoveryKey').addEventListener('click', () => copyValue($('#recoveryKey').value, 'Recovery key copied.'));
     $('#checkRecovery').addEventListener('click', checkRecovery);
     $('#resetCompleteForm').addEventListener('submit', completeRecovery);
@@ -244,9 +220,6 @@
         closeManagedOverlay('authModal');
       }
     });
-    document.addEventListener('visibilitychange', () => {
-      if (me && document.visibilityState === 'visible') loadPayments({ silent: true });
-    });
   }
 
   function applicationServerKey(value) {
@@ -263,11 +236,6 @@
       ? 'Alerts enabled'
       : (granted ? 'Finish alert setup' : 'Enable alerts');
     $('#notificationPermission').disabled = pushSubscriptionActive;
-    show('#paymentEnableAlerts', Boolean(
-      publicConfig?.pushEnabled
-      && 'Notification' in window
-      && Notification.permission === 'default',
-    ));
   }
 
   async function subscribeToPush({ prompt = false } = {}) {
@@ -352,7 +320,6 @@
     if (tab === 'history' || tab === 'wallet') loadHistory();
     if (tab === 'wallet') {
       loadPlans();
-      loadPayments();
     }
     if (tab === 'favorites') loadFavorites();
     if (tab === 'notifications') loadNotifications();
@@ -461,8 +428,6 @@
     loadFavorites();
     loadNotifications();
     loadPlans();
-    loadPayments();
-    startPaymentPolling();
     syncAlertControls();
     if ('Notification' in window && Notification.permission === 'granted') {
       subscribeToPush().catch(() => null);
@@ -476,9 +441,6 @@
     if (clear) P.Store.clear();
     socket?.disconnect();
     audioCall?.stop();
-    clearInterval(paymentPollTimer);
-    paymentPollTimer = null;
-    resetPaymentCheckout();
     me = null;
     pushSubscriptionActive = false;
     currentCall = null;
@@ -512,13 +474,6 @@
       me = { ...me, ...response.user };
       updateBalance(me.balanceSeconds);
     } catch {}
-  }
-
-  function startPaymentPolling() {
-    clearInterval(paymentPollTimer);
-    paymentPollTimer = setInterval(() => {
-      if (me && document.visibilityState !== 'hidden') loadPayments({ silent: true });
-    }, 12000);
   }
 
   async function connectSocket() {
@@ -638,10 +593,8 @@
     socket.on('notification:new', (notification) => {
       if (/payment/i.test(notification.title || '')) {
         refreshCustomerBalance();
-        loadPayments({ silent: true });
-      } else {
-        P.notify(notification.title, notification.body);
       }
+      P.notify(notification.title, notification.body);
     });
     socket.on('account:restricted', (data) => {
       P.toast(data.reason || 'Your account has been restricted.', 'error');
@@ -909,7 +862,6 @@
     paymentPlans = plans;
     const planDescription = 'Secure Razorpay checkout · UPI, cards and supported methods · billed by connected second.';
     $('#walletPaymentIntro').textContent = 'Choose a pack and complete the secure Razorpay checkout. Verified payments add talk-time automatically.';
-    $('#paymentHistoryIntro').textContent = 'Razorpay payments appear in Wallet activity after verification. Older manual UPI submissions remain below.';
     $('#plansGrid').innerHTML = plans.map((plan) => `
       <article class="plan-card ${plan.popular ? 'popular' : ''}">
         ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
@@ -943,60 +895,6 @@
     } catch {
       P.toast('Copy failed. Select the value and copy it manually.', 'error');
     }
-  }
-
-  function currentPaymentMode() {
-    return currentCheckout?.mode || 'upi_direct';
-  }
-
-  function isDirectPaymentMode(mode) {
-    return mode === 'upi_direct' || mode === 'manual_transfer';
-  }
-
-  function setPaymentStep(step) {
-    const order = ['pay', 'submit', 'status'];
-    const activeIndex = order.indexOf(step);
-    $('#paymentProgress').classList.add('manual-mode');
-    $('[data-payment-progress="submit"]').classList.remove('hidden');
-    $('[data-payment-progress="status"] b').textContent = '3';
-    $$('[data-payment-step]').forEach((section) => section.classList.toggle('hidden', section.dataset.paymentStep !== step));
-    $$('[data-payment-progress]').forEach((item) => {
-      const index = order.indexOf(item.dataset.paymentProgress);
-      if (index < 0) return;
-      item.classList.toggle('active', index === activeIndex);
-      item.classList.toggle('complete', index < activeIndex || (step === 'status' && ['paid', 'approved'].includes(currentCheckout?.payment?.status)));
-    });
-    $('#paymentModal .modal-card').scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function resetPaymentCheckout(mode = null) {
-    if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
-    proofPreviewUrl = '';
-    currentCheckout = null;
-    $('#manualPaymentForm')?.reset();
-    show('#manualProofPreview', false);
-    show('#manualCheckoutPanel', false);
-    show('#paymentPayContent', false);
-    show('#paymentLoading');
-    if (mode) currentCheckout = { mode };
-    $('#paymentModal .payment-card').classList.toggle('simple-upi-mode', isDirectPaymentMode(mode));
-    $('#paymentSummary').classList.toggle('simple-upi-summary', isDirectPaymentMode(mode));
-    setPaymentStep('pay');
-  }
-
-  function closePaymentCheckout() {
-    closeManagedOverlay('paymentModal');
-  }
-
-  function saveActivePayment(id) {
-    try {
-      if (id) localStorage.setItem(ACTIVE_PAYMENT_KEY, id);
-      else localStorage.removeItem(ACTIVE_PAYMENT_KEY);
-    } catch {}
-  }
-
-  function storedActivePayment() {
-    try { return localStorage.getItem(ACTIVE_PAYMENT_KEY) || ''; } catch { return ''; }
   }
 
   async function verifyRazorpayCheckout(payment) {
@@ -1095,259 +993,6 @@
     } catch (error) {
       button?.removeAttribute('disabled');
       P.toast(error.message || 'The Razorpay checkout could not be prepared.', 'error');
-    }
-  }
-
-  function renderDirectUpiIntent(intent) {
-    $('#paymentSummary').innerHTML = `<div><small>Talk-time</small><strong>${Math.round(intent.seconds / 60)} minutes</strong></div><div class="exact-amount"><small>Pay exactly</small><strong>${P.money(intent.amount_paise)}</strong></div>`;
-    $('#manualUpiId').textContent = intent.upi.id;
-    $('#manualPayeeName').textContent = intent.upi.payee_name;
-    $('#manualUpiQr').src = intent.upi_qr_data_url;
-    show('#manualCheckoutPanel');
-  }
-
-  function upiPaymentLink() {
-    const link = String(currentCheckout?.intent?.upi?.payment_uri || '').trim();
-    return /^upi:\/\/pay\?/i.test(link) ? link : '';
-  }
-
-  function upiIntentLink(upiLink, googlePay = false) {
-    const query = upiLink.split('?')[1] || '';
-    if (!query) return '';
-    if (googlePay) {
-      return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
-    }
-    return `intent://pay?${query}#Intent;scheme=upi;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
-  }
-
-  function launchPaymentLink(primaryLink, fallbackLink) {
-    if (!primaryLink) return window.location.assign(fallbackLink);
-    let fallbackTimer = window.setTimeout(() => {
-      fallbackTimer = 0;
-      if (document.visibilityState === 'visible') window.location.assign(fallbackLink);
-    }, 1250);
-    const stopFallback = () => {
-      if (document.visibilityState !== 'hidden') return;
-      if (fallbackTimer) window.clearTimeout(fallbackTimer);
-      fallbackTimer = 0;
-      document.removeEventListener('visibilitychange', stopFallback);
-    };
-    document.addEventListener('visibilitychange', stopFallback);
-    window.location.assign(primaryLink);
-  }
-
-  function openUpiApp(type = 'upi') {
-    const link = upiPaymentLink();
-    if (!link) return P.toast('The UPI payment is not ready. Please try again.', 'error');
-
-    const userAgent = navigator.userAgent || '';
-    const isAndroid = /Android/i.test(userAgent);
-    const isIos = /iPhone|iPad|iPod/i.test(userAgent);
-    if (!isAndroid && !isIos) {
-      P.toast('Open this checkout on your phone or scan the QR with your UPI app.', 'info');
-      return;
-    }
-
-    if (isAndroid) {
-      launchPaymentLink(upiIntentLink(link, type === 'google'), link);
-      return;
-    }
-
-    if (type === 'google') {
-      const query = link.split('?')[1] || '';
-      launchPaymentLink(query ? `gpay://upi/pay?${query}` : '', link);
-      return;
-    }
-
-    window.location.assign(link);
-  }
-
-  function saveUpiQr() {
-    const qrImage = $('#manualUpiQr');
-    if (!qrImage?.src?.startsWith('data:image/')) {
-      P.toast('The payment QR is not ready. Close checkout and try again.', 'error');
-      return;
-    }
-    const reference = currentCheckout?.intent?.checkout_reference || 'payment';
-    const download = document.createElement('a');
-    download.href = qrImage.src;
-    download.download = `we-met-upi-${reference}.png`;
-    document.body.append(download);
-    download.click();
-    download.remove();
-    P.toast('QR saved. Open your UPI app and use Scan from gallery.', 'success');
-  }
-
-  function previewManualProof(event) {
-    const file = event.target.files?.[0];
-    if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
-    proofPreviewUrl = '';
-    show('#manualProofPreview', false);
-    if (!file) return;
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) {
-      event.target.value = '';
-      return P.toast('Choose a PNG, JPG, or WebP screenshot no larger than 3 MB.', 'error');
-    }
-    proofPreviewUrl = URL.createObjectURL(file);
-    $('#manualProofImage').src = proofPreviewUrl;
-    $('#manualProofName').textContent = `${file.name} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
-    show('#manualProofPreview');
-  }
-
-  async function submitManualPayment(event) {
-    event.preventDefault();
-    const intent = currentCheckout?.intent;
-    if (!intent) return P.toast('This checkout expired. Start again.', 'error');
-    const button = event.submitter;
-    button?.setAttribute('disabled', '');
-    try {
-      const body = new FormData(event.target);
-      body.set('intentId', intent.id);
-      body.set('paymentMethod', 'upi');
-      const response = await P.api('/api/customer/manual-payments/submissions', {
-        method: 'POST',
-        body,
-        timeout: 60000,
-      });
-      const payment = response.submission;
-      currentCheckout = { ...currentCheckout, activePaymentId: payment.id, payment };
-      paymentStatusSeen.set(payment.id, payment.status);
-      saveActivePayment(payment.id);
-      renderPaymentStatus(payment);
-      P.toast(response.message || 'UPI payment submitted for verification.', 'success');
-      await loadPayments({ silent: true });
-    } catch (error) {
-      P.toast(error.message || 'The UPI transaction ID could not be submitted.', 'error');
-    } finally {
-      button?.removeAttribute('disabled');
-    }
-  }
-
-  function renderPaymentStatus(payment) {
-    if (!payment) return;
-    currentCheckout = { ...(currentCheckout || {}), activePaymentId: payment.id, payment };
-    const status = payment.status || 'created';
-    const minutes = Math.round(Number(payment.seconds) / 60);
-    currentCheckout.mode = 'upi_direct';
-    const details = ({
-      pending: {
-        title: 'UPI payment submitted — review pending',
-        text: 'The administrator will review your submitted UTR and payment screenshot before adding talk-time.',
-        note: 'Do not pay again while this submission is pending.',
-        icon: '<i></i>',
-      },
-      approved: {
-        title: 'UPI payment verified — minutes added',
-        text: `${minutes} minutes have been added to your wallet. You can start a call whenever a listener is available.`,
-        note: 'The UPI transaction ID was approved once and cannot credit another wallet entry.',
-        icon: '✓',
-      },
-      declined: {
-        title: 'UPI payment was declined',
-        text: payment.admin_message || 'The administrator declined the submitted UTR and screenshot.',
-        note: 'Check the administrator message. If money was debited, contact support with the correct transaction ID.',
-        icon: '!',
-      },
-    })[status] || null;
-    $('#paymentStatusIcon').className = `payment-status-icon ${status}`;
-    $('#paymentStatusIcon').innerHTML = details?.icon || '!';
-    const waiting = status === 'pending';
-    $('#paymentLiveLabel').innerHTML = waiting ? '<i></i> PAYMENT STATUS' : status.toUpperCase();
-    $('#paymentStatusTitle').textContent = details?.title || 'Payment status updated';
-    $('#paymentStatusText').textContent = details?.text || status;
-    $('#paymentWaitNote').textContent = details?.note || '';
-    const reference = payment.utr_reference || payment.checkout_reference || `#${String(payment.id).slice(0, 8).toUpperCase()}`;
-    $('#pendingPaymentSummary').innerHTML = `<div><small>Pack</small><strong>${P.esc(payment.plan_name || currentCheckout.plan?.name || 'Talk-time pack')}</strong></div><div><small>Minutes</small><strong>${minutes}</strong></div><div><small>Amount</small><strong>${P.money(payment.amount_paise ?? currentCheckout.plan?.price_paise)}</strong></div><div><small>Reference</small><strong>${P.esc(reference)}</strong></div>`;
-    const statusMessage = payment.admin_message;
-    if (statusMessage) {
-      $('#paymentAdminMessage').innerHTML = `<strong>Administrator message</strong><p>${P.esc(statusMessage)}</p>`;
-      show('#paymentAdminMessage');
-    } else {
-      show('#paymentAdminMessage', false);
-    }
-    show('#checkPaymentNow', waiting);
-    show('#paymentEnableAlerts', status === 'approved'
-      && publicConfig?.pushEnabled
-      && 'Notification' in window
-      && Notification.permission === 'default');
-    setPaymentStep('status');
-  }
-
-  function openPaymentStatus(payment) {
-    if (!payment) return;
-    const mode = 'upi_direct';
-    resetPaymentCheckout(mode);
-    currentCheckout = { mode, activePaymentId: payment.id, payment };
-    if (payment.status === 'pending') saveActivePayment(payment.id);
-    renderPaymentStatus(payment);
-    $('#paymentTitle').textContent = 'Payment status';
-    $('#paymentEyebrow').textContent = 'UPI VERIFICATION';
-    $('#paymentSubtitle').textContent = 'Your submitted UTR and payment screenshot are shown here.';
-    openManagedOverlay('#paymentModal', 'paymentModal');
-  }
-
-  async function checkPaymentNow(event) {
-    const button = event.currentTarget;
-    button.setAttribute('disabled', '');
-    try {
-      await loadPayments({ silent: true });
-      P.toast('Payment status is up to date.', 'success');
-    } finally {
-      button.removeAttribute('disabled');
-    }
-  }
-
-  function paymentHistoryMarkup(payment) {
-    const reference = payment.utr_reference || payment.checkout_reference || '';
-    const method = payment.payment_method === 'bank_transfer' ? 'Previous bank transfer' : 'Direct UPI';
-    return `<article class="list-item payment-item"><div><strong>${P.esc(payment.plan_name)} · ${P.money(payment.amount_paise)}</strong><p>${Math.round(payment.seconds / 60)} minutes · ${P.esc(method)} · ${P.date(payment.created_at)}</p>${reference ? `<small>Reference: ${P.esc(reference)}</small>` : ''}${payment.admin_message ? `<p><b>Admin:</b> ${P.esc(payment.admin_message)}</p>` : ''}</div><div class="payment-item-side"><span class="badge ${payment.status}">${P.esc(payment.status)}</span><button class="button button-quiet" type="button" data-view-payment="${payment.id}">View status</button></div></article>`;
-  }
-
-  async function loadPayments(options = {}) {
-    if (!me) return;
-    try {
-      const manualResponse = await P.api('/api/customer/manual-payments/submissions');
-      paymentSubmissions = (manualResponse.submissions || [])
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      let balanceNeedsRefresh = false;
-      paymentSubmissions.forEach((payment) => {
-        const previous = paymentStatusSeen.get(payment.id);
-        if (previous && previous !== payment.status) {
-          const paid = payment.status === 'approved';
-          P.notify(paid ? 'Payment successful' : 'Payment status updated', paid
-            ? `${Math.round(payment.seconds / 60)} minutes were added to your wallet.`
-            : `Your ${payment.plan_name} payment was ${payment.status}.`);
-          if (paid) balanceNeedsRefresh = true;
-        }
-        paymentStatusSeen.set(payment.id, payment.status);
-      });
-
-      $('#paymentHistory').innerHTML = paymentSubmissions.length
-        ? paymentSubmissions.map(paymentHistoryMarkup).join('')
-        : emptyState('No payments yet', 'Choose a talk-time pack, pay in a UPI app, and submit its transaction ID.');
-      $$('[data-view-payment]').forEach((button) => button.addEventListener('click', () => {
-        openPaymentStatus(paymentSubmissions.find((payment) => payment.id === button.dataset.viewPayment));
-      }));
-
-      const pending = paymentSubmissions.find((payment) => payment.status === 'pending');
-      if (pending) {
-        $('#activePaymentBanner').innerHTML = `<div><span class="payment-review-dot"><i></i></span><div><strong>UPI verification pending</strong><p>${P.esc(pending.plan_name)} · ${P.money(pending.amount_paise)} · ${P.date(pending.created_at)}</p></div></div><button id="viewActivePayment" class="button button-soft" type="button">View status</button>`;
-        show('#activePaymentBanner');
-        $('#viewActivePayment').addEventListener('click', () => openPaymentStatus(pending));
-      } else {
-        show('#activePaymentBanner', false);
-      }
-
-      const activeId = storedActivePayment();
-      const activePayment = paymentSubmissions.find((payment) => payment.id === activeId);
-      if (activePayment && currentCheckout?.activePaymentId === activePayment.id) renderPaymentStatus(activePayment);
-      if (activePayment && activePayment.status !== 'pending') {
-        saveActivePayment('');
-        if (activePayment.status === 'approved') balanceNeedsRefresh = true;
-      }
-      if (balanceNeedsRefresh) await refreshCustomerBalance();
-    } catch (error) {
-      if (!options?.silent) P.toast(error.message, 'error');
     }
   }
 
