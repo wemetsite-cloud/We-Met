@@ -106,5 +106,5 @@ main,.tab,.panel,.desk-grid>*,.grid-two>*,.list-item>*{min-width:0}
 @media(max-width:900px){.settlement-panel{position:static}}
 @media(max-width:520px){.settlement-panel{padding:18px}.settlement-panel li{grid-template-columns:1fr;gap:3px}}
 
-/* v6.9.1 one-tap controls */
+/* v7.0.0 one-tap controls */
 @media(hover:none),(pointer:coarse){.button:hover,.panel:hover,.avatar-choice:hover{transform:none}.button,.tabs button{min-height:42px}}

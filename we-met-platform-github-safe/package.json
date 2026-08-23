@@ -1,6 +1,6 @@
 {
   "name": "we-met-platform",
-  "version": "6.9.1",
+  "version": "7.0.0",
   "private": true,
   "description": "We Met platform with customer Razorpay checkout, role-safe portals, connected-second billing and admin-managed listener wallets.",
   "scripts": {
