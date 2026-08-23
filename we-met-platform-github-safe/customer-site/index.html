@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f0448f">
+  <meta name="theme-color" content="#280052">
   <meta name="description" content="Private browser voice conversations with clear listener profiles, live availability, transparent connected-second billing and no phone-number sharing.">
   <meta name="robots" content="index,follow">
   <meta property="og:title" content="We Met — Real conversations, when you need one">
@@ -14,8 +14,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=6.9.1">
-  <link rel="stylesheet" href="style.css?v=6.9.1">
+  <link rel="manifest" href="manifest.webmanifest?v=7.0.0">
+  <link rel="stylesheet" href="style.css?v=7.0.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -68,7 +68,7 @@
               <h3>Someone is ready to listen</h3>
               <p>Your identity stays private throughout the call.</p>
             </div>
-            <button class="preview-call" type="button" data-auth="register"><span>⌕</span> Start a conversation</button>
+            <button class="preview-call" type="button" data-auth="register"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg> Start a voice conversation</button>
             <div class="preview-note"><span>00:00</span><small>Timer begins after audio connects</small></div>
           </article>
           <div class="floating-note note-one">Private by design</div>
@@ -101,45 +101,47 @@
       </section>
       <footer class="public-footer shell">
         <div><a class="brand footer-brand" href="#"><img src="assets/logo.svg" alt=""><span><strong>We Met</strong><small>Conversation with care</small></span></a><p>A private browser-based voice conversation service with transparent billing and clear safety standards.</p></div>
-        <nav aria-label="Company and policy links"><a href="about.html">About</a><a href="contact.html">Contact</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund.html">Refunds</a><a href="safety.html">Safety</a><a href="child-safety.html">Child safety</a><a href="delete-account.html">Delete account</a></nav>
+        <nav aria-label="Company and policy links"><a href="about.html">About</a><a href="contact.html">Contact</a><a href="pricing.html">Pricing</a><a href="delivery.html">Service delivery</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund.html">Refunds</a><a href="safety.html">Safety</a><a href="community-guidelines.html">Guidelines</a><a href="child-safety.html">Child safety</a><a href="delete-account.html">Delete account</a></nav>
         <small>© 2026 We Met. Support: <a href="mailto:wemetsite@gmail.com">wemetsite@gmail.com</a></small>
       </footer>
     </section>
 
     <section id="dashboard" class="dashboard hidden shell">
-      <div class="install-inline"><span>Enjoy We Met like an app.</span><button data-install-app class="button button-soft button-small" type="button">Install We Met</button></div><div class="welcome-card">
-        <div>
-          <span class="eyebrow">YOUR SPACE</span>
+      <div class="install-inline"><span>Use We Met like an app.</span><button data-install-app class="button button-soft button-small" type="button">Install app</button></div>
+      <section class="welcome-card" aria-label="Account overview">
+        <div class="welcome-copy">
+          <span class="eyebrow">PRIVATE VOICE CONVERSATIONS</span>
           <h1 id="helloName">Hello</h1>
-          <p>Choose a listener and start a private conversation whenever you feel like talking.</p>
+          <p>Choose someone you feel comfortable talking with. Your personal contact details stay private.</p>
         </div>
-        <div class="wallet-pill"><small>Talk-time available</small><strong id="balanceTop">0:00</strong><button type="button" data-purchase>Add minutes</button></div>
-      </div>
+        <button class="wallet-pill balance-shortcut" type="button" data-purchase aria-label="View and add talk-time">
+          <span class="balance-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 7v10M8.5 10.2c0-1.6 1.5-2.5 3.5-2.5s3.5.8 3.5 2.3c0 3.8-7 1.4-7 5.1 0 1.5 1.4 2.4 3.5 2.4s3.7-.9 3.7-2.5"/></svg></span>
+          <span><small>Minutes left</small><strong id="balanceTop">0:00</strong></span>
+          <svg class="balance-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </section>
 
-      <nav class="tabs" id="tabs" aria-label="Customer navigation">
-        <button class="active" data-tab="home" type="button"><span>Home</span></button>
-        <button data-tab="wallet" type="button"><span>Wallet</span></button>
-        <button data-tab="history" type="button"><span>History</span></button>
-        <button data-tab="favorites" type="button"><span>Favourites</span></button>
-        <button data-tab="notifications" type="button"><span>Alerts</span></button>
-        <button data-tab="support" type="button"><span>Support</span></button>
-        <button data-tab="profile" type="button"><span>Profile</span></button>
+      <nav class="tabs" id="tabs" aria-label="Main navigation">
+        <button class="active" data-tab="home" type="button" aria-label="Home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>Home</span></button>
+        <button data-tab="history" type="button" aria-label="Recent conversations"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Recents</span></button>
+        <button data-tab="wallet" type="button" aria-label="Talk-time"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M3 9h18M8 15h3"/></svg><span>Minutes</span></button>
+        <button data-tab="profile" type="button" aria-label="Profile"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4.3 3.4-6.5 8-6.5s7.2 2.2 8 6.5"/></svg><span>Profile</span></button>
       </nav>
 
       <div class="tab active" id="tab-home">
         <section class="call-hero">
-          <div>
+          <div class="call-hero-copy">
             <span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking listener availability…</span></span>
-            <h2>Ready to talk?</h2>
-            <p>Choose a listener yourself, reconnect with your previous listener, or let We Met find the next available person.</p>
-            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button">Call an available listener</button><button class="button button-quiet" type="button" data-purchase>Add minutes</button></div>
+            <h2>Who would you like to talk to?</h2>
+            <p>Choose an active listener below, reconnect with someone from your recents, or let We Met find an available person.</p>
+            <div class="hero-buttons"><button id="callNow" class="button button-primary button-large" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg>Find an active listener</button><button class="button button-quiet" type="button" data-purchase>Add minutes</button></div>
           </div>
-          <div class="balance-ring"><span>Talk-time</span><strong id="balanceRing">0:00</strong><small>Minimum 2 minutes to call</small></div>
+          <div class="balance-ring"><span>Available</span><strong id="balanceRing">0:00</strong><small>2 min needed to start</small></div>
         </section>
 
         <div id="previousBox" class="previous-box hidden"></div>
         <section id="listenerDiscovery" class="listener-discovery hidden" aria-live="polite">
-          <div class="section-head listener-heading"><div><span class="eyebrow">LIVE AVAILABILITY</span><h2>Choose your Malayalam listener</h2><p>Choose who you would like to talk with.</p></div><button id="refreshListeners" class="button button-quiet" type="button">Refresh</button></div>
+          <div class="section-head listener-heading"><div><span class="eyebrow">ACTIVE NOW</span><h2>Choose a Malayalam listener</h2><p>Voice calls only. Video calling is not offered.</p></div><button id="refreshListeners" class="button button-quiet" type="button" aria-label="Refresh listener availability"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.8-2L20 11M4 13l2.1 4a7 7 0 0 0 11.8-2"/></svg><span>Refresh</span></button></div>
           <label class="language-fallback-toggle"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>If no Malayalam listener is available, We Met can try another language listener.</small></span></label>
           <div id="listenerGrid" class="listener-grid" aria-live="polite"></div>
           <section id="otherLanguageSection" class="other-language-section hidden"><div class="section-head compact"><div><span class="eyebrow">OTHER LANGUAGES</span><h2>Other language listeners</h2><p>Turn this option off anytime to keep automatic matching Malayalam-only.</p></div></div><div id="otherLanguageGrid" class="listener-grid other-language-grid" aria-live="polite"></div></section>
@@ -147,28 +149,22 @@
       </div>
 
       <div class="tab" id="tab-wallet">
-        
-        <div class="section-head"><div><span class="eyebrow">TALK-TIME PAYMENT</span><h2>Choose a talk-time pack</h2><p id="walletPaymentIntro">Choose a pack to view the available payment method and exact amount.</p></div></div>
+        <div class="section-head wallet-heading"><div><span class="eyebrow">ADD TALK-TIME</span><h2>Choose your minutes</h2><p id="walletPaymentIntro">Choose a pack to view the exact amount.</p></div><div class="minutes-balance"><small>Available now</small><strong id="walletBalance">0:00</strong></div></div>
         <div id="plansGrid" class="plans-grid"></div>
         <div class="grid-two">
-
-          <section class="panel balance-panel"><span class="eyebrow">CURRENT BALANCE</span><div class="huge-balance" id="walletBalance">0:00</div><p>Billing begins only after the voice connection is live and stops as soon as the call ends.</p></section>
           <section class="panel coupon-panel">
-            <span class="eyebrow">REDEEM TALK-TIME</span>
-            <h2>Enter your We Met code</h2>
-            <p>Redeem a valid code to add talk-time to your wallet.</p>
+            <span class="eyebrow">HAVE A CODE?</span>
+            <h2>Redeem minutes</h2>
+            <p>Use a valid We Met code to add talk-time.</p>
             <form id="couponForm" class="inline-form"><label class="sr-only" for="couponCode">Redeem code</label><input id="couponCode" autocomplete="off" placeholder="Example: WEMET-START" required><button class="button button-primary">Redeem</button></form>
           </section>
-          
+          <section class="panel billing-note"><span class="eyebrow">FAIR BILLING</span><h2>Pay only while connected</h2><p>Your minutes begin reducing only after the voice connection is live and stop as soon as the call ends.</p></section>
         </div>
-        <div class="section-head compact"><div><h2>Wallet activity</h2></div></div>
+        <div class="section-head compact"><div><h2>Talk-time activity</h2><p>Payments, redeemed minutes and call usage.</p></div></div>
         <div id="walletHistory" class="list"></div>
-
-        
-        
       </div>
 
-      <div class="tab" id="tab-history"><div class="section-head"><div><span class="eyebrow">YOUR CONVERSATIONS</span><h2>Call history</h2></div></div><div id="callHistory" class="list"></div></div>
+      <div class="tab" id="tab-history"><div class="section-head"><div><span class="eyebrow">YOUR CONVERSATIONS</span><h2>Recents</h2><p>Call again, report an issue or review your talk-time.</p></div><button class="button button-quiet" type="button" data-jump="favorites"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Favourites</button></div><div id="callHistory" class="list"></div></div>
       <div class="tab" id="tab-favorites"><div class="section-head"><div><span class="eyebrow">SAVED LISTENERS</span><h2>Your favourites</h2></div></div><div id="favoritesList" class="listener-grid"></div></div>
       <div class="tab" id="tab-notifications"><div class="section-head"><div><span class="eyebrow">UPDATES</span><h2>Notifications</h2></div><button id="readNotifications" class="button button-quiet" type="button">Mark all read</button></div><div id="notificationsList" class="list"></div></div>
 
@@ -186,16 +182,36 @@
       </div>
 
       <div class="tab" id="tab-profile">
-        <div class="grid-two">
-          <section class="panel profile-summary"><span class="eyebrow">ACCOUNT</span><div class="profile-mark"><img src="assets/logo.svg" alt=""></div><h2 id="profileName">—</h2><p id="profileEmail">—</p><p id="profilePhoneText">—</p><div class="legal-links"><button class="legal-btn" data-legal="terms" type="button">Terms</button><button class="legal-btn" data-legal="privacy" type="button">Privacy</button><button class="legal-btn" data-legal="refund" type="button">Refund policy</button><a class="legal-btn delete-link" href="delete-account.html">Delete account</a></div></section>
-          <section class="panel security-panel">
-            <span class="eyebrow">ACCOUNT SECURITY</span>
-            <form id="phoneForm" class="stack"><h2>Contact phone</h2><label>Phone number<input id="profilePhone" type="tel" autocomplete="tel" inputmode="tel" minlength="10" maxlength="24" required></label><label>Current password<input id="phoneChangePassword" type="password" autocomplete="current-password" required></label><button class="button button-soft">Update phone</button></form>
-            <hr>
-            <form id="loginChangeForm" class="stack"><h2>Change email</h2><label>New email<input id="newEmail" type="email" autocomplete="email" required></label><label>Current password<input id="emailChangePassword" type="password" autocomplete="current-password" required></label><button class="button button-soft">Update email</button></form>
-            <hr>
-            <form id="passwordForm" class="stack"><h2>Change password</h2><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form>
+        <div class="profile-layout">
+          <section class="panel profile-summary"><div class="profile-mark"><img src="assets/logo.svg" alt=""></div><div><span class="eyebrow">YOUR PROFILE</span><h2 id="profileName">—</h2><p id="profileEmail">—</p><p id="profilePhoneText">—</p></div></section>
+
+          <section class="profile-menu-group" aria-labelledby="activityMenuTitle">
+            <h2 id="activityMenuTitle">Your activity</h2>
+            <button class="profile-menu-row" type="button" data-jump="favorites"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span><b>Favourite listeners</b><small>People you saved</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="profile-menu-row" type="button" data-jump="notifications"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Notifications</b><small>Account and payment updates</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="profile-menu-row" type="button" data-jump="support"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 13a8 8 0 0 1 16 0M4 13v5h3v-6H4M20 13v5h-3v-6h3M17 18c0 2-2 3-5 3"/></svg></span><span><b>Help &amp; support</b><small>Contact the We Met team</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
           </section>
+
+          <section class="profile-menu-group" aria-labelledby="policyMenuTitle">
+            <h2 id="policyMenuTitle">Safety &amp; policies</h2>
+            <button class="profile-menu-row legal-btn" type="button" data-legal="privacy"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span><span><b>Privacy policy</b><small>How your information is protected</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="profile-menu-row legal-btn" type="button" data-legal="terms"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12a2 2 0 0 1 2 2v16l-4-2-4 2-4-2-4 2V5a2 2 0 0 1 2-2Z"/><path d="M8 8h8M8 12h6"/></svg></span><span><b>Terms &amp; conditions</b><small>Rules for using We Met</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="profile-menu-row legal-btn" type="button" data-legal="safety"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M12 7v5M12 16h.01"/></svg></span><span><b>Safety centre</b><small>Stay safe while talking</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="profile-menu-row legal-btn" type="button" data-legal="refund"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M9 9h6v6H9z"/></svg></span><span><b>Refund policy</b><small>Payment review and service issues</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <a class="profile-menu-row" href="community-guidelines.html"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span><span><b>Community guidelines</b><small>Respectful conversation standards</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a>
+          </section>
+
+          <details id="accountSecurity" class="panel security-panel">
+            <summary><span><b>Account &amp; security</b><small>Phone, email and password</small></span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <div class="security-forms">
+              <form id="phoneForm" class="stack"><h2>Contact phone</h2><label>Phone number<input id="profilePhone" type="tel" autocomplete="tel" inputmode="tel" minlength="10" maxlength="24" required></label><label>Current password<input id="phoneChangePassword" type="password" autocomplete="current-password" required></label><button class="button button-soft">Update phone</button></form>
+              <form id="loginChangeForm" class="stack"><h2>Change email</h2><label>New email<input id="newEmail" type="email" autocomplete="email" required></label><label>Current password<input id="emailChangePassword" type="password" autocomplete="current-password" required></label><button class="button button-soft">Update email</button></form>
+              <form id="passwordForm" class="stack"><h2>Change password</h2><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form>
+            </div>
+          </details>
+
+          <div class="profile-danger-links"><a class="delete-link" href="delete-account.html">Delete account</a></div>
+          <button id="profileLogout" class="profile-logout" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg><span>Log out</span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
         </div>
       </div>
     </section>
@@ -205,13 +221,53 @@
     <div class="modal-card auth-card">
       <button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
       <button class="close" data-close="authModal" type="button" aria-label="Close">×</button>
-      <img class="auth-logo" src="assets/logo.svg" alt="">
-      <span class="eyebrow">WELCOME TO WE MET</span>
+      <div class="auth-brand"><img class="auth-logo" src="assets/logo.svg" alt=""><span><b>We Met</b><small>Private voice conversations</small></span></div>
+      <span class="eyebrow">WELCOME</span>
       <h2 id="authTitle">Welcome back</h2>
-      <p id="authSubtitle">Sign in to continue.</p>
+      <p id="authSubtitle">Sign in one simple step at a time.</p>
       <div class="auth-switch"><button data-mode="login" class="active" type="button">Sign in</button><button data-mode="register" type="button">Create account</button></div>
-      <form id="loginForm" class="stack"><label>Email<input id="loginIdentifier" type="email" required autocomplete="email" placeholder="you@example.com"></label><label>Password<input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password"></label><button class="button button-primary button-large">Sign in</button><button type="button" id="forgotOpen" class="link-button">Forgot password?</button></form>
-      <form id="registerForm" class="stack hidden"><label>Full name<input id="regName" autocomplete="name" required></label><label>Email<input id="regEmail" type="email" autocomplete="email" required></label><label>Phone number<input id="regPhone" type="tel" autocomplete="tel" inputmode="tel" minlength="10" maxlength="24" placeholder="+91 98765 43210" required><small>Used for payment confirmation and private account support. It is never shown to listeners.</small></label><label>Password<input id="regPassword" type="password" minlength="8" autocomplete="new-password" required><small>Use at least 8 characters.</small></label><label class="check"><input id="regTerms" type="checkbox" required><span>I accept the Terms and Privacy Policy and confirm that I am eligible to use We Met.</span></label><button class="button button-primary button-large">Create account</button></form>
+      <form id="loginForm" class="stack auth-flow" data-auth-flow="login">
+        <div class="auth-progress" aria-label="Sign-in progress"><span class="active"></span><span></span></div>
+        <section class="auth-step active" data-auth-step="1">
+          <div class="auth-step-copy"><small>STEP 1 OF 2</small><h3>What is your email?</h3><p>Enter the email connected to your We Met account.</p></div>
+          <label>Email address<input id="loginIdentifier" type="email" required autocomplete="email" inputmode="email" placeholder="you@example.com"></label>
+          <button class="button button-primary button-large" type="button" data-auth-next="2">Continue <span aria-hidden="true">→</span></button>
+          <button type="button" id="forgotOpen" class="link-button">Forgot password?</button>
+        </section>
+        <section class="auth-step" data-auth-step="2">
+          <div class="auth-step-copy"><small>STEP 2 OF 2</small><h3>Enter your password</h3><p class="auth-account-preview">Signing in as <b id="loginEmailPreview">your account</b></p></div>
+          <label>Password<div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password"><button type="button" data-password-toggle="loginPassword" aria-label="Show password">Show</button></div></label>
+          <button class="button button-primary button-large" type="submit">Sign in securely</button>
+          <button class="auth-previous" type="button" data-auth-prev="1">← Change email</button>
+        </section>
+      </form>
+      <form id="registerForm" class="stack auth-flow hidden" data-auth-flow="register">
+        <div class="auth-progress register-progress" aria-label="Account creation progress"><span class="active"></span><span></span><span></span><span></span></div>
+        <section class="auth-step active" data-auth-step="1">
+          <div class="auth-step-copy"><small>STEP 1 OF 4</small><h3>What should we call you?</h3><p>This name is used only for your We Met profile.</p></div>
+          <label>Full name<input id="regName" autocomplete="name" minlength="2" required placeholder="Your name"></label>
+          <button class="button button-primary button-large" type="button" data-auth-next="2">Continue <span aria-hidden="true">→</span></button>
+        </section>
+        <section class="auth-step" data-auth-step="2">
+          <div class="auth-step-copy"><small>STEP 2 OF 4</small><h3>Add your email</h3><p>You will use this email whenever you sign in.</p></div>
+          <label>Email address<input id="regEmail" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com"></label>
+          <button class="button button-primary button-large" type="button" data-auth-next="3">Continue <span aria-hidden="true">→</span></button>
+          <button class="auth-previous" type="button" data-auth-prev="1">← Back</button>
+        </section>
+        <section class="auth-step" data-auth-step="3">
+          <div class="auth-step-copy"><small>STEP 3 OF 4</small><h3>Add your phone number</h3><p>Used privately for payment confirmation and account support. Listeners cannot see it.</p></div>
+          <label>Phone number<input id="regPhone" type="tel" autocomplete="tel" inputmode="tel" minlength="10" maxlength="24" placeholder="+91 98765 43210" required></label>
+          <button class="button button-primary button-large" type="button" data-auth-next="4">Continue <span aria-hidden="true">→</span></button>
+          <button class="auth-previous" type="button" data-auth-prev="2">← Back</button>
+        </section>
+        <section class="auth-step" data-auth-step="4">
+          <div class="auth-step-copy"><small>STEP 4 OF 4</small><h3>Secure your account</h3><p>Create a password with at least 8 characters.</p></div>
+          <label>Password<div class="password-field"><input id="regPassword" type="password" minlength="8" autocomplete="new-password" required placeholder="At least 8 characters"><button type="button" data-password-toggle="regPassword" aria-label="Show password">Show</button></div></label>
+          <label class="check"><input id="regTerms" type="checkbox" required><span>I am 18 or older and accept the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+          <button class="button button-primary button-large" type="submit">Create my account</button>
+          <button class="auth-previous" type="button" data-auth-prev="3">← Back</button>
+        </section>
+      </form>
       <form id="forgotForm" class="stack hidden"><p>Enter your account email. Save the recovery key shown after submission, then wait for administrator approval.</p><label>Email<input id="forgotIdentifier" type="email" autocomplete="email" required></label><button class="button button-primary">Send recovery request</button><button type="button" id="backLogin" class="link-button">Back to sign in</button></form>
       <section id="recoveryPanel" class="recovery-panel hidden"><span class="eyebrow">RECOVERY STATUS</span><p id="recoveryStatus">Waiting for administrator review.</p><label>Recovery key<input id="recoveryKey" autocomplete="off" spellcheck="false"></label><input id="recoveryRequestId" type="hidden"><div class="recovery-actions"><button id="copyRecoveryKey" class="button button-quiet" type="button">Copy key</button><button id="checkRecovery" class="button button-soft" type="button">Check status</button></div><form id="resetCompleteForm" class="stack hidden"><label>New password<input id="recoveryNewPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm new password<input id="recoveryConfirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Set new password</button></form></section>
     </div>
@@ -220,20 +276,20 @@
   <div id="callModal" class="call-modal hidden" role="dialog" aria-modal="true" aria-label="Active call">
     <div class="call-shell">
       <div class="call-top"><span id="callState">Finding a listener…</span><button id="minimizeCall" class="call-back" type="button" aria-label="Return to the dashboard"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button></div>
-      <div class="call-person"><div class="call-avatar"><img src="assets/logo.svg" alt=""></div><span class="language-chip">Malayalam call</span><h2 id="callPerson">Listener</h2><p id="callBio">A private conversation</p><strong id="callTimer">0:00</strong><small>Wallet: <span id="callBalance">0:00</span></small></div>
-      <div class="chat-box"><div id="chatMessages" class="chat-messages" aria-live="polite"></div><form id="chatForm" class="chat-form"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Type a message…"><button type="submit" aria-label="Send message">➤</button></form></div>
-      <div class="call-actions"><button id="muteBtn" class="round-action" type="button"><span>🎙</span><small>Mute</small></button><button id="reportCallBtn" class="round-action" type="button"><span>⚑</span><small>Report</small></button><button id="endCallBtn" class="round-action end" type="button"><span>☎</span><small>End</small></button></div>
+      <div class="call-person"><div class="call-avatar"><img src="assets/logo.svg" alt=""></div><span class="language-chip">Malayalam voice call</span><h2 id="callPerson">Listener</h2><p id="callBio">A private conversation</p><strong id="callTimer">0:00</strong><small>Minutes left: <span id="callBalance">0:00</span></small></div>
+      <div class="chat-box"><div id="chatMessages" class="chat-messages" aria-live="polite"></div><form id="chatForm" class="chat-form"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Type a message…"><button type="submit" aria-label="Send message"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button></form></div>
+      <div class="call-actions"><button id="muteBtn" class="round-action" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg><small>Mute</small></button><button id="reportCallBtn" class="round-action" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 22V4M5 5c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></svg><small>Report</small></button><button id="endCallBtn" class="round-action end" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 15c4.8-4 11.2-4 16 0l-2.5 4-3.3-2v-3.2a12 12 0 0 0-4.4 0V17l-3.3 2Z"/></svg><small>End</small></button></div>
     </div>
   </div>
-  <button id="restoreCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small id="restoreTimer">0:00</small></button>
+  <button id="restoreCall" class="restore-call hidden" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg><b>Return to call</b><small id="restoreTimer">0:00</small></button>
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=6.9.1"></script>
-  <script src="socket-loader.js?v=6.9.1"></script>
-  <script src="api.js?v=6.9.1"></script>
-  <script src="webrtc.js?v=6.9.1"></script>
+  <script src="config.js?v=7.0.0"></script>
+  <script src="socket-loader.js?v=7.0.0"></script>
+  <script src="api.js?v=7.0.0"></script>
+  <script src="webrtc.js?v=7.0.0"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app.js?v=6.9.1"></script>
+  <script src="app.js?v=7.0.0"></script>
 </body>
 </html>

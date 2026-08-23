@@ -106,7 +106,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '6\.9\.1'/);
+    assert.match(serviceWorker, /const VERSION = '7\.0\.0'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }

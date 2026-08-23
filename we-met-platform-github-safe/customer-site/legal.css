@@ -1,2 +1,56 @@
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#2a1822;background:#fff8fb;line-height:1.7;--pink:#c92f78;--line:#eedce5;--muted:#786772}*{box-sizing:border-box}body{margin:0}a{color:var(--pink);font-weight:750;text-decoration:none}.legal-top{height:72px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 max(20px,calc((100% - 880px)/2));background:rgba(255,248,251,.94);border-bottom:1px solid var(--line);position:sticky;top:0;backdrop-filter:blur(16px)}.legal-top>a:first-child{display:flex;align-items:center;gap:10px;color:#2a1822;font-size:18px}.legal-top img{width:40px;height:40px}.legal-top nav{display:flex;gap:12px}.legal-main{width:min(880px,calc(100% - 36px));margin:56px auto 80px;background:#fff;border:1px solid var(--line);border-radius:26px;padding:clamp(24px,6vw,54px);box-shadow:0 22px 65px rgba(138,38,86,.09)}.kicker{color:var(--pink);font-size:11px;font-weight:900;letter-spacing:.13em}.legal-main h1{font-size:clamp(36px,7vw,58px);line-height:1.05;letter-spacing:-.04em;margin:12px 0 18px}.legal-main h2{font-size:21px;margin:34px 0 8px}.legal-main p,.legal-main li{color:var(--muted)}.legal-main ul{padding-left:20px}.legal-note{padding:16px 18px;border-radius:16px;background:#fff0f6;border:1px solid #f2d6e3}.legal-footer{width:min(880px,calc(100% - 36px));margin:-48px auto 60px;color:var(--muted);font-size:12px}@media(max-width:580px){.legal-top nav{display:none}.legal-main{margin-top:24px;border-radius:20px}}
-.delete-account-form{display:grid;gap:14px;margin:28px 0}.delete-account-form label{display:grid;gap:7px;font-weight:800;font-size:13px}.delete-account-form input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:#fff;font:inherit;outline:0}.delete-account-form input:focus{border-color:var(--pink);box-shadow:0 0 0 3px rgba(201,47,120,.09)}.legal-danger-button{border:0;border-radius:13px;padding:14px 16px;background:#8d204d;color:#fff;font:inherit;font-weight:900;cursor:pointer}.legal-danger-button:disabled{opacity:.6;cursor:not-allowed}.legal-note[data-ok="1"]{background:#f1fbf5;border-color:#ccebd7;color:#286a41}
+:root{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:#f8f7fa;
+  background:#111217;
+  line-height:1.7;
+  color-scheme:dark;
+  --accent:#d65cff;
+  --pink:#ed4c96;
+  --surface:#1a1c21;
+  --surface-2:#23252b;
+  --line:rgba(255,255,255,.09);
+  --muted:#aaa8b1;
+}
+*{box-sizing:border-box}
+html{background:#111217;-webkit-text-size-adjust:100%}
+body{min-width:320px;margin:0;background:radial-gradient(circle at 80% 0,rgba(119,48,204,.16),transparent 32%),#111217;color:#f8f7fa}
+a{color:#d99cff;font-weight:750;text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+button,input{font:inherit}
+.shell{width:100%;margin:0 auto}
+.legal-top{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 max(20px,calc((100% - 920px)/2));background:linear-gradient(110deg,#230047,#320063 55%,#24004d);border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:10;backdrop-filter:blur(16px);box-shadow:0 10px 35px rgba(0,0,0,.2)}
+.legal-top>.shell{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.legal-top>a:first-child,.legal-brand{display:flex;align-items:center;gap:10px;color:#fff;font-size:18px;font-weight:850}
+.legal-top img{width:40px;height:40px}
+.legal-top nav{display:flex;align-items:center;gap:12px}
+.legal-top nav a,.back-home{color:rgba(255,255,255,.82);font-size:12px}
+.legal-main{width:min(920px,calc(100% - 36px));margin:46px auto 82px;background:linear-gradient(150deg,#1d1f25,#17191e);border:1px solid var(--line);border-radius:28px;padding:clamp(24px,6vw,56px);box-shadow:0 28px 80px rgba(0,0,0,.3)}
+.legal-main>.shell{width:100%}
+.legal-hero{padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.kicker,.eyebrow{color:#d99cff;font-size:10px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}
+.legal-main h1{max-width:760px;font-size:clamp(36px,7vw,58px);line-height:1.04;letter-spacing:-.045em;margin:12px 0 18px;color:#fff}
+.legal-main h2{font-size:21px;letter-spacing:-.02em;margin:34px 0 8px;color:#fff}
+.legal-main p,.legal-main li,.lead,.updated{color:var(--muted)}
+.legal-main p{margin:8px 0}
+.legal-main ul{padding-left:21px}
+.legal-main li+li{margin-top:7px}
+.lead{max-width:700px;font-size:16px}
+.updated{font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.legal-note{padding:16px 18px;border-radius:16px;background:rgba(180,82,255,.09);border:1px solid rgba(194,111,255,.17)}
+.policy-card{min-width:0}
+.policy-nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:38px;padding-top:23px;border-top:1px solid var(--line)}
+.policy-nav a{padding:8px 10px;border-radius:10px;background:var(--surface-2);font-size:10px}
+.legal-footer{width:min(920px,calc(100% - 36px));margin:-50px auto 58px;color:var(--muted);font-size:11px}
+.legal-footer>.shell{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.delete-account-form{display:grid;gap:14px;margin:28px 0}
+.delete-account-form label{display:grid;gap:7px;font-weight:800;font-size:12px;color:#dedce2}
+.delete-account-form input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);color:#fff;outline:0}
+.delete-account-form input:focus{border-color:#b45cff;box-shadow:0 0 0 4px rgba(180,92,255,.11)}
+.legal-danger-button{min-height:48px;border:0;border-radius:13px;padding:14px 16px;background:linear-gradient(135deg,#c43468,#8f244e);color:#fff;font-weight:900;cursor:pointer}
+.legal-danger-button:disabled{opacity:.6;cursor:not-allowed}
+.legal-note[data-ok="1"]{background:rgba(56,214,139,.09);border-color:rgba(56,214,139,.2);color:#8be7ba}
+@media(max-width:580px){
+  .legal-top{min-height:66px;padding-inline:14px}.legal-top nav{display:none}.legal-top img{width:36px;height:36px}.back-home{font-size:10px}
+  .legal-main{width:calc(100% - 24px);margin-top:18px;border-radius:21px;padding:24px 19px}.legal-main h1{font-size:36px}.legal-main h2{font-size:19px;margin-top:28px}
+  .legal-footer{width:calc(100% - 28px);margin-top:-54px}.legal-footer>.shell{display:grid}
+}

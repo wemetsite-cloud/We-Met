@@ -63,3 +63,24 @@ test('every admin page and listener tab navigation target exists', () => {
     assert.match(listener, new RegExp(`id="tab-${match[1]}"`), `listener tab ${match[1]} is missing`);
   }
 });
+
+test('the customer portal ships the v7 app layout and guided authentication', () => {
+  const siteRoot = path.join(projectRoot, 'customer-site');
+  const html = fs.readFileSync(path.join(siteRoot, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(siteRoot, 'style.css'), 'utf8');
+  const app = fs.readFileSync(path.join(siteRoot, 'app.js'), 'utf8');
+  const serviceWorker = fs.readFileSync(path.join(siteRoot, 'service-worker.js'), 'utf8');
+
+  assert.match(html, /id="tabs"[\s\S]*data-tab="home"[\s\S]*data-tab="history"[\s\S]*data-tab="wallet"[\s\S]*data-tab="profile"/);
+  assert.match(html, /data-auth-flow="login"/);
+  assert.match(html, /data-auth-flow="register"/);
+  assert.equal((html.match(/data-auth-step="[1-4]"/g) || []).length, 6);
+  assert.match(css, /\.plans-grid\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(css, /@media\(min-width:600px\)\{\.plans-grid\{grid-template-columns:repeat\(4/);
+  assert.match(css, /@media\(min-width:840px\)\{\.plans-grid\{grid-template-columns:repeat\(5/);
+  assert.match(css, /@media\(min-width:1080px\)\{\.plans-grid\{grid-template-columns:repeat\(6/);
+  assert.match(app, /class="plan-minutes"/);
+  assert.match(app, /Start voice call/);
+  assert.doesNotMatch(app, /data-video|Start video call/);
+  assert.match(serviceWorker, /const VERSION = '7\.0\.0'/);
+});

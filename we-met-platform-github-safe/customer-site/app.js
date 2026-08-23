@@ -26,6 +26,7 @@
 
   const NAVIGATION_MARKER = 'we-met-customer-navigation';
   const VALID_TABS = new Set(['home', 'wallet', 'history', 'favorites', 'notifications', 'support', 'profile']);
+  const TAB_PARENT = { favorites: 'history', notifications: 'profile', support: 'profile' };
 
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const setModalState = () => {
@@ -131,9 +132,64 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.9.1', { updateViaCache: 'none' });
+      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=7.0.0', { updateViaCache: 'none' });
       return serviceWorkerRegistration;
     } catch {}
+  }
+
+  function authFormFor(mode) {
+    return mode === 'register' ? $('#registerForm') : mode === 'login' ? $('#loginForm') : null;
+  }
+
+  function focusCurrentAuthField() {
+    const field = $('#authModal form:not(.hidden) .auth-step.active input:not([type="hidden"])')
+      || $('#authModal form:not(.hidden) input:not([type="hidden"])');
+    field?.focus({ preventScroll: true });
+  }
+
+  function showAuthStep(form, step) {
+    if (!form) return;
+    const nextStep = Number(step) || 1;
+    form.querySelectorAll('.auth-step').forEach((section) => {
+      section.classList.toggle('active', Number(section.dataset.authStep) === nextStep);
+    });
+    form.querySelectorAll('.auth-progress span').forEach((item, index) => {
+      item.classList.toggle('active', index < nextStep);
+    });
+    if (form.dataset.authFlow === 'login' && nextStep === 2) {
+      $('#loginEmailPreview').textContent = $('#loginIdentifier').value.trim();
+    }
+    setTimeout(focusCurrentAuthField, 40);
+  }
+
+  function validateAuthStep(section) {
+    const fields = [...section.querySelectorAll('input,select,textarea')];
+    for (const field of fields) {
+      if (!field.checkValidity()) {
+        field.reportValidity();
+        field.focus();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function moveAuthStep(button, direction) {
+    const form = button.closest('.auth-flow');
+    const current = button.closest('.auth-step');
+    if (!form || !current) return;
+    if (direction === 'next' && !validateAuthStep(current)) return;
+    showAuthStep(form, button.dataset.authNext || button.dataset.authPrev || 1);
+  }
+
+  function togglePassword(button) {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (!input) return;
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    button.textContent = reveal ? 'Hide' : 'Show';
+    button.setAttribute('aria-label', `${reveal ? 'Hide' : 'Show'} password`);
+    input.focus({ preventScroll: true });
   }
 
   function setAuth(mode) {
@@ -144,13 +200,15 @@
     $$('.auth-switch button').forEach((button) => button.classList.toggle('active', button.dataset.mode === mode));
     $('#authTitle').textContent = mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Recover your account' : 'Welcome back';
     $('#authSubtitle').textContent = mode === 'register'
-      ? 'Create your private We Met account.'
+      ? 'A private account, created one step at a time.'
       : mode === 'forgot'
         ? 'The administrator will review your request.'
-        : 'Sign in to continue.';
+        : 'Sign in one simple step at a time.';
     if (mode === 'forgot') restoreRecovery();
     else show('#recoveryPanel', false);
-    setTimeout(() => $('#authModal input:not(.hidden)')?.focus(), 50);
+    const form = authFormFor(mode);
+    if (form) showAuthStep(form, 1);
+    else setTimeout(focusCurrentAuthField, 50);
   }
 
   async function init() {
@@ -180,12 +238,23 @@
     $$('[data-close]').forEach((button) => button.addEventListener('click', () => closeManagedOverlay(button.dataset.close)));
     $$('[data-app-back]').forEach((button) => button.addEventListener('click', goBackInApp));
     $$('.auth-switch button').forEach((button) => button.addEventListener('click', () => setAuth(button.dataset.mode)));
+    $$('[data-auth-next]').forEach((button) => button.addEventListener('click', () => moveAuthStep(button, 'next')));
+    $$('[data-auth-prev]').forEach((button) => button.addEventListener('click', () => moveAuthStep(button, 'previous')));
+    $$('[data-password-toggle]').forEach((button) => button.addEventListener('click', () => togglePassword(button)));
+    $$('.auth-flow').forEach((form) => form.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.target.matches('button')) return;
+      const next = form.querySelector('.auth-step.active [data-auth-next]');
+      if (!next) return;
+      event.preventDefault();
+      next.click();
+    }));
     $('#forgotOpen').addEventListener('click', () => setAuth('forgot'));
     $('#backLogin').addEventListener('click', () => setAuth('login'));
     $('#loginForm').addEventListener('submit', login);
     $('#registerForm').addEventListener('submit', register);
     $('#forgotForm').addEventListener('submit', forgot);
     $('#logoutBtn').addEventListener('click', () => logout());
+    $('#profileLogout').addEventListener('click', () => logout());
     $('#notificationPermission').addEventListener('click', requestNotifications);
     $('#tabs').addEventListener('click', (event) => {
       const button = event.target.closest('[data-tab]');
@@ -311,7 +380,8 @@
     const changed = activeTab !== tab;
     if (changed && historyMode === 'push') setNavigationState({ tab, overlay: null });
     activeTab = tab;
-    const targetButton = button || $(`[data-tab="${tab}"]`);
+    const parentTab = TAB_PARENT[tab] || tab;
+    const targetButton = button || $(`[data-tab="${parentTab}"]`);
     $$('#tabs button').forEach((item) => item.classList.toggle('active', item === targetButton));
     $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
     targetButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -410,12 +480,13 @@
   }
 
   function enterApp() {
+    document.body.classList.add('signed-in');
     show('#landing', false);
     show('#dashboard');
     show('#openAuth', false);
     show('#logoutBtn');
     show('#notificationPermission');
-    $('#helloName').textContent = `Hello, ${me.name}`;
+    $('#helloName').textContent = `Hello, ${String(me.name || '').trim().split(/\s+/)[0] || 'there'}`;
     $('#profileName').textContent = me.name;
     $('#profileEmail').textContent = me.email || '—';
     $('#profilePhoneText').textContent = me.phone || 'Phone not added';
@@ -443,6 +514,7 @@
     me = null;
     pushSubscriptionActive = false;
     currentCall = null;
+    document.body.classList.remove('signed-in');
     show('#landing');
     show('#dashboard', false);
     show('#openAuth');
@@ -579,7 +651,7 @@
       $('#restoreTimer').textContent = P.duration(data.billedSeconds);
       updateBalance(data.balanceSeconds);
     });
-    socket.on('call:low-balance', () => P.notify('Low talk-time', 'Only one minute remains in your wallet.'));
+    socket.on('call:low-balance', () => P.notify('Low talk-time', 'Only one minute remains.'));
     socket.on('call:ended', (data) => {
       const needsTopup = data.needsTopup;
       P.toast(data.reason || 'The call ended.', needsTopup ? 'error' : 'info');
@@ -629,12 +701,16 @@
     return items.length
       ? items.map((listener) => `
         <article class="listener-card">
-          <div class="abstract-avatar tone-${listenerTone(listener.id)}"><img src="${P.esc(avatarFor(listener))}" alt="" loading="lazy"></div>
-          <button class="favorite-btn" data-favorite="${listener.id}" title="${favoriteIds.has(listener.id) ? 'Remove favourite' : 'Add favourite'}" aria-label="Favourite listener">${favoriteIds.has(listener.id) ? '♥' : '♡'}</button>
-          <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge ${listener.status}">${statusText(listener.status)}</span></div>
-          <div class="language-line">● ${P.esc(listenerLanguage(listener))} conversations</div>
-          <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
-          <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' ? 'disabled' : ''}>${listener.status === 'available' ? 'Call this listener' : statusText(listener.status)}</button>
+          <div class="listener-media">
+            <div class="abstract-avatar tone-${listenerTone(listener.id)}"><img src="${P.esc(avatarFor(listener))}" alt="${P.esc(listener.name)} profile" loading="lazy"></div>
+            <span class="listener-status badge ${P.esc(listener.status)}"><i></i>${statusText(listener.status)}</span>
+            <button class="favorite-btn ${favoriteIds.has(listener.id) ? 'saved' : ''}" data-favorite="${P.esc(listener.id)}" title="${favoriteIds.has(listener.id) ? 'Remove favourite' : 'Add favourite'}" aria-label="${favoriteIds.has(listener.id) ? 'Remove from favourites' : 'Add to favourites'}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg></button>
+          </div>
+          <div class="listener-body">
+            <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span>${P.esc(listenerLanguage(listener))}</span></div>
+            <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
+            <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-call="${P.esc(listener.id)}" ${listener.status !== 'available' ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg>${listener.status === 'available' ? 'Start voice call' : statusText(listener.status)}</button>
+          </div>
         </article>`).join('')
       : emptyState(emptyTitle, emptyMessage);
   }
@@ -652,6 +728,7 @@
       : anyoneOnline
         ? 'Live listener status is updating'
         : 'Listener availability updates live';
+    $('.call-hero')?.classList.toggle('has-available', anyAvailable);
 
     // Hide listener discovery completely when nobody is online.
     // This keeps the customer home clean and avoids showing an empty live-listener section.
@@ -733,7 +810,9 @@
 
   function toggleMute() {
     const muted = audioCall?.toggleMute();
-    $('#muteBtn').innerHTML = `<span>${muted ? '🔇' : '🎙'}</span><small>${muted ? 'Unmute' : 'Mute'}</small>`;
+    $('#muteBtn').innerHTML = muted
+      ? '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 3 18 18M9 9v2a3 3 0 0 0 4.7 2.5M15 10V5a3 3 0 0 0-5.6-1.5M5 10a7 7 0 0 0 11.7 5.2M19 10a7 7 0 0 1-.3 2M12 17v4M8 21h8"/></svg><small>Unmute</small>'
+      : '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg><small>Mute</small>';
   }
 
   function sendChat(event) {
@@ -767,11 +846,16 @@
       $('#favoritesList').innerHTML = response.favorites.length
         ? response.favorites.map((listener) => `
           <article class="listener-card">
-            <div class="abstract-avatar tone-${listenerTone(listener.employee_id)}">${P.esc(initials(listener.name))}</div>
-            <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge">Favourite</span></div>
-            <div class="language-line">● ${P.esc(listener.listener_language || 'Malayalam')} conversations</div>
-            <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
-            <div class="list-actions"><button class="button button-primary" data-fav-call="${listener.employee_id}">Call</button><button class="button button-quiet" data-fav-remove="${listener.employee_id}">Remove</button></div>
+            <div class="listener-media">
+              <div class="abstract-avatar tone-${listenerTone(listener.employee_id)}"><img src="${P.esc(avatarFor({ id: listener.employee_id }))}" alt="${P.esc(listener.name)} profile" loading="lazy"></div>
+              <span class="listener-status badge ${P.esc(listener.status || '')}"><i></i>${statusText(listener.status)}</span>
+              <button class="favorite-btn saved" data-fav-remove="${P.esc(listener.employee_id)}" aria-label="Remove from favourites"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg></button>
+            </div>
+            <div class="listener-body">
+              <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span>${P.esc(listener.listener_language || 'Malayalam')}</span></div>
+              <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
+              <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-fav-call="${P.esc(listener.employee_id)}" ${listener.status !== 'available' ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg>${listener.status === 'available' ? 'Start voice call' : statusText(listener.status)}</button>
+            </div>
           </article>`).join('')
         : emptyState('No favourites yet', 'Tap the heart on a listener card to save them here.');
       $$('[data-fav-call]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.favCall)));
@@ -828,7 +912,7 @@
       $('#walletHistory').innerHTML = (response.wallet || []).length
         ? response.wallet.map((entry) => `
           <article class="list-item"><div><strong>${entry.seconds_delta > 0 ? '+' : '−'}${P.duration(Math.abs(entry.seconds_delta))}</strong><p>${P.esc(entry.note || entry.type)}</p></div><small>${P.date(entry.created_at)}</small></article>`).join('')
-        : emptyState('No wallet activity', 'Redeemed minutes and call deductions will appear here.');
+        : emptyState('No talk-time activity', 'Payments, redeemed minutes and call usage will appear here.');
 
       $$('[data-reconnect]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.reconnect)));
       $$('[data-report]').forEach((button) => button.addEventListener('click', () => reportCall(button.dataset.report, false)));
@@ -859,17 +943,12 @@
 
   function renderPlans(plans = []) {
     paymentPlans = plans;
-    const planDescription = 'Secure Razorpay checkout · UPI, cards and supported methods · billed by connected second.';
-    $('#walletPaymentIntro').textContent = 'Choose a pack and complete the secure Razorpay checkout. Verified payments add talk-time automatically.';
+    $('#walletPaymentIntro').textContent = 'Tap a pack to pay securely. Verified payments add minutes automatically.';
     $('#plansGrid').innerHTML = plans.map((plan) => `
-      <article class="plan-card ${plan.popular ? 'popular' : ''}">
-        ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
-        <span class="plan-kicker">TALK-TIME</span>
-        <h3>${Math.round(plan.seconds / 60)} <small>min</small></h3>
-        <strong>${P.money(plan.price_paise)}</strong>
-        <p>${P.esc(planDescription)}</p>
-        <button class="button button-primary" type="button" data-buy-plan="${plan.id}">Get this pack <span>→</span></button>
-      </article>`).join('');
+      <button class="plan-card ${plan.popular ? 'popular' : ''}" type="button" data-buy-plan="${P.esc(plan.id)}" aria-label="Buy ${Math.round(plan.seconds / 60)} minutes for ${P.money(plan.price_paise)}">
+        <span class="plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span>
+        <strong class="plan-price">${P.money(plan.price_paise)}</strong>
+      </button>`).join('');
     $$('[data-buy-plan]').forEach((button) => button.addEventListener('click', (event) => {
       openPayment(button.dataset.buyPlan, event.currentTarget);
     }));
@@ -1065,7 +1144,7 @@
       });
       updateBalance(response.balanceSeconds);
       $('#couponCode').value = '';
-      P.notify('Code redeemed', `${P.duration(response.seconds)} was added to your wallet.`);
+      P.notify('Code redeemed', `${P.duration(response.seconds)} was added to your talk-time.`);
       loadHistory();
     } catch (error) {
       P.toast(error.message, 'error');

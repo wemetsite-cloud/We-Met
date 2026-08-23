@@ -1,4 +1,4 @@
-const VERSION = '6.9.1';
+const VERSION = '7.0.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -14,10 +14,13 @@ const STATIC = [
   'legal.css',
   'about.html',
   'contact.html',
+  'pricing.html',
+  'delivery.html',
   'terms.html',
   'privacy.html',
   'refund.html',
   'safety.html',
+  'community-guidelines.html',
   'child-safety.html',
   'delete-account.html',
   'delete-account.js',
