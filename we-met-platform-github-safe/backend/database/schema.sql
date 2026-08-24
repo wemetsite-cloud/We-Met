@@ -338,6 +338,13 @@ CREATE TABLE IF NOT EXISTS listener_posts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS listener_post_likes (
+  post_id uuid NOT NULL REFERENCES listener_posts(id) ON DELETE CASCADE,
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, customer_id)
+);
+
 CREATE TABLE IF NOT EXISTS listener_follows (
   customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -591,6 +598,7 @@ CREATE INDEX IF NOT EXISTS idx_otp_challenges_phone ON otp_challenges(phone,role
 CREATE INDEX IF NOT EXISTS idx_listener_verifications_employee ON listener_verifications(employee_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_verifications_status ON listener_verifications(status,created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_listener_posts_employee ON listener_posts(employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_post_likes_customer ON listener_post_likes(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_follows_employee ON listener_follows(employee_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_subscriptions_customer ON listener_subscriptions(customer_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_subscriptions_employee ON listener_subscriptions(employee_id,updated_at DESC);

@@ -50,7 +50,7 @@ test('each listener membership is recurring ₹399 while every call remains wall
   assert.match(access, /payment\.status='captured'/);
   assert.doesNotMatch(socket, /FROM listener_subscriptions/);
   assert.doesNotMatch(socket, /subscriptionRequired: true/);
-  assert.match(socket, /ringCustomer\(user\.id, employeeId \|\| null/);
+  assert.match(socket, /const outcome = await ringCustomer\(user\.id, directEmployeeId/);
   assert.match(socket, /balance_seconds/);
   assert.match(customer, /Calls need only wallet talk-time/);
   assert.doesNotMatch(customer.slice(customer.indexOf('function requestCall'), customer.indexOf('function requestRandomCall')), /isSubscribed/);
@@ -129,7 +129,7 @@ test('v8.3 customer home contains only connection, language choice and verified 
   assert.doesNotMatch(html, /helloName|YOUR PRIVATE SPACE/);
   assert.match(app, /otherLanguageToggle'\)\.onchange = renderDirectory/);
   assert.match(app, /employeeId: null, allowOtherLanguages:/);
-  assert.match(app, /walletCheckoutModal/);
+  assert.match(app, /walletCheckoutSection/);
   assert.match(app, /theme: \{ color: '#e62d7d', backdrop_color: '#0c0d10' \}/);
   assert.match(css, /\.plans-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/);
   assert.match(css, /\.wallet-plan-card/);
@@ -216,6 +216,7 @@ test('v8.3 screenshot regressions keep calls, profiles, messages and checkout in
     assert.match(checkout, /backdrop_color: '#0c0d10'/);
   }
   assert.doesNotMatch(walletCheckout, /show\('#walletCheckoutModal', false\)/);
+  assert.match(walletCheckout, /history\.replaceState\(\{ marker: NAV_MARKER, tab: 'wallet'/);
   assert.doesNotMatch(membershipCheckout, /show\('#membershipCheckoutModal', false\)/);
 
   const customerProfile = customerHtml.slice(
@@ -237,4 +238,65 @@ test('v8.3 screenshot regressions keep calls, profiles, messages and checkout in
   assert.match(listenerApp, /saveProfileMedia\('bannerImage'/);
   assert.match(listenerCss, /\.app-profile\{min-height:0!important;padding:0 0 20px!important/);
   assert.match(listenerCss, /\.follower-count\{min-width:0;padding:0;border:0;border-radius:0;background:transparent/);
+});
+
+test('v8.4 keeps pre-ring searches invisible and exposes listener-only post insights', () => {
+  const schema = read('backend', 'database', 'schema.sql');
+  const socket = read('backend', 'src', 'socket.js');
+  const customerRoutes = read('backend', 'src', 'routes', 'customer-social.js');
+  const listenerRoutes = read('backend', 'src', 'routes', 'employee-social.js');
+  const customerApp = read('customer-site', 'app.js');
+  const listenerApp = read('employee-site', 'app.js');
+  const listenerHtml = read('employee-site', 'index.html');
+
+  const randomCall = customerApp.slice(
+    customerApp.indexOf('function requestRandomCall'),
+    customerApp.indexOf('function syncCallRequestControls'),
+  );
+  assert.doesNotMatch(randomCall, /openCall\(\)|currentCall\s*=/);
+  assert.match(customerApp, /socket\.on\('call:ringing'[\s\S]*openCall\(\)/);
+  assert.match(customerApp, /socket\.timeout\(12_000\)\.emit\('call:request'/);
+  assert.match(customerApp, /if \(!liveDirectoryReady \|\| !socket\?\.connected\) return 'offline'/);
+  assert.match(customerApp, /liveDirectoryReady = true;[\s\S]{0,500}renderDirectory\(\)/);
+  assert.match(socket, /availabilityReply\(acknowledge, outcome/);
+  assert.match(socket, /return preferred \? preferredEmployeeId : null/);
+  assert.match(socket, /runtime\.status !== 'ringing' \|\| runtime\.ending \|\| runtime\.accepting/);
+  assert.match(socket, /if \(!hasLiveSocket\(user\.id\) \|\| user\.listener_availability !== 'online'\)/);
+  const incomingDispatch = socket.indexOf("emitToUser(employeeId, 'call:incoming'");
+  const customerRingingDispatch = socket.indexOf("emitToUser(customerId, 'call:ringing'");
+  assert.ok(incomingDispatch >= 0 && incomingDispatch < customerRingingDispatch);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS listener_post_likes/);
+  assert.match(customerRoutes, /\/listener-posts\/:postId\/like/);
+  assert.match(listenerRoutes, /\/posts\/:id\/insights/);
+  assert.match(listenerRoutes, /router\.patch\('\/posts\/:id'/);
+  assert.match(listenerHtml, /id="listenerPostDetailModal"/);
+  assert.match(listenerHtml, /id="listenerPostEditModal"/);
+  assert.match(listenerApp, /async function openPostInsights/);
+  assert.match(listenerApp, /async function openPostEditor/);
+  assert.match(listenerApp, /async function savePostEdit/);
+});
+
+test('v8.5 keeps listener media fresh, ships the supplied default banner and permits embedded Razorpay checkout', () => {
+  const publicRoutes = read('backend', 'src', 'routes', 'public.js');
+  const socket = read('backend', 'src', 'socket.js');
+  const customerApp = read('customer-site', 'app.js');
+  const customerCss = read('customer-site', 'style.css');
+  const listenerApp = read('employee-site', 'app.js');
+  const listenerCss = read('employee-site', 'style.css');
+  const customerHeaders = read('customer-site', '_headers');
+
+  assert.match(publicRoutes, /Cache-Control', 'no-store, max-age=0'/);
+  assert.match(customerApp, /assets\/default-listener-banner\.png/);
+  assert.match(listenerApp, /assets\/default-listener-banner\.png/);
+  assert.match(listenerApp, /profileMediaVersion = Date\.now\(\)/);
+  assert.match(socket, /io\.emit\('listener:profile-updated'/);
+  assert.match(customerApp, /socket\.on\('listener:profile-updated'/);
+  assert.match(customerApp, /if \(wasRazorpayOpen && activeWalletRazorpay\)[\s\S]{0,220}checkout\.close\(\)/);
+  assert.match(customerApp, /classList\.add\('wallet-checkout-active'\)/);
+  assert.match(customerCss, /#tab-wallet\.wallet-checkout-active>:not\(#walletCheckoutSection\)/);
+  assert.match(listenerCss, /\.listener-profile-editor\.hidden\{display:none!important\}/);
+  assert.match(customerHeaders, /script-src 'self' https:\/\/checkout\.razorpay\.com/);
+  assert.match(customerHeaders, /frame-src https:\/\/api\.razorpay\.com https:\/\/checkout\.razorpay\.com/);
+  assert.equal(fs.existsSync(path.join(root, 'customer-site', 'assets', 'default-listener-banner.png')), true);
+  assert.equal(fs.existsSync(path.join(root, 'employee-site', 'assets', 'default-listener-banner.png')), true);
 });

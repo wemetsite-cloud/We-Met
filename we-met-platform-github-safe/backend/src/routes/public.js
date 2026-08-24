@@ -33,7 +33,7 @@ router.get('/listener-profile-image/:id', asyncHandler(async (req, res) => {
   const image = decodeProfileImage(result.rows[0]?.profile_image);
   if (!image) return res.status(404).end();
   res.setHeader('Content-Type', image.mime);
-  res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('Content-Length', String(image.buffer.length));
   return res.end(image.buffer);
 }));
@@ -48,7 +48,7 @@ router.get('/listener-banner-image/:id', asyncHandler(async (req, res) => {
   const image = decodeProfileImage(result.rows[0]?.banner_image);
   if (!image) return res.status(404).end();
   res.setHeader('Content-Type', image.mime);
-  res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('Content-Length', String(image.buffer.length));
   return res.end(image.buffer);
 }));

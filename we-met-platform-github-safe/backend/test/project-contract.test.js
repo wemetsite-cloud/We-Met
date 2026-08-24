@@ -20,7 +20,10 @@ test('ships authenticated Razorpay checkout without exposing the secret to the f
   assert.doesNotMatch(routes, /router\.use\(authenticate, requireRole\('customer'\)\)/);
   assert.match(routes, /verifyPaymentSignature/);
   assert.match(routes, /status='paid'/);
-  assert.match(customerHtml, /https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js/);
+  assert.match(customerHtml, /id="walletCheckoutSection"/);
+  assert.match(customerApp, /function loadRazorpayCheckout/);
+  assert.match(customerApp, /script\.src = 'https:\/\/checkout\.razorpay\.com\/v1\/checkout\.js'/);
+  assert.doesNotMatch(customerHtml, /<script src="https:\/\/checkout\.razorpay\.com/);
   assert.match(customerApp, /razorpay_payment_id/);
   assert.doesNotMatch(customerApp, /RAZORPAY_KEY_SECRET|keySecret/);
   assert.match(backendConfig, /path\.join\(__dirname, '\.\.', '\.\.', '\.env'\)/);
@@ -108,7 +111,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '8\.3\.0'/);
+    assert.match(serviceWorker, /const VERSION = '8\.5\.0'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }

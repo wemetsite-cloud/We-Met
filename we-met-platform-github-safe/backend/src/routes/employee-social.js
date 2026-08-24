@@ -125,10 +125,11 @@ router.get('/verification/audio/:id', asyncHandler(async (req, res) => {
 
 router.get('/posts', asyncHandler(async (req, res) => {
   const result = await db.query(`
-    SELECT id,caption,image_mime,image_size,created_at,updated_at
-    FROM listener_posts WHERE employee_id=$1 ORDER BY created_at DESC LIMIT 100
+    SELECT p.id,p.caption,p.image_mime,p.image_size,p.created_at,p.updated_at,
+           (SELECT COUNT(*)::int FROM listener_post_likes likes WHERE likes.post_id=p.id) AS like_count
+    FROM listener_posts p WHERE p.employee_id=$1 ORDER BY p.created_at DESC LIMIT 100
   `, [req.user.id]);
-  res.json({ posts: result.rows.map((post) => ({ ...post, imageUrl: `/api/employee/posts/${post.id}/image` })) });
+  res.json({ posts: result.rows.map((post) => ({ ...post, likeCount: Number(post.like_count || 0), imageUrl: `/api/employee/posts/${post.id}/image` })) });
 }));
 
 router.post('/posts', imageUpload.single('photo'), asyncHandler(async (req, res) => {
@@ -146,6 +147,37 @@ router.post('/posts', imageUpload.single('photo'), asyncHandler(async (req, res)
   res.status(201).json({ post: { ...result.rows[0], imageUrl: `/api/employee/posts/${result.rows[0].id}/image` } });
 }));
 
+router.patch('/posts/:id', imageUpload.single('photo'), asyncHandler(async (req, res) => {
+  if (req.user.listener_verification_status !== 'approved') {
+    return res.status(403).json({ error: 'Complete listener verification before editing photos.' });
+  }
+  if (req.file?.buffer?.length && !fileSignatureMatches(req.file.buffer, req.file.mimetype)) {
+    return res.status(400).json({ error: 'The replacement photo format could not be verified.' });
+  }
+  const caption = String(req.body.caption || '').trim().slice(0, 1000) || null;
+  const hasPhoto = Boolean(req.file?.buffer?.length);
+  const result = await db.query(`
+    UPDATE listener_posts
+    SET caption=$3,
+        image_mime=CASE WHEN $4::boolean THEN $5 ELSE image_mime END,
+        image_size=CASE WHEN $4::boolean THEN $6 ELSE image_size END,
+        image_data=CASE WHEN $4::boolean THEN $7 ELSE image_data END,
+        updated_at=now()
+    WHERE id=$1 AND employee_id=$2
+    RETURNING id,caption,image_mime,image_size,created_at,updated_at
+  `, [
+    req.params.id,
+    req.user.id,
+    caption,
+    hasPhoto,
+    hasPhoto ? req.file.mimetype : null,
+    hasPhoto ? req.file.size : null,
+    hasPhoto ? req.file.buffer : null,
+  ]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Post not found.' });
+  res.json({ post: { ...result.rows[0], imageUrl: `/api/employee/posts/${result.rows[0].id}/image` } });
+}));
+
 router.get('/posts/:id/image', asyncHandler(async (req, res) => {
   const result = await db.query(`
     SELECT image_mime,image_size,image_data
@@ -157,6 +189,63 @@ router.get('/posts/:id/image', asyncHandler(async (req, res) => {
   res.setHeader('Content-Length', String(image.image_size));
   res.setHeader('Cache-Control', 'private, no-store');
   res.end(image.image_data);
+}));
+
+router.get('/posts/:id/insights', asyncHandler(async (req, res) => {
+  const post = await db.query(`
+    SELECT p.id,p.caption,p.image_size,p.created_at,p.updated_at,
+           (SELECT COUNT(*)::int FROM listener_post_likes likes WHERE likes.post_id=p.id) AS like_count
+    FROM listener_posts p
+    WHERE p.id=$1 AND p.employee_id=$2
+  `, [req.params.id, req.user.id]);
+  if (!post.rows[0]) return res.status(404).json({ error: 'Post not found.' });
+
+  const likes = await db.query(`
+    SELECT likes.customer_id,likes.created_at,u.name,u.username,u.profile_image
+    FROM listener_post_likes likes
+    JOIN users u ON u.id=likes.customer_id AND u.role='customer'
+    WHERE likes.post_id=$1
+    ORDER BY likes.created_at DESC
+    LIMIT 500
+  `, [req.params.id]);
+  const row = post.rows[0];
+  res.json({
+    post: {
+      id: row.id,
+      caption: row.caption,
+      imageSize: Number(row.image_size || 0),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      likeCount: Number(row.like_count || 0),
+      imageUrl: `/api/employee/posts/${row.id}/image`,
+    },
+    likes: likes.rows.map((like) => ({
+      customerId: like.customer_id,
+      name: like.username || like.name,
+      username: like.username || null,
+      profileImage: profileImageReference(like.profile_image, like.customer_id),
+      likedAt: like.created_at,
+      imageUrl: String(like.profile_image || '').startsWith('data:image/')
+        ? `/api/employee/posts/${row.id}/likes/${like.customer_id}/image`
+        : null,
+    })),
+  });
+}));
+
+router.get('/posts/:postId/likes/:customerId/image', asyncHandler(async (req, res) => {
+  const result = await db.query(`
+    SELECT u.profile_image
+    FROM listener_post_likes likes
+    JOIN listener_posts post ON post.id=likes.post_id
+    JOIN users u ON u.id=likes.customer_id AND u.role='customer'
+    WHERE likes.post_id=$1 AND likes.customer_id=$2 AND post.employee_id=$3
+  `, [req.params.postId, req.params.customerId, req.user.id]);
+  const image = decodeProfileImage(result.rows[0]?.profile_image);
+  if (!image) return res.status(404).end();
+  res.setHeader('Content-Type', image.mime);
+  res.setHeader('Content-Length', String(image.buffer.length));
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.end(image.buffer);
 }));
 
 router.delete('/posts/:id', asyncHandler(async (req, res) => {

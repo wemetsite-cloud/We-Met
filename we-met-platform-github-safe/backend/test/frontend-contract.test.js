@@ -85,5 +85,5 @@ test('the customer portal ships the v8 membership layout and phone-first authent
   assert.match(app, /data-subscribe/);
   assert.match(app, /Calls need only wallet talk-time/);
   assert.doesNotMatch(app, /data-video|Start video call/);
-  assert.match(serviceWorker, /const VERSION = '8\.3\.0'/);
+  assert.match(serviceWorker, /const VERSION = '8\.5\.0'/);
 });

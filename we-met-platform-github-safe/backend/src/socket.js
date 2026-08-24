@@ -48,7 +48,7 @@ function createSocketServer(io) {
   function publicListeners() {
     const priority = { available: 0, ringing: 1, busy: 2, break: 3 };
     return [...employees.entries()]
-      .map(([id, employee]) => ({ id, name: employee.name, bio: employee.bio || '', avatar: employee.avatar || '', banner: employee.banner || '', language: employee.language || 'Malayalam', status: employee.state }))
+      .map(([id, employee]) => ({ id, name: employee.name, bio: employee.bio || '', avatar: employee.avatar || '', banner: employee.banner || '', language: employee.language || 'Malayalam', status: employee.state, updatedAt: employee.updatedAt || null }))
       .sort((a, b) => (priority[a.status] ?? 9) - (priority[b.status] ?? 9) || a.name.localeCompare(b.name));
   }
 
@@ -70,6 +70,7 @@ function createSocketServer(io) {
       avatar: user.profile_image || '',
       banner: user.banner_image || '',
       language: user.listener_language || 'Malayalam',
+      updatedAt: user.updated_at || null,
       lastAssigned: employees.get(user.id)?.lastAssigned || 0,
     });
   }
@@ -99,7 +100,7 @@ function createSocketServer(io) {
                CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
                CASE WHEN banner_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE banner_image END AS banner_image,
                balance_seconds,status,listener_availability,listener_language,listener_verification_status,
-               suspended_until, suspension_reason, auth_version
+               suspended_until, suspension_reason, auth_version, updated_at
         FROM users
         WHERE id = $1
       `, [payload.sub]);
@@ -132,7 +133,7 @@ function createSocketServer(io) {
 
     if (preferredEmployeeId) {
       const preferred = available.find(([id]) => id === preferredEmployeeId);
-      if (preferred) return preferredEmployeeId;
+      return preferred ? preferredEmployeeId : null;
     }
 
     const primary = available
@@ -148,8 +149,9 @@ function createSocketServer(io) {
 
   async function ringCustomer(customerId, preferredEmployeeId = null, triedEmployees = [], options = {}) {
     if (userCall.has(customerId)) {
-      emitToUser(customerId, 'call:error', { message: 'You already have a call in progress.' });
-      return;
+      const outcome = { ok: false, error: 'You already have a call in progress.' };
+      emitToUser(customerId, 'call:error', { message: outcome.error });
+      return outcome;
     }
 
     const customerResult = await db.query(`
@@ -160,20 +162,20 @@ function createSocketServer(io) {
     const customer = customerResult.rows[0];
 
     if (!customer || accountUnavailable(customer)) {
-      emitToUser(customerId, 'call:error', { message: 'Your account is not available for calls.' });
-      return;
+      const outcome = { ok: false, error: 'Your account is not available for calls.' };
+      emitToUser(customerId, 'call:error', { message: outcome.error });
+      return outcome;
     }
 
     if (Number(customer.balance_seconds) < config.minimumStartSeconds) {
-      emitToUser(customerId, 'call:error', {
-        message: 'Your wallet has no talk-time. Add minutes to start a call.',
-        needsTopup: true,
-      });
-      return;
+      const outcome = { ok: false, error: 'Your wallet has no talk-time. Add minutes to start a call.', needsTopup: true };
+      emitToUser(customerId, 'call:error', { message: outcome.error, needsTopup: true });
+      return outcome;
     }
 
     let primaryLanguage = String(options.primaryLanguage || 'Malayalam').trim() || 'Malayalam';
     const allowOtherLanguages = Boolean(options.allowOtherLanguages);
+    const directEmployeeId = options.directEmployeeId || preferredEmployeeId || null;
 
     if (preferredEmployeeId) {
       const preferred = employees.get(preferredEmployeeId);
@@ -183,20 +185,29 @@ function createSocketServer(io) {
     const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
     if (!employeeId) {
       const otherLanguagesAvailable = [...employees.values()].some((item) => item.state === 'available' && !sameLanguage(item.language, primaryLanguage));
-      emitToUser(customerId, 'call:unavailable', {
-        message: allowOtherLanguages
+      const outcome = {
+        ok: false,
+        unavailable: true,
+        message: directEmployeeId
+          ? 'This listener is not available right now. Please try again shortly.'
+          : allowOtherLanguages
           ? `No ${primaryLanguage} or other-language listener is available right now. Please try again shortly.`
           : `No ${primaryLanguage} listener is available right now.${otherLanguagesAvailable ? ' Turn on “Suggest other languages” to connect with another available listener.' : ' Please try again shortly.'}`,
         otherLanguagesAvailable,
-      });
-      return;
+      };
+      emitToUser(customerId, 'call:unavailable', outcome);
+      return outcome;
     }
 
     const employee = employees.get(employeeId);
     if (!employee || employee.state !== 'available' || !hasLiveSocket(employeeId)) {
       if (!hasLiveSocket(employeeId)) employees.delete(employeeId);
-      await ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
-      return;
+      if (directEmployeeId) {
+        const outcome = { ok: false, unavailable: true, message: 'This listener is not available right now. Please try again shortly.' };
+        emitToUser(customerId, 'call:unavailable', outcome);
+        return outcome;
+      }
+      return ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
     }
     employee.state = 'ringing';
     employee.lastAssigned = ++assignmentSequence;
@@ -219,8 +230,9 @@ function createSocketServer(io) {
       if (employees.get(employeeId) === employee) employee.state = 'available';
       broadcastListeners();
       if (error.code === '23505') {
-        emitToUser(customerId, 'call:error', { message: 'A call is already in progress.' });
-        return;
+        const outcome = { ok: false, error: 'A call is already in progress.' };
+        emitToUser(customerId, 'call:error', { message: outcome.error });
+        return outcome;
       }
       throw error;
     }
@@ -239,8 +251,12 @@ function createSocketServer(io) {
       `, [callRow.id]);
       if (employees.get(employeeId) === employee && employee.state === 'ringing') employee.state = 'available';
       broadcastListeners();
-      await ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
-      return;
+      if (directEmployeeId) {
+        const outcome = { ok: false, unavailable: true, message: 'This listener went offline before the call could ring.' };
+        emitToUser(customerId, 'call:unavailable', outcome);
+        return outcome;
+      }
+      return ringCustomer(customerId, null, [...triedEmployees, employeeId], { primaryLanguage, allowOtherLanguages });
     }
 
     const runtime = {
@@ -254,11 +270,13 @@ function createSocketServer(io) {
       language: employee.language || primaryLanguage,
       primaryLanguage,
       allowOtherLanguages,
+      directEmployeeId,
       customer: { id: customer.id, name: customer.name },
       balanceSeconds: Number(customer.balance_seconds),
       signalingReady: new Set(),
       offerStarted: false,
       activating: false,
+      accepting: false,
       mediaConnected: new Set(),
       ringTimer: null,
       connectTimer: null,
@@ -273,6 +291,14 @@ function createSocketServer(io) {
     userCall.set(customerId, runtime.id);
     userCall.set(employeeId, runtime.id);
 
+    // Dispatch the listener's real incoming call first. The customer receives a
+    // ringing screen only after an available, connected listener was selected.
+    emitToUser(employeeId, 'call:incoming', {
+      callId: runtime.id,
+      customer: runtime.customer,
+      balanceSeconds: runtime.balanceSeconds,
+    });
+
     emitToUser(customerId, 'call:ringing', {
       callId: runtime.id,
       employee: {
@@ -285,20 +311,15 @@ function createSocketServer(io) {
       },
     });
 
-    emitToUser(employeeId, 'call:incoming', {
-      callId: runtime.id,
-      customer: runtime.customer,
-      balanceSeconds: runtime.balanceSeconds,
-    });
-
     runtime.ringTimer = setTimeout(() => {
       retryCall(runtime.id, 'The listener did not answer.').catch(console.error);
     }, config.ringSeconds * 1000);
+    return { ok: true, state: 'ringing', callId: runtime.id, employeeId };
   }
 
   async function retryCall(callId, reason) {
     const runtime = calls.get(callId);
-    if (!runtime || runtime.ending) return;
+    if (!runtime || runtime.ending || runtime.accepting) return;
     runtime.ending = true;
 
     if (runtime.ringTimer) clearTimeout(runtime.ringTimer);
@@ -318,8 +339,14 @@ function createSocketServer(io) {
     restoreEmployeeAfterCall(runtime.employeeId);
 
     emitToUser(runtime.employeeId, 'call:ended', { callId, reason });
-    emitToUser(runtime.customerId, 'call:retrying', { reason });
     broadcastListeners();
+
+    if (runtime.directEmployeeId) {
+      emitToUser(runtime.customerId, 'call:ended', { callId, reason });
+      return;
+    }
+
+    emitToUser(runtime.customerId, 'call:retrying', { reason });
 
     await ringCustomer(runtime.customerId, null, runtime.tried, { primaryLanguage: runtime.primaryLanguage, allowOtherLanguages: runtime.allowOtherLanguages });
   }
@@ -613,9 +640,15 @@ function createSocketServer(io) {
       availabilityReply(acknowledge, { ok: true, status: 'offline' });
     }));
 
-    socket.on('call:request', safeHandler(async ({ employeeId = null, allowOtherLanguages = false } = {}) => {
-      if (user.role !== 'customer') return;
-      await ringCustomer(user.id, employeeId || null, [], { primaryLanguage: 'Malayalam', allowOtherLanguages: Boolean(allowOtherLanguages) });
+    socket.on('call:request', safeHandler(async ({ employeeId = null, allowOtherLanguages = false } = {}, acknowledge) => {
+      if (user.role !== 'customer') return availabilityReply(acknowledge, { ok: false, error: 'This is not a customer account.' });
+      const directEmployeeId = employeeId || null;
+      const outcome = await ringCustomer(user.id, directEmployeeId, [], {
+        primaryLanguage: 'Malayalam',
+        allowOtherLanguages: directEmployeeId ? false : Boolean(allowOtherLanguages),
+        directEmployeeId,
+      });
+      availabilityReply(acknowledge, outcome || { ok: false, error: 'The call could not start.' });
     }));
 
     socket.on('call:cancel', safeHandler(async ({ callId } = {}) => {
@@ -628,25 +661,40 @@ function createSocketServer(io) {
     socket.on('call:accept', safeHandler(async ({ callId } = {}) => {
       if (user.role !== 'employee') return;
       const runtime = calls.get(callId);
-      if (!runtime || runtime.employeeId !== user.id || runtime.status !== 'ringing') return;
+      if (!runtime || runtime.employeeId !== user.id || runtime.status !== 'ringing' || runtime.ending || runtime.accepting) return;
       if (user.listener_availability !== 'online' || !hasLiveSocket(user.id)) {
         await retryCall(callId, 'The listener is no longer available.');
         return;
       }
 
+      runtime.accepting = true;
       if (runtime.ringTimer) clearTimeout(runtime.ringTimer);
       runtime.ringTimer = null;
-      const result = await db.query(`
-        UPDATE calls SET status = 'connecting'
-        WHERE id = $1 AND status = 'ringing'
-        RETURNING id
-      `, [callId]);
-      if (!result.rows[0]) {
-        await endCall(callId, 'The call could not be accepted.');
+      let result;
+      try {
+        result = await db.query(`
+          UPDATE calls SET status = 'connecting'
+          WHERE id = $1 AND status = 'ringing'
+          RETURNING id
+        `, [callId]);
+      } catch (error) {
+        runtime.accepting = false;
+        if (!runtime.ending) await endCall(callId, 'The call could not be accepted.');
+        throw error;
+      }
+      if (!result.rows[0] || runtime.ending) {
+        runtime.accepting = false;
+        if (!runtime.ending) await endCall(callId, 'The call could not be accepted.');
+        return;
+      }
+      if (!hasLiveSocket(user.id) || user.listener_availability !== 'online') {
+        runtime.accepting = false;
+        await retryCall(callId, 'The listener disconnected before the call connected.');
         return;
       }
 
       runtime.status = 'connecting';
+      runtime.accepting = false;
       runtime.signalingReady.clear();
       runtime.mediaConnected.clear();
       runtime.offerStarted = false;
@@ -784,14 +832,30 @@ function createSocketServer(io) {
   });
 
   async function refreshEmployeeProfile(userId) {
-    const current = employees.get(userId);
-    if (!current) return;
     const result = await db.query(`SELECT id,name,username,bio,
       CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
       CASE WHEN banner_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE banner_image END AS banner_image,
-      listener_language,listener_availability,listener_verification_status,status
+      listener_language,listener_availability,listener_verification_status,status,updated_at
       FROM users WHERE id=$1 AND role='employee'`, [userId]);
     const row = result.rows[0];
+    const current = employees.get(userId);
+    if (row?.status === 'active' && row.listener_verification_status === 'approved') {
+      io.emit('listener:profile-updated', {
+        listener: {
+          id: row.id,
+          name: row.username || row.name,
+          bio: row.bio || '',
+          avatar: row.profile_image || '',
+          banner: row.banner_image || '',
+          language: row.listener_language || 'Malayalam',
+          updatedAt: row.updated_at,
+        },
+      });
+    }
+    if (!current) {
+      broadcastListeners();
+      return;
+    }
     if (!row || row.status !== 'active' || row.listener_verification_status !== 'approved' || !hasLiveSocket(userId) || !['online','break'].includes(row.listener_availability)) {
       employees.delete(userId);
       if (!row || row.status !== 'active' || row.listener_availability === 'offline') {
@@ -803,6 +867,7 @@ function createSocketServer(io) {
       current.avatar = row.profile_image || '';
       current.banner = row.banner_image || '';
       current.language = row.listener_language || 'Malayalam';
+      current.updatedAt = row.updated_at;
       current.availability = row.listener_availability;
       if (current.state !== 'ringing' && current.state !== 'busy') current.state = row.listener_availability === 'break' ? 'break' : 'available';
     }

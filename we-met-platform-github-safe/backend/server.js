@@ -36,7 +36,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(), payment=(self "https://checkout.razorpay.com" "https://api.razorpay.com")');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   if (config.isProduction) {

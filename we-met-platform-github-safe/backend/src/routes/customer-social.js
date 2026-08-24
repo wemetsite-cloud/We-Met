@@ -22,7 +22,7 @@ async function listenerDirectory(customerId, employeeId = null) {
   const whereId = employeeId ? 'AND u.id=$2' : '';
   if (employeeId) params.push(employeeId);
   const result = await db.query(`
-    SELECT u.id,u.name,u.username,u.bio,u.profile_image,u.banner_image,
+    SELECT u.id,u.name,u.username,u.bio,u.profile_image,u.banner_image,u.updated_at,
            u.listener_language,u.listener_availability,u.last_seen_at,
            EXISTS(SELECT 1 FROM listener_follows f WHERE f.customer_id=$1 AND f.employee_id=u.id) AS following,
            EXISTS(
@@ -58,6 +58,7 @@ async function listenerDirectory(customerId, employeeId = null) {
     subscribed: Boolean(row.subscribed),
     postCount: Number(row.post_count || 0),
     lastSeenAt: row.last_seen_at,
+    updatedAt: row.updated_at,
   }));
 }
 
@@ -78,11 +79,15 @@ router.get('/listeners/:id/profile', asyncHandler(async (req, res) => {
   let posts = [];
   if (listener.subscribed) {
     const postResult = await db.query(`
-      SELECT id,caption,image_mime,image_size,created_at
-      FROM listener_posts WHERE employee_id=$1
+      SELECT p.id,p.caption,p.image_mime,p.image_size,p.created_at,
+             EXISTS(
+               SELECT 1 FROM listener_post_likes likes
+               WHERE likes.post_id=p.id AND likes.customer_id=$2
+             ) AS liked
+      FROM listener_posts p WHERE p.employee_id=$1
       ORDER BY created_at DESC LIMIT 60
-    `, [listener.id]);
-    posts = postResult.rows.map((post) => ({ ...post, imageUrl: `/api/customer/listener-posts/${post.id}/image` }));
+    `, [listener.id, req.user.id]);
+    posts = postResult.rows.map((post) => ({ ...post, liked: Boolean(post.liked), imageUrl: `/api/customer/listener-posts/${post.id}/image` }));
   }
   res.json({ listener, posts, postsLocked: !listener.subscribed && listener.postCount > 0 });
 }));
@@ -99,6 +104,25 @@ router.get('/listener-posts/:postId/image', asyncHandler(async (req, res) => {
   res.setHeader('Content-Length', String(row.image_size));
   res.setHeader('Cache-Control', 'private, no-store');
   return res.end(row.image_data);
+}));
+
+router.post('/listener-posts/:postId/like', asyncHandler(async (req, res) => {
+  const post = await db.query('SELECT employee_id FROM listener_posts WHERE id=$1', [req.params.postId]);
+  if (!post.rows[0]) return res.status(404).json({ error: 'Post not found.' });
+  await requireActiveSubscription(db, req.user.id, post.rows[0].employee_id);
+  await db.query(`
+    INSERT INTO listener_post_likes(post_id,customer_id)
+    VALUES($1,$2) ON CONFLICT DO NOTHING
+  `, [req.params.postId, req.user.id]);
+  res.json({ ok: true, liked: true });
+}));
+
+router.delete('/listener-posts/:postId/like', asyncHandler(async (req, res) => {
+  const post = await db.query('SELECT employee_id FROM listener_posts WHERE id=$1', [req.params.postId]);
+  if (!post.rows[0]) return res.status(404).json({ error: 'Post not found.' });
+  await requireActiveSubscription(db, req.user.id, post.rows[0].employee_id);
+  await db.query('DELETE FROM listener_post_likes WHERE post_id=$1 AND customer_id=$2', [req.params.postId, req.user.id]);
+  res.json({ ok: true, liked: false });
 }));
 
 router.post('/listeners/:id/follow', asyncHandler(async (req, res) => {

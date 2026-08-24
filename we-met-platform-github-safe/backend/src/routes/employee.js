@@ -196,7 +196,7 @@ router.patch('/profile', asyncHandler(async (req, res) => {
        profile_image=CASE WHEN $5::boolean THEN $6 ELSE profile_image END,
        banner_image=CASE WHEN $7::boolean THEN $8 ELSE banner_image END,
        updated_at=now()
-       WHERE id=$1 RETURNING id,name,username,email,phone,bio,profile_image,banner_image,employee_code,listener_language,listener_rate_paise`,
+       WHERE id=$1 RETURNING id,name,username,email,phone,bio,profile_image,banner_image,employee_code,listener_language,listener_rate_paise,updated_at`,
       [
         req.user.id, name, username, bio,
         profileImage !== undefined, profileImage === undefined ? null : profileImage,
