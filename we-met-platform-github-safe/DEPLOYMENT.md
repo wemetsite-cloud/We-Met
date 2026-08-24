@@ -1,4 +1,4 @@
-# We Met v8 deployment
+# We Met v8.1 deployment
 
 This package contains the customer site, listener workspace, admin operations portal, API server and PostgreSQL schema.
 
@@ -55,6 +55,12 @@ The default local customer URL is `http://localhost:3000/`; listener and admin a
 5. Confirm a subscribed customer with insufficient talk-time is sent to Wallet, and that membership never provides a free call.
 6. Buy talk-time from Wallet, call an online subscribed listener and confirm billing starts only after audio connects.
 7. Confirm Admin → Payments records the top-up, subscription payment and ₹50 listener credit exactly once.
-8. Refresh each portal once so the v8 service worker replaces the old cache.
+8. Refresh each portal once so the v8.1 service worker replaces the old cache.
+
+## Render duplicate-phone migration
+
+v8.1 repairs the legacy `uq_users_role_phone` startup failure before creating the unique index. If an older database contains more than one account with the same role and phone, the migration keeps the active account with the strongest wallet/activity record and clears the phone only from older duplicate rows. It does not delete an account, call, wallet entry, payment, post or message.
+
+After uploading v8.1, use **Manual Deploy → Deploy latest commit** in Render. A successful log contains `We Met database initialized successfully`, followed by the server startup line. Then open `/api/health` before testing `/admin/`.
 
 Listener payouts remain administrator-managed: pay the listener by the agreed external method, then use **Admin → Listener wallets → Record paid** to create the audited ledger entry.

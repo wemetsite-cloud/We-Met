@@ -1,6 +1,6 @@
 {
-  "version": "8.0.0",
-  "name": "We Met v8.0.0 Exclusive Listener Platform",
+  "version": "8.1.0",
+  "name": "We Met v8.1.0 Professional Listener Platform",
   "changes": [
     "Introduces phone-first OTP onboarding with password login for returning customers and listeners",
     "Adds administrator-reviewed Malayalam voice verification for every self-created listener account",
@@ -8,6 +8,10 @@
     "Adds separate recurring ₹399 Razorpay memberships for each listener using plan_TTIsGpwDtJmgi5",
     "Keeps paid calls separate from membership access and bills every connected second from the main talk-time wallet",
     "Adds audited subscription payments, ₹50 listener credits, post moderation and a complete operations dashboard",
-    "Rebuilds customer, listener, admin, wallet, Razorpay and login interfaces in the We Met pink-and-black theme"
+    "Rebuilds customer, listener, admin, wallet, Razorpay and login interfaces in the We Met pink-and-black theme",
+    "Repairs duplicate legacy phone records before creating the production uniqueness index so Render can start safely",
+    "Removes repeated portal greetings, adds random subscribed-listener connection and keeps other languages optional",
+    "Adds compact three-across wallet packs and a branded in-wallet confirmation before Razorpay Checkout",
+    "Makes admin-created listeners approved by default with an optional voice-verification control"
   ]
 }

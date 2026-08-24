@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const esc = P.esc;
-  const NAV_MARKER = 'we-met-customer-v8';
+  const NAV_MARKER = 'we-met-customer-v81';
   const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'favorites', 'notifications', 'support']);
   const TAB_PARENT = { history: 'profile', favorites: 'profile', notifications: 'profile', support: 'profile' };
 
@@ -28,6 +28,7 @@
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
   let directPollTimer = null;
+  let pendingWalletCheckout = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
     P.toast(event.detail?.message || 'Your session expired. Please start again.', 'error');
@@ -67,7 +68,7 @@
   }
 
   function currentOverlay() {
-    return ['listenerProfileModal', 'authModal', 'legalModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
+    return ['listenerProfileModal', 'authModal', 'legalModal', 'walletCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
   function syncBodyState() {
@@ -100,7 +101,7 @@
     history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title);
     window.addEventListener('popstate', (event) => {
       const state = event.state?.marker === NAV_MARKER ? event.state : { tab: 'home' };
-      ['authModal', 'listenerProfileModal', 'legalModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      ['authModal', 'listenerProfileModal', 'legalModal', 'walletCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
       releasePostUrls();
@@ -194,7 +195,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.0.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.1.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -227,6 +228,9 @@
     $('#tabs').onclick = (event) => { const button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); };
     $$('[data-jump]').forEach((button) => { button.onclick = () => selectTab(button.dataset.jump); });
     $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
+    $('#randomConnectButton').onclick = requestRandomCall;
+    $('#otherLanguageToggle').onchange = renderDirectory;
+    $('#walletCheckoutPay').onclick = beginWalletCheckout;
     $('#couponForm').onsubmit = redeem;
     $('#supportForm').onsubmit = sendSupport;
     $('#passwordForm').onsubmit = changePassword;
@@ -279,7 +283,6 @@
   async function enterApp() {
     document.body.classList.add('signed-in');
     show('#landing', false); show('#dashboard'); show('#openAuth', false); show('#logoutBtn');
-    $('#helloName').textContent = `Hello, ${String(me.name || 'there').split(/\s+/)[0]}`;
     $('#profileName').textContent = me.name || 'Customer';
     $('#customerProfileName').value = me.name || '';
     $('#profilePhoneText').textContent = me.phone || 'Private mobile';
@@ -336,13 +339,24 @@
   function renderDirectory() {
     const node = $('#listenerGrid');
     if (!node) return;
-    $('#availabilityText').textContent = directory.some((item) => liveStatus(item) === 'available') ? 'Verified listeners are online now' : 'Browse verified listener profiles';
-    node.innerHTML = directory.length ? directory.map((listener) => {
+    const showOtherLanguages = Boolean($('#otherLanguageToggle')?.checked);
+    const primaryListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam');
+    const otherListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam');
+    const eligibleOnline = directory.filter((listener) => (isActiveMember(listener.id) || listener.subscribed) && liveStatus(listener) === 'available' && (showOtherLanguages || String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam'));
+    $('#availabilityText').textContent = eligibleOnline.length
+      ? `${eligibleOnline.length} subscribed listener${eligibleOnline.length === 1 ? '' : 's'} online now`
+      : 'Connect when a subscribed listener is online';
+
+    const cards = (listeners) => listeners.map((listener) => {
       const status = liveStatus(listener);
       const subscribed = isActiveMember(listener.id) || listener.subscribed;
-      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-banner" style="--listener-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-card-avatar"><img src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>🎧 ${esc(listener.language || 'Malayalam')}</span><span>₹${(Number(listener.ratePaise || 100) / 100).toFixed(0)}/min</span>${subscribed ? '<span class="exclusive-tag">Exclusive active</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">View profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" type="button" ${status !== 'available' ? 'disabled' : ''}>Call</button></div></article>`;
-    }).join('') : emptyState('No verified listeners yet', 'Approved listener profiles will appear here.');
-    show('#listenerDiscovery'); show('#otherLanguageSection', false);
+      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-banner" style="--listener-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-card-avatar"><img src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><span class="verified-listener-label">Verified listener</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>${esc(listener.language || 'Malayalam')}</span><span>₹${(Number(listener.ratePaise || 100) / 100).toFixed(0)}/min</span>${subscribed ? '<span class="exclusive-tag">Member</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">Profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" type="button" ${status !== 'available' ? 'disabled' : ''}>Call</button></div></article>`;
+    }).join('');
+
+    node.innerHTML = primaryListeners.length ? cards(primaryListeners) : emptyState('No Malayalam listeners yet', 'Try the other-language option or check again soon.');
+    $('#otherLanguageGrid').innerHTML = otherListeners.length ? cards(otherListeners) : emptyState('No other languages yet', 'More verified listeners will appear here.');
+    show('#listenerDiscovery');
+    show('#otherLanguageSection', showOtherLanguages);
   }
 
   async function openListenerProfile(listenerId) {
@@ -389,7 +403,7 @@
     try {
       const order = await P.api('/api/subscriptions/create', { method: 'POST', body: JSON.stringify({ employeeId: listenerId }) });
       document.body.classList.add('razorpay-open');
-      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met Exclusive', description: `${order.listener.name} · ₹399 monthly`, image: new URL('assets/logo.svg', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, theme: { color: '#ff2f8d', backdrop_color: '#12070f' }, modal: { ondismiss: () => { document.body.classList.remove('razorpay-open'); button?.removeAttribute('disabled'); } }, handler: async (payment) => {
+      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met Exclusive', description: `${order.listener.name} · ₹399 monthly`, image: new URL('assets/logo.svg', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, escape: true, animation: true, ondismiss: () => { document.body.classList.remove('razorpay-open'); button?.removeAttribute('disabled'); } }, handler: async (payment) => {
         try { const verified = await P.api('/api/subscriptions/verify', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) }); await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]); closeOverlay('listenerProfileModal', false); P.toast(verified.message || 'Exclusive membership is active.', 'success'); openListenerProfile(listenerId); }
         catch (error) { P.toast(error.message, 'error'); }
         finally { document.body.classList.remove('razorpay-open'); button?.removeAttribute('disabled'); }
@@ -435,24 +449,40 @@
 
   async function loadPlans() {
     if (!me) return;
-    try { const response = await P.api('/api/customer/plans'); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a pack. Talk-time is charged only while audio is connected.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="plan-card-v8 ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">MOST POPULAR</span>' : ''}<div><span class="plan-orb"><b>${Math.round(plan.seconds / 60)}</b><small>minutes</small></span><div><h3>${esc(plan.name)}</h3><p>Private browser call credit</p></div></div><strong>${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy talk-time</button></article>`).join('') : emptyState('No talk-time packs', 'The administrator can publish wallet packs from the admin portal.'); }
+    try { const response = await P.api('/api/customer/plans'); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
     catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function openPayment(planId, button) {
+  function openPayment(planId, button) {
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan || typeof window.Razorpay !== 'function') return P.toast('Secure checkout is unavailable.', 'error');
-    button.disabled = true;
+    pendingWalletCheckout = { plan, button };
+    $('#walletCheckoutContent').innerHTML = `<div class="wallet-checkout-summary"><span class="wallet-checkout-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>minutes</small></span><div><small>Talk-time pack</small><h2 id="walletCheckoutTitle">${esc(plan.name)}</h2><p>Added after secure payment confirmation.</p></div><strong>${P.money(plan.price_paise)}</strong></div><div class="wallet-checkout-trust"><span>Secure payment</span><span>Connected-second billing</span><span>No card data stored by We Met</span></div>`;
+    $('#walletCheckoutPay').textContent = `Pay ${P.money(plan.price_paise)}`;
+    $('#walletCheckoutPay').disabled = false;
+    openOverlay('walletCheckoutModal');
+  }
+
+  async function beginWalletCheckout() {
+    if (!pendingWalletCheckout) return;
+    const { plan, button } = pendingWalletCheckout;
+    const payButton = $('#walletCheckoutPay');
+    payButton.disabled = true;
+    button?.setAttribute('disabled', '');
     try {
       const order = await P.api('/api/create-order', { method: 'POST', body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }) });
+      show('#walletCheckoutModal', false);
+      if (history.state?.marker === NAV_MARKER && history.state.overlay === 'walletCheckoutModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title);
+      syncBodyState();
       document.body.classList.add('razorpay-open');
-      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met Wallet', description: `${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/logo.svg', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, theme: { color: '#ff2f8d', backdrop_color: '#12070f' }, retry: { enabled: true }, modal: { ondismiss: () => { button.disabled = false; document.body.classList.remove('razorpay-open'); } }, handler: async (payment) => {
+      const finish = () => { button?.removeAttribute('disabled'); payButton.disabled = false; document.body.classList.remove('razorpay-open'); pendingWalletCheckout = null; };
+      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met Wallet', description: `${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/logo.svg', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, escape: true, animation: true, ondismiss: finish }, handler: async (payment) => {
         try { const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) }); updateBalance(verified.balance_seconds); await loadHistory(); P.toast(verified.message || 'Talk-time added.', 'success'); }
         catch (error) { P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error'); }
-        finally { button.disabled = false; document.body.classList.remove('razorpay-open'); }
+        finally { finish(); }
       } });
       checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Payment failed.', 'error')); checkout.open();
-    } catch (error) { button.disabled = false; document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
+    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
   }
 
   async function redeem(event) {
@@ -499,12 +529,23 @@
     closeOverlay('listenerProfileModal', false); socket.emit('call:request', { employeeId: listenerId, allowOtherLanguages: false });
   }
 
+  function requestRandomCall() {
+    if (!subscriptions.some((item) => item.active) && !directory.some((item) => item.subscribed)) return P.toast('Choose a listener and subscribe before using random connect.', 'info');
+    if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 120)) { P.toast('Add talk-time before calling. Membership does not include free calls.', 'info'); return selectTab('wallet'); }
+    if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
+    if (currentCall) return P.toast('A call is already in progress.', 'info');
+    currentCall = { employee: null, billed: 0, pending: true };
+    openCall();
+    $('#callState').textContent = 'Finding an available subscribed listener…';
+    socket.emit('call:request', { employeeId: null, allowOtherLanguages: Boolean($('#otherLanguageToggle')?.checked) });
+  }
+
   function openCall() {
     openOverlay('callModal'); show('#restoreCall', false); $('#callPerson').textContent = currentCall.employee?.name || 'Listener'; $('#callBio').textContent = currentCall.employee?.bio || 'A private conversation'; $('#callTimer').textContent = '0:00'; $('#restoreTimer').textContent = '0:00'; $('#chatMessages').innerHTML = '<div class="bubble">Private call chat starts here.</div>';
   }
   function minimizeCall(useHistory = true) { if (!currentCall) return; if (useHistory && history.state?.overlay === 'callModal') return history.back(); show('#callModal', false); show('#restoreCall'); syncBodyState(); }
   function restoreCall() { if (currentCall) { openOverlay('callModal'); show('#restoreCall', false); } }
-  function closeCall() { show('#callModal', false); show('#restoreCall', false); audioCall?.stop(); currentCall = null; syncBodyState(); }
+  function closeCall() { show('#callModal', false); show('#restoreCall', false); audioCall?.stop(); currentCall = null; if (history.state?.marker === NAV_MARKER && history.state.overlay === 'callModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title); syncBodyState(); }
   function toggleMute() { const muted = audioCall?.toggleMute(); $('#muteBtn small').textContent = muted ? 'Unmute' : 'Mute'; }
   function sendCallChat(event) { event.preventDefault(); const message = $('#chatInput').value.trim(); if (!message || !currentCall) return; socket.emit('chat:send', { callId: currentCall.id, message }); $('#chatInput').value = ''; }
   function addCallChat(message) { if (currentCall?.id !== message.callId) return; $('#chatMessages').insertAdjacentHTML('beforeend', `<div class="bubble ${message.senderId === me.id ? 'mine' : ''}"><b>${esc(message.senderName)}</b><br>${esc(message.message)}</div>`); }
@@ -536,7 +577,7 @@
     try { const image = new Image(); await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; }); const size = 560; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const ctx = canvas.getContext('2d'); const crop = Math.min(image.naturalWidth, image.naturalHeight); ctx.drawImage(image, (image.naturalWidth - crop) / 2, (image.naturalHeight - crop) / 2, crop, crop, 0, 0, size, size); const result = canvas.toDataURL('image/jpeg', 0.84); if (result.length > 610000) throw new Error('Choose a simpler or smaller photo.'); return result; }
     finally { URL.revokeObjectURL(url); }
   }
-  async function saveCustomerProfile(event) { event.preventDefault(); try { const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: $('#customerProfileName').value, ...(customerPhotoDraft !== undefined ? { profileImage: customerPhotoDraft } : {}) }) }); me.name = response.user.name; me.profileImage = response.user.profileImage; customerPhotoDraft = undefined; $('#profileName').textContent = me.name; $('#helloName').textContent = `Hello, ${me.name.split(/\s+/)[0]}`; P.toast('Profile updated.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function saveCustomerProfile(event) { event.preventDefault(); try { const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: $('#customerProfileName').value, ...(customerPhotoDraft !== undefined ? { profileImage: customerPhotoDraft } : {}) }) }); me.name = response.user.name; me.profileImage = response.user.profileImage; customerPhotoDraft = undefined; $('#profileName').textContent = me.name; P.toast('Profile updated.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
   async function loadCustomerPhoto() { if (!me?.profileImage?.startsWith('photo:')) return; try { const blob = await P.apiBlob('/api/customer/profile/image'); $('#customerPhotoPreview').src = URL.createObjectURL(blob); } catch {} }
   async function changePassword(event) { event.preventDefault(); try { await P.api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }) }); P.toast('Password updated. Please sign in again.', 'success'); setTimeout(() => logout(), 700); } catch (error) { P.toast(error.message, 'error'); } }
   async function reportCall(id) { const reason = prompt('Describe the issue for the safety team:'); if (!reason) return; try { await P.api('/api/customer/reports', { method: 'POST', body: JSON.stringify({ callId: id, reason, details: reason }) }); P.toast('Report sent.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }

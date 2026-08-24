@@ -14,8 +14,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.0.0">
-  <link rel="stylesheet" href="style.css?v=8.0.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.1.0">
+  <link rel="stylesheet" href="style.css?v=8.1.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -105,15 +105,6 @@
     </section>
 
     <section id="dashboard" class="dashboard hidden shell">
-      <div class="install-inline"><span>Use We Met like an app.</span><button data-install-app class="button button-soft button-small" type="button">Install app</button></div>
-      <section class="welcome-card welcome-card-clean" aria-label="Account overview">
-        <div class="welcome-copy">
-          <span class="eyebrow">YOUR PRIVATE SPACE</span>
-          <h1 id="helloName">Hello</h1>
-          <p>Choose a verified listener, open their profile and connect privately.</p>
-        </div>
-      </section>
-
       <nav class="tabs" id="tabs" aria-label="Main navigation">
         <button class="active" data-tab="home" type="button" aria-label="Home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>Home</span></button>
         <button data-tab="subscriptions" type="button" aria-label="Subscriptions"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Exclusive</span></button>
@@ -123,20 +114,18 @@
       </nav>
 
       <div class="tab active" id="tab-home">
-        <section class="call-hero call-hero-clean">
-          <div class="call-hero-copy">
-            <span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking listener availability…</span></span>
-            <h2>Who would you like to talk to?</h2>
-            <p>Open a profile to follow, subscribe, view exclusive photos, message or call when they are online.</p>
-          </div>
+        <section class="random-connect-card" aria-labelledby="randomConnectTitle">
+          <div class="random-connect-mark" aria-hidden="true"><img src="assets/logo.svg" alt=""></div>
+          <div class="random-connect-copy"><span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking availability…</span></span><h1 id="randomConnectTitle">Connect with an available listener</h1><p>Randomly connects to one of your subscribed listeners.</p></div>
+          <button id="randomConnectButton" class="button button-primary button-large" type="button">Connect now</button>
         </section>
 
-        <div id="previousBox" class="previous-box hidden"></div>
+        <label class="language-fallback-toggle language-fallback-bar"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>Show more verified listeners and include subscribed ones in Random Connect.</small></span></label>
+
         <section id="listenerDiscovery" class="listener-discovery" aria-live="polite">
-          <div class="section-head listener-heading"><div><span class="eyebrow">VERIFIED LISTENERS</span><h2>Choose your listener</h2><p>Each exclusive membership is separate. Calls also use your wallet balance.</p></div><button id="refreshListeners" class="button button-quiet" type="button" aria-label="Refresh listener availability"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.8-2L20 11M4 13l2.1 4a7 7 0 0 0 11.8-2"/></svg><span>Refresh</span></button></div>
-          <label class="language-fallback-toggle"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>If no Malayalam listener is available, We Met can try another language listener.</small></span></label>
+          <div class="section-head listener-heading"><div><span class="eyebrow">VERIFIED LISTENERS</span><h2>Choose a listener</h2></div><button id="refreshListeners" class="button button-quiet" type="button" aria-label="Refresh listener availability"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.8-2L20 11M4 13l2.1 4a7 7 0 0 0 11.8-2"/></svg><span>Refresh</span></button></div>
           <div id="listenerGrid" class="listener-grid" aria-live="polite"></div>
-          <section id="otherLanguageSection" class="other-language-section hidden"><div class="section-head compact"><div><span class="eyebrow">OTHER LANGUAGES</span><h2>Other language listeners</h2><p>Turn this option off anytime to keep automatic matching Malayalam-only.</p></div></div><div id="otherLanguageGrid" class="listener-grid other-language-grid" aria-live="polite"></div></section>
+          <section id="otherLanguageSection" class="other-language-section hidden"><div class="section-head compact"><div><span class="eyebrow">OTHER LANGUAGES</span><h2>More verified listeners</h2></div></div><div id="otherLanguageGrid" class="listener-grid other-language-grid" aria-live="polite"></div></section>
         </section>
       </div>
 
@@ -238,6 +227,16 @@
     </div>
   </div>
 
+  <div id="walletCheckoutModal" class="modal wallet-checkout-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="walletCheckoutTitle">
+    <div class="modal-card wallet-checkout-card">
+      <button class="close" data-close="walletCheckoutModal" type="button" aria-label="Close">×</button>
+      <div class="wallet-checkout-brand"><img src="assets/logo.svg" alt=""><span><b>We Met Wallet</b><small>Secure talk-time top-up</small></span></div>
+      <div id="walletCheckoutContent"></div>
+      <button id="walletCheckoutPay" class="button button-primary button-large" type="button">Continue securely</button>
+      <small class="wallet-checkout-provider">Payment is completed securely through Razorpay.</small>
+    </div>
+  </div>
+
   <div id="listenerProfileModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerProfileName"><div class="modal-card listener-profile-modal"><button class="close" data-close="listenerProfileModal" type="button" aria-label="Close">×</button><div id="listenerProfileContent"></div></div></div>
 
   <div id="callModal" class="call-modal hidden" role="dialog" aria-modal="true" aria-label="Active call">
@@ -252,11 +251,11 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.0.0"></script>
-  <script src="socket-loader.js?v=8.0.0"></script>
-  <script src="api.js?v=8.0.0"></script>
-  <script src="webrtc.js?v=8.0.0"></script>
+  <script src="config.js?v=8.1.0"></script>
+  <script src="socket-loader.js?v=8.1.0"></script>
+  <script src="api.js?v=8.1.0"></script>
+  <script src="webrtc.js?v=8.1.0"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app.js?v=8.0.0"></script>
+  <script src="app.js?v=8.1.0"></script>
 </body>
 </html>

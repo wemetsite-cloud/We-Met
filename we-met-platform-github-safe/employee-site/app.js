@@ -124,7 +124,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.0.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.1.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -482,7 +482,6 @@
     }
     show('#verificationView', false);
     show('#appView');
-    $('#hello').textContent = `Hello, @${me.username || me.name}`;
     $('#profileName').value = me.name || '';
     $('#profileUsername').value = me.username || '';
     $('#profilePhone').value = me.phone || '';
@@ -1056,7 +1055,6 @@
       bannerImageDraft = undefined;
       renderProfileImageEditor();
       $('#profilePreviewUsername').textContent = `@${me.username || 'listener'}`;
-      $('#hello').textContent = `Hello, @${me.username || me.name}`;
       P.toast('Profile saved.', 'success');
     } catch (error) {
       P.toast(error.message, 'error');
