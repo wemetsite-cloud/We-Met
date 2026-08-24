@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const esc = P.esc;
-  const NAV_MARKER = 'we-met-customer-v83';
+  const NAV_MARKER = 'we-met-customer-v84';
   const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'following', 'notifications', 'support']);
   const TAB_PARENT = { history: 'profile', following: 'profile', notifications: 'profile', support: 'profile' };
 
@@ -17,6 +17,7 @@
   let currentCall = null;
   let directory = [];
   let liveListeners = [];
+  let liveDirectoryReady = false;
   let subscriptions = [];
   let conversations = [];
   let activeConversation = null;
@@ -30,7 +31,9 @@
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
   let directPollTimer = null;
+  let pendingWalletCheckout = null;
   let pendingMembershipCheckout = null;
+  let pendingCallRequest = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
     P.toast(event.detail?.message || 'Your session expired. Please start again.', 'error');
@@ -55,10 +58,9 @@
   }
 
   function liveStatus(listener) {
+    if (!liveDirectoryReady || !socket?.connected) return 'offline';
     const live = liveListeners.find((item) => item.id === (listener.id || listener.listenerId));
-    if (live) return live.status || 'offline';
-    const value = listener.availability || listener.listener_availability || 'offline';
-    return value === 'online' ? 'available' : value;
+    return live?.status || 'offline';
   }
 
   function statusLabel(status) {
@@ -71,7 +73,7 @@
   }
 
   function currentOverlay() {
-    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
+    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'walletCheckoutModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
   function syncBodyState() {
@@ -92,6 +94,7 @@
     if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
     document.getElementById(id)?.classList.add('hidden');
     if (id === 'listenerProfileModal') releasePostUrls();
+    if (id === 'walletCheckoutModal') pendingWalletCheckout = null;
     if (id === 'membershipCheckoutModal') pendingMembershipCheckout = null;
     syncBodyState();
   }
@@ -109,7 +112,8 @@
     history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title);
     window.addEventListener('popstate', (event) => {
       const state = event.state?.marker === NAV_MARKER ? event.state : { tab: 'home' };
-      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'walletCheckoutModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      if (state.overlay !== 'walletCheckoutModal') pendingWalletCheckout = null;
       if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
       document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
@@ -253,7 +257,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.3.1', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.4.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -288,6 +292,7 @@
     $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
+    $('#walletCheckoutPay').onclick = beginWalletCheckout;
     $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
     $('#couponForm').onsubmit = redeem;
     $('#supportForm').onsubmit = sendSupport;
@@ -332,6 +337,8 @@
       renderConversations();
       return;
     }
+    const postLike = event.target.closest('button[data-post-like]');
+    if (postLike) return togglePostLike(postLike);
     const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
     if (!target) return;
     const d = target.dataset;
@@ -345,6 +352,23 @@
     if (d.buyPlan) return openPayment(d.buyPlan, target);
     if (d.conversation) return openConversation(d.conversation);
     if (d.cancelSubscription) return cancelSubscription(d.cancelSubscription);
+  }
+
+  async function togglePostLike(button) {
+    const postId = button.dataset.postLike;
+    const liked = button.dataset.liked === 'true';
+    button.disabled = true;
+    try {
+      const response = await P.api(`/api/customer/listener-posts/${encodeURIComponent(postId)}/like`, {
+        method: liked ? 'DELETE' : 'POST',
+        body: '{}',
+      });
+      button.dataset.liked = String(response.liked);
+      button.classList.toggle('liked', response.liked);
+      button.setAttribute('aria-pressed', String(response.liked));
+      button.setAttribute('aria-label', `${response.liked ? 'Unlike' : 'Like'} this post`);
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
   }
 
   async function init() {
@@ -384,7 +408,14 @@
 
   async function logout(clear = true) {
     if (clear) P.Store.clear();
-    clearInterval(directPollTimer); socket?.disconnect(); audioCall?.stop(); me = null; currentCall = null;
+    clearInterval(directPollTimer);
+    clearPendingCallRequest();
+    currentCall = null;
+    socket?.disconnect();
+    audioCall?.stop();
+    me = null;
+    liveDirectoryReady = false;
+    liveListeners = [];
     if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
     customerPhotoObjectUrl = '';
     document.body.classList.remove('signed-in');
@@ -427,21 +458,19 @@
     const showOtherLanguages = Boolean($('#otherLanguageToggle')?.checked);
     const primaryListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam');
     const otherListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam');
-    const eligibleOnline = directory.filter((listener) => liveStatus(listener) === 'available' && (showOtherLanguages || String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam'));
-    $('#availabilityText').textContent = eligibleOnline.length
-      ? `${eligibleOnline.length} verified listener${eligibleOnline.length === 1 ? '' : 's'} online now`
-      : 'No listener online right now';
+    $('#availabilityText').textContent = 'Listeners available';
 
     const cards = (listeners) => listeners.map((listener) => {
       const status = liveStatus(listener);
       const subscribed = isActiveMember(listener.id) || listener.subscribed;
-      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="verified-listener-label">Verified listener</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>🎧 ${esc(listener.language || 'Malayalam')}</span><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span>${subscribed ? '<span class="exclusive-tag">Exclusive</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">Profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" type="button" ${status !== 'available' ? 'disabled' : ''}>Call</button></div></article>`;
+      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="verified-listener-label">Verified listener</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>🎧 ${esc(listener.language || 'Malayalam')}</span><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span>${subscribed ? '<span class="exclusive-tag">Exclusive</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">Profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" data-call-available="${status === 'available'}" type="button" ${status !== 'available' || pendingCallRequest || currentCall ? 'disabled' : ''}>Call</button></div></article>`;
     }).join('');
 
-    node.innerHTML = primaryListeners.length ? cards(primaryListeners) : emptyState('No Malayalam listeners yet', 'Try the other-language option or check again soon.');
-    $('#otherLanguageGrid').innerHTML = otherListeners.length ? cards(otherListeners) : emptyState('No other languages yet', 'More verified listeners will appear here.');
+    node.innerHTML = primaryListeners.length ? cards(primaryListeners) : '';
+    $('#otherLanguageGrid').innerHTML = otherListeners.length ? cards(otherListeners) : '';
     show('#listenerDiscovery');
     show('#otherLanguageSection', showOtherLanguages);
+    syncCallRequestControls();
   }
 
   async function openListenerProfile(listenerId) {
@@ -454,7 +483,7 @@
       const subscribed = Boolean(listener.subscribed || isActiveMember(listener.id));
       const postsMarkup = subscribed ? await renderPrivatePosts(response.posts || []) : response.postsLocked ? `<button class="locked-posts" data-subscribe="${esc(listener.id)}" type="button"><span class="lock-art">✦</span><b>See exclusive posts</b><small>Subscribe to ${esc(listener.name)} for ₹399/month</small></button>` : '<div class="profile-no-posts">No exclusive posts yet.</div>';
       const callButton = status === 'available'
-        ? `<button class="listener-call-fab" data-listener-call="${esc(listener.id)}" type="button" aria-label="Call ${esc(listener.name)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg></button>`
+        ? `<button class="listener-call-fab" data-listener-call="${esc(listener.id)}" data-call-available="true" type="button" aria-label="Call ${esc(listener.name)}" ${pendingCallRequest || currentCall ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg></button>`
         : '';
       $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
     } catch (error) { $('#listenerProfileContent').innerHTML = emptyState('Profile unavailable', error.message); }
@@ -463,7 +492,7 @@
   async function renderPrivatePosts(posts) {
     if (!posts.length) return '<div class="profile-no-posts">No exclusive posts yet.</div>';
     const items = await Promise.all(posts.map(async (post) => {
-      try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); postObjectUrls.push(url); return `<figure class="exclusive-post protected-media"><img src="${esc(url)}" alt="Exclusive listener post" draggable="false"><figcaption>${esc(post.caption || '')}<small>${P.date(post.created_at)}</small></figcaption></figure>`; }
+      try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); postObjectUrls.push(url); return `<figure class="exclusive-post protected-media"><img src="${esc(url)}" alt="Exclusive listener post" draggable="false"><button class="exclusive-post-like ${post.liked ? 'liked' : ''}" data-post-like="${esc(post.id)}" data-liked="${Boolean(post.liked)}" type="button" aria-label="${post.liked ? 'Unlike' : 'Like'} this post" aria-pressed="${Boolean(post.liked)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg></button><figcaption>${esc(post.caption || '')}<small>${P.date(post.created_at)}</small></figcaption></figure>`; }
       catch { return ''; }
     }));
     return items.join('') || '<div class="profile-no-posts">Posts could not be loaded.</div>';
@@ -520,7 +549,7 @@
         pendingMembershipCheckout = null;
         closeOverlay('membershipCheckoutModal', false);
       };
-      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: true, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
         handled = true;
         let verifiedSuccessfully = false;
         try {
@@ -604,72 +633,45 @@
     catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function openPayment(planId, button) {
-    if (!me) { P.toast('Sign in before starting a payment.', 'info'); return setAuth('login'); }
+  function openPayment(planId, button) {
     const plan = paymentPlans.find((item) => item.id === planId);
-    if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
-    if (typeof window.Razorpay !== 'function') return P.toast('Secure checkout is unavailable. Check your connection.', 'error');
+    if (!plan || typeof window.Razorpay !== 'function') return P.toast('Secure checkout is unavailable.', 'error');
+    pendingWalletCheckout = { plan, button };
+    $('#walletCheckoutContent').innerHTML = `<div class="wallet-checkout-summary"><span class="wallet-checkout-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>minutes</small></span><div><small>Talk-time pack</small><h2 id="walletCheckoutTitle">${esc(plan.name)}</h2><p>Added after secure payment confirmation.</p></div><strong>${P.money(plan.price_paise)}</strong></div><div class="wallet-checkout-trust"><span>Secure payment</span><span>Connected-second billing</span><span>No card data stored by We Met</span></div>`;
+    $('#walletCheckoutPay').textContent = `Pay ${P.money(plan.price_paise)}`;
+    $('#walletCheckoutPay').disabled = false;
+    openOverlay('walletCheckoutModal');
+  }
 
+  async function beginWalletCheckout() {
+    if (!pendingWalletCheckout) return;
+    const { plan, button } = pendingWalletCheckout;
+    const payButton = $('#walletCheckoutPay');
+    payButton.disabled = true;
     button?.setAttribute('disabled', '');
-    let paymentHandled = false;
-    let paymentFailureShown = false;
     try {
-      const order = await P.api('/api/create-order', {
-        method: 'POST',
-        body: JSON.stringify({
-          planId: plan.id,
-          amount: Number(plan.price_paise),
-          currency: 'INR',
-          receipt: `wallet_${Date.now()}`,
-        }),
-      });
-
-      const finish = () => button?.removeAttribute('disabled');
-      const checkout = new window.Razorpay({
-        key: order.key_id,
-        amount: order.amount,
-        currency: order.currency,
-        order_id: order.order_id,
-        name: 'We Met',
-        description: `${plan.name} · ${Math.round(plan.seconds / 60)} minutes`,
-        image: new URL('assets/logo.svg', location.href).href,
-        prefill: { name: me.name || '', contact: me.phone || '' },
-        notes: { plan_id: plan.id },
-        theme: { color: '#e62d7d' },
-        retry: { enabled: true },
-        modal: {
-          backdropclose: false,
-          escape: true,
-          animation: true,
-          ondismiss: () => {
-            finish();
-            if (!paymentHandled && !paymentFailureShown) P.toast('Payment cancelled. No talk-time was added.', 'info');
-          },
-        },
-        handler: async (payment) => {
-          paymentHandled = true;
-          try {
-            const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
-            updateBalance(verified.balance_seconds);
-            await loadHistory();
-            P.toast(verified.message || 'Talk-time added.', 'success');
-          } catch (error) {
-            P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error');
-          } finally {
-            finish();
-          }
-        },
-      });
-
-      checkout.on('payment.failed', (response) => {
-        paymentFailureShown = true;
-        P.toast(response?.error?.description || 'Payment failed.', 'error');
-      });
-      checkout.open();
-    } catch (error) {
-      button?.removeAttribute('disabled');
-      P.toast(error.message || 'The Razorpay checkout could not be prepared.', 'error');
-    }
+      const order = await P.api('/api/create-order', { method: 'POST', body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }) });
+      document.body.classList.add('razorpay-open');
+      $('#walletCheckoutModal').setAttribute('aria-busy', 'true');
+      let handled = false;
+      const restore = (settled = false) => {
+        button?.removeAttribute('disabled');
+        payButton.disabled = false;
+        document.body.classList.remove('razorpay-open');
+        $('#walletCheckoutModal').removeAttribute('aria-busy');
+        if (!settled) return;
+        pendingWalletCheckout = null;
+        closeOverlay('walletCheckoutModal', false);
+        replaceOverlayHistory();
+      };
+      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met', description: `Wallet · ${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+        handled = true;
+        try { const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) }); updateBalance(verified.balance_seconds); await loadHistory(); P.toast(verified.message || 'Talk-time added.', 'success'); }
+        catch (error) { P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error'); }
+        finally { restore(true); }
+      } });
+      checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Payment failed.', 'error')); checkout.open();
+    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; $('#walletCheckoutModal').removeAttribute('aria-busy'); document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
   }
 
   async function redeem(event) {
@@ -688,11 +690,28 @@
       if (['failed', 'disconnected', 'closed'].includes(state) && currentCall.mediaConnected !== false) { currentCall.mediaConnected = false; socket.emit('call:media-state', { callId: currentCall.id, connected: false }); $('#callState').textContent = 'Audio reconnecting…'; }
     } });
     socket.on('connect', () => socket.emit('listeners:get'));
-    socket.on('listeners:update', ({ listeners = [] }) => { liveListeners = listeners; renderDirectory(); });
-    socket.on('call:ringing', (data) => { currentCall = { id: data.callId, employee: data.employee, billed: 0 }; openCall(); $('#callState').textContent = `Ringing ${data.employee?.name || 'listener'}…`; });
+    socket.on('disconnect', () => {
+      const wasRequesting = Boolean(pendingCallRequest);
+      const hadCall = Boolean(currentCall);
+      liveDirectoryReady = false;
+      liveListeners = [];
+      clearPendingCallRequest();
+      if (currentCall) closeCall();
+      renderDirectory();
+      if (wasRequesting || hadCall) P.toast('Calling is reconnecting. Please try again shortly.', 'error');
+    });
+    socket.on('listeners:update', ({ listeners = [] }) => { liveListeners = listeners; liveDirectoryReady = true; renderDirectory(); });
+    socket.on('call:ringing', (data) => {
+      clearPendingCallRequest();
+      currentCall = { id: data.callId, employee: data.employee, billed: 0, mediaConnected: false };
+      closeOverlay('listenerProfileModal', false);
+      openCall();
+      $('#callState').textContent = `Ringing ${data.employee?.name || 'listener'}…`;
+      syncCallRequestControls();
+    });
     socket.on('call:retrying', (data) => { $('#callState').textContent = 'Trying another available listener…'; P.toast(data.reason || 'The listener did not answer.', 'info'); });
-    socket.on('call:unavailable', (data) => { closeCall(); P.toast(data.message || 'This listener is unavailable.', 'info'); });
-    socket.on('call:error', (data) => { closeCall(); P.toast(data.message || 'The call could not start.', 'error'); if (data.needsTopup) selectTab('wallet'); });
+    socket.on('call:unavailable', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.message || 'No listener is available right now.', 'info'); });
+    socket.on('call:error', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.message || 'The call could not start.', 'error'); if (data.needsTopup) selectTab('wallet'); });
     socket.on('call:accepted', async (data) => { if (!currentCall) currentCall = { id: data.callId }; currentCall.mediaConnected = false; $('#callState').textContent = 'Preparing microphone…'; try { await audioCall.prepare(data.callId); if (currentCall?.id === data.callId) { $('#callState').textContent = 'Connecting secure audio…'; socket.emit('webrtc:ready', { callId: data.callId }); } } catch (error) { P.toast(error.message || 'Allow microphone access.', 'error'); socket.emit('call:end', { callId: data.callId }); } });
     socket.on('webrtc:start', async ({ callId }) => { if (currentCall?.id === callId) { try { await audioCall.createOffer(); } catch { socket.emit('call:end', { callId }); } } });
     socket.on('call:connected', () => { if (currentCall) { $('#callState').textContent = 'Connected · wallet billing active'; P.notify('We Met', 'Your private call is connected.'); } });
@@ -700,7 +719,7 @@
     socket.on('call:audio-restored', () => { if (currentCall) $('#callState').textContent = 'Connected · wallet billing active'; });
     socket.on('call:tick', (data) => { if (currentCall?.id === data.callId) { $('#callTimer').textContent = P.duration(data.billedSeconds); $('#restoreTimer').textContent = P.duration(data.billedSeconds); updateBalance(data.balanceSeconds); } });
     socket.on('call:low-balance', () => P.notify('Low talk-time', 'Only one minute remains in your wallet.'));
-    socket.on('call:ended', (data) => { closeCall(); P.toast(data.reason || 'The call ended.', data.needsTopup ? 'error' : 'info'); loadMe(); if (data.needsTopup) selectTab('wallet'); });
+    socket.on('call:ended', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.reason || 'The call ended.', data.needsTopup ? 'error' : 'info'); loadMe(); if (data.needsTopup) selectTab('wallet'); });
     socket.on('chat:message', addCallChat);
     socket.on('notification:new', (notification) => { P.notify(notification.title, notification.body); loadSubscriptions(false); loadConversations(false); });
     socket.on('account:restricted', (data) => { P.toast(data.reason || 'Account restricted.', 'error'); logout(); });
@@ -711,18 +730,55 @@
     if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
     if (liveStatus(listener || { id: listenerId }) !== 'available') return P.toast('This listener is not online right now.', 'info');
     if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
-    if (currentCall) return P.toast('A call is already in progress.', 'info');
-    closeOverlay('listenerProfileModal', false); socket.emit('call:request', { employeeId: listenerId, allowOtherLanguages: false });
+    if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
+    beginCallRequest({ employeeId: listenerId, allowOtherLanguages: false });
   }
 
   function requestRandomCall() {
     if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
     if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
-    if (currentCall) return P.toast('A call is already in progress.', 'info');
-    currentCall = { employee: null, billed: 0, pending: true };
-    openCall();
-    $('#callState').textContent = 'Finding an available listener…';
-    socket.emit('call:request', { employeeId: null, allowOtherLanguages: Boolean($('#otherLanguageToggle')?.checked) });
+    if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
+    beginCallRequest({ employeeId: null, allowOtherLanguages: Boolean($('#otherLanguageToggle')?.checked) });
+  }
+
+  function syncCallRequestControls() {
+    const locked = Boolean(pendingCallRequest || currentCall);
+    const randomButton = $('#randomConnectButton');
+    if (randomButton) {
+      randomButton.disabled = locked;
+      randomButton.textContent = pendingCallRequest ? 'Checking availability…' : currentCall ? 'Call in progress' : 'Connect now';
+    }
+    $$('[data-listener-call]').forEach((button) => {
+      button.disabled = locked || button.dataset.callAvailable === 'false';
+    });
+  }
+
+  function clearPendingCallRequest() {
+    if (pendingCallRequest?.timer) clearTimeout(pendingCallRequest.timer);
+    pendingCallRequest = null;
+    syncCallRequestControls();
+  }
+
+  function beginCallRequest(payload) {
+    const request = { employeeId: payload.employeeId || null, timer: null };
+    pendingCallRequest = request;
+    request.timer = setTimeout(() => {
+      if (pendingCallRequest !== request || currentCall) return;
+      clearPendingCallRequest();
+      P.toast('Calling took too long to respond. Please try again.', 'error');
+    }, 15_000);
+    syncCallRequestControls();
+    socket.timeout(12_000).emit('call:request', payload, (timeoutError, response) => {
+      if (pendingCallRequest !== request || currentCall) return;
+      if (timeoutError) {
+        clearPendingCallRequest();
+        return P.toast('Calling is taking too long. Please try again.', 'error');
+      }
+      if (response?.ok) return;
+      clearPendingCallRequest();
+      if (response?.needsTopup) selectTab('wallet');
+      if (response?.error || response?.message) P.toast(response.error || response.message, response?.unavailable ? 'info' : 'error');
+    });
   }
 
   function openCall() {
@@ -742,7 +798,7 @@
   }
   function minimizeCall(useHistory = true) { if (!currentCall) return; if (useHistory && history.state?.overlay === 'callModal') return history.back(); show('#callModal', false); show('#restoreCall'); syncBodyState(); }
   function restoreCall() { if (currentCall) { openOverlay('callModal'); show('#restoreCall', false); } }
-  function closeCall() { show('#callModal', false); show('#restoreCall', false); audioCall?.stop(); currentCall = null; if (history.state?.marker === NAV_MARKER && history.state.overlay === 'callModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title); syncBodyState(); }
+  function closeCall() { show('#callModal', false); show('#restoreCall', false); audioCall?.stop(); currentCall = null; if (history.state?.marker === NAV_MARKER && history.state.overlay === 'callModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title); syncBodyState(); syncCallRequestControls(); }
   function toggleMute() { const muted = audioCall?.toggleMute(); $('#muteBtn small').textContent = muted ? 'Unmute' : 'Mute'; }
   function sendCallChat(event) { event.preventDefault(); const message = $('#chatInput').value.trim(); if (!message || !currentCall) return; socket.emit('chat:send', { callId: currentCall.id, message }); $('#chatInput').value = ''; }
   function addCallChat(message) { if (currentCall?.id !== message.callId) return; $('#chatMessages').insertAdjacentHTML('beforeend', `<div class="bubble ${message.senderId === me.id ? 'mine' : ''}"><b>${esc(message.senderName)}</b><br>${esc(message.message)}</div>`); }
