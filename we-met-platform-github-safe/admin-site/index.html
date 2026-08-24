@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12070f">
+  <meta name="description" content="Secure We Met operations dashboard for accounts, listener activity, calls, wallet records and support.">
+  <title>We Met Operations</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest?v=8.5.0">
+  <link rel="stylesheet" href="style.css?v=8.5.0">
+</head>
+<body>
+  <div id="loginView" class="login-screen">
+    <div class="login-decoration decoration-one"></div><div class="login-decoration decoration-two"></div>
+    <section class="login-card">
+      <div class="login-logo"><img src="assets/logo.svg" alt=""><span>WM</span></div>
+      <span class="eyebrow">WE MET OPERATIONS</span><h1>Admin sign in</h1>
+      <p>Your secure We Met control centre.</p>
+      <form id="loginForm" class="stack"><label>Username<input id="username" autocomplete="username" required placeholder="Admin username"></label><label>Password<input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password"></label><button class="primary big">Sign in securely</button></form>
+      <small>Administrator access is logged for operational security.</small>
+    </section>
+  </div>
+
+  <div id="appView" class="layout hidden">
+    <aside>
+      <div class="side-brand"><img src="assets/logo.svg" alt=""><div><strong>We Met</strong><small>Operations</small></div></div>
+      <nav id="nav" aria-label="Admin navigation">
+        <button class="active" data-page="overview"><b>◫</b><span>Overview</span></button>
+        <button data-page="customers"><b>◎</b><span>Customers</span></button>
+        <button data-page="employees"><b>♙</b><span>Listeners</span></button>
+        <button data-page="verifications"><b>✓</b><span>Verifications</span></button>
+        <button data-page="payments"><b>₹</b><span>Payments</span></button>
+        <button data-page="content"><b>▦</b><span>Listener posts</span></button>
+        <button data-page="wallets"><b>₹</b><span>Listener wallets</span></button>
+        <button data-page="withdrawals"><b>↗</b><span>Withdrawals</span></button>
+        <button data-page="plans"><b>◇</b><span>Plans</span></button>
+        <button data-page="coupons"><b>⌁</b><span>Coupons</span></button>
+        <button data-page="calls"><b>☎</b><span>Calls</span></button>
+        <button data-page="reports"><b>⚑</b><span>Reports</span></button>
+        <button data-page="support"><b>✉</b><span>Support</span></button>
+        <button data-page="resets"><b>↻</b><span>Password resets</span></button>
+        <button data-page="broadcast"><b>✦</b><span>Notifications</span></button>
+        <button data-page="audit"><b>◉</b><span>Audit log</span></button>
+        <button data-page="security"><b>⚙</b><span>Security</span></button>
+      </nav>
+      <div class="side-footer"><small>Secure control centre</small><button id="logout" class="side-logout">Log out</button></div>
+    </aside>
+
+    <div class="content">
+      <header><button id="menuBtn" class="menu" type="button" aria-label="Open menu">☰</button><button id="adminBackButton" class="admin-back hidden" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><div class="page-heading"><h1 id="pageTitle">Overview</h1><p id="pageDesc">Live service health and operational summary</p></div><div class="admin-chip"><span>AD</span><div><b>Administrator</b><small>Secure session</small></div></div></header>
+      <main>
+        <section id="page-overview" class="page active">
+          <div class="metric-grid"><article><div class="metric-icon purple">◎</div><small>Customers</small><strong id="mCustomers">0</strong><span>Registered accounts</span></article><article><div class="metric-icon cyan">↟</div><small>Online now</small><strong id="mConcurrent">0</strong><span id="mConcurrentBreakdown">0 customers • 0 listeners</span></article><article><div class="metric-icon green">●</div><small>Online listeners</small><strong id="mOnline">0</strong><span>Available, ringing or busy</span></article><article><div class="metric-icon blue">◷</div><small>Total talk-time</small><strong id="mTalk">0:00</strong><span>Connected call duration</span></article><article><div class="metric-icon orange">!</div><small>Needs attention</small><strong id="mAttention">0</strong><span>Open reports and support tickets</span></article></div>
+          <div class="grid-two"><section class="panel"><div class="panel-head"><div><span class="eyebrow">REAL TIME</span><h2>Live calls</h2></div><button id="refreshLive" class="ghost">Refresh</button></div><div id="liveCalls" class="live-list"></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">PRESENCE</span><h2>Listener availability</h2></div></div><div id="liveListeners" class="live-list"></div></section></div>
+          <section class="panel"><div class="panel-head"><div><span class="eyebrow">ALL TIME</span><h2>Call status summary</h2></div></div><div id="callSummary" class="summary-bars"></div></section>
+        </section>
+
+        <section id="page-customers" class="page">
+          <div class="toolbar customer-toolbar"><div><span class="eyebrow">CUSTOMER DIRECTORY</span><h2>Accounts, contacts and wallet controls</h2><p>Open any name or card action to review the complete account record.</p></div><div class="toolbar-actions"><input id="customerSearch" placeholder="Search name or phone"><button id="reloadCustomers" class="ghost">Refresh</button></div></div>
+          <div class="customer-overview-strip" aria-label="Customer summary"><article><small>Total customers</small><strong id="customerCount">0</strong></article><article><small>Active accounts</small><strong id="customerActiveCount">0</strong></article><article><small>Phone available</small><strong id="customerPhoneCount">0</strong></article><article><small>Total wallet time</small><strong id="customerWalletTotal">0:00</strong></article></div>
+          <div id="customersTable" class="customer-directory-scroll customer-directory-grid" role="list" aria-live="polite"></div>
+        </section>
+
+        <section id="page-employees" class="page">
+          <div class="toolbar"><div><span class="eyebrow">LISTENERS</span><h2>Listener accounts</h2><p>Profiles, availability, rates and verification.</p></div><div class="toolbar-actions"><input id="listenerSearch" placeholder="Search listener, phone or ID"><select id="listenerStatusFilter" aria-label="Filter listener availability"><option value="">All availability</option><option value="online">Online</option><option value="break">On break</option><option value="offline">Offline</option></select><button id="reloadEmployees" class="ghost">Refresh</button></div></div>
+          <div class="customer-overview-strip listener-overview-strip"><article><small>Listeners</small><strong id="listenerCount">0</strong></article><article><small>Online now</small><strong id="listenerOnlineCount">0</strong></article><article><small>Work today</small><strong id="listenerTodayWork">0:00</strong></article><article><small>Talk today</small><strong id="listenerTodayTalk">0:00</strong></article></div>
+          <div class="grid-form listener-management">
+            <form id="employeeForm" class="panel stack">
+              <span class="eyebrow">ADD LISTENER</span><h2>Create listener</h2>
+              <label>Private original name<input id="empName" required></label>
+              <label>Public username<input id="empUsername" placeholder="friendly.listener" pattern="[a-zA-Z0-9._-]{3,80}" required></label>
+              <label>Private phone<input id="empPhone" type="tel" inputmode="tel" maxlength="16" placeholder="+919876543210" required></label>
+              <label>Temporary password<input id="empPassword" type="password" minlength="8" required></label>
+              <label>Employee ID<input id="empCode" placeholder="Generated if blank"></label>
+              <label>Rate per minute (₹)<input id="empRate" type="number" min="0" max="100000" step="0.01" value="1" required></label>
+              <label>Language<input id="empLanguage" list="listenerLanguages" value="Malayalam" maxlength="60" required></label>
+              <label>Public bio<textarea id="empBio" maxlength="500" placeholder="Short introduction"></textarea></label>
+              <label class="check admin-verification-toggle"><input id="empRequireVerification" type="checkbox"><span><b>Require voice verification</b><small>Off by default for admin-created accounts.</small></span></label>
+              <button class="primary">Create listener</button>
+            </form>
+            <section class="panel listener-directory-panel"><div class="panel-head"><div><span class="eyebrow">DIRECTORY</span><h2>All listeners</h2></div></div><div id="employeeCards" class="employee-cards listener-cards"></div></section>
+          </div>
+        </section>
+
+        <section id="page-verifications" class="page">
+          <div class="toolbar"><div><span class="eyebrow">VOICE APPROVAL</span><h2>Listener verification</h2><p>Set the Malayalam line, listen to each recording and approve or request a new recording.</p></div><button id="reloadVerifications" class="ghost" type="button">Refresh</button></div>
+          <form id="verificationPromptForm" class="panel verification-prompt-form"><div><span class="eyebrow">CURRENT MALAYALAM LINE</span><h2>Reading prompt</h2><p>New recordings capture the exact line saved here.</p></div><textarea id="verificationPrompt" lang="ml" maxlength="500" required></textarea><button class="primary" type="submit">Save prompt</button></form>
+          <div class="verification-summary"><article><small>Waiting</small><strong id="verificationPendingCount">0</strong></article><article><small>Approved</small><strong id="verificationApprovedCount">0</strong></article><article><small>Needs retry</small><strong id="verificationRejectedCount">0</strong></article></div>
+          <div class="queue-tabs" data-queue-group="verifications"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div>
+          <div id="verificationCards" class="verification-admin-grid"></div>
+        </section>
+
+        <section id="page-payments" class="page">
+          <div class="toolbar"><div><span class="eyebrow">RAZORPAY LEDGER</span><h2>Payments and memberships</h2><p>Customer top-ups, per-listener subscriptions and listener ₹50 credits in one audited view.</p></div><button id="reloadPayments" class="ghost" type="button">Refresh</button></div>
+          <div class="payment-metrics"><article><small>Active memberships</small><strong id="payActiveSubscriptions">0</strong></article><article><small>Subscription revenue</small><strong id="paySubscriptionRevenue">₹0</strong></article><article><small>Listener credits</small><strong id="payListenerCredits">₹0</strong></article><article><small>Wallet top-ups</small><strong id="payTopupRevenue">₹0</strong></article></div>
+          <section class="panel payment-admin-section"><div class="panel-head"><div><span class="eyebrow">MEMBERSHIPS</span><h2>Listener subscriptions</h2></div></div><div id="adminSubscriptions" class="admin-payment-list"></div></section>
+          <div class="grid-two payment-admin-grid"><section class="panel"><div class="panel-head"><div><span class="eyebrow">SUBSCRIPTION PAYMENTS</span><h2>Captured payments</h2></div></div><div id="adminSubscriptionPayments" class="admin-payment-list compact"></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">TALK-TIME</span><h2>Wallet top-ups</h2></div></div><div id="adminTopups" class="admin-payment-list compact"></div></section></div>
+        </section>
+
+        <section id="page-content" class="page">
+          <div class="toolbar"><div><span class="eyebrow">CONTENT REVIEW</span><h2>Exclusive listener posts</h2><p>Review the private photo feed and remove content that breaks platform rules.</p></div><button id="reloadAdminPosts" class="ghost" type="button">Refresh</button></div>
+          <div id="adminPostGallery" class="admin-post-gallery"></div>
+        </section>
+
+        <section id="page-wallets" class="page">
+          <div class="toolbar"><div><span class="eyebrow">ADMIN-MANAGED EARNINGS</span><h2>Listener balances and payment records</h2><p>Listeners only see their earnings ledger. Adjust balances here and record a payment after you pay a listener using your agreed offline method.</p></div><div class="toolbar-actions"><input id="walletSearch" placeholder="Search listener, phone or employee ID"><button id="reloadWallets" class="ghost">Refresh</button></div></div>
+          <div class="customer-overview-strip wallet-overview-strip"><article><small>Listener wallets</small><strong id="listenerWalletCount">0</strong></article><article><small>Total unpaid balance</small><strong id="listenerWalletBalance">₹0.00</strong></article><article><small>Lifetime earnings</small><strong id="listenerWalletEarned">₹0.00</strong></article><article><small>Lifetime recorded paid</small><strong id="listenerWalletPaid">₹0.00</strong></article></div>
+          <section class="panel wallet-policy-panel"><span class="wallet-policy-icon" aria-hidden="true">✓</span><div><span class="eyebrow">LISTENER PAYOUT RECORDS</span><h2>Razorpay collects top-ups and memberships</h2><p>Call earnings and ₹50 subscription credits enter the listener ledger. “Record paid” records an offline payout already made by the administrator.</p></div></section>
+          <div class="section-divider"><span>ALL LISTENER WALLETS</span></div><div id="listenerWalletCards" class="listener-wallet-cards"></div>
+        </section>
+
+        <section id="page-withdrawals" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">PAYOUT QUEUE</span><h2>Listener withdrawals</h2><p>Review the saved UPI destination. Enter the bank UTR only after payment succeeds.</p></div><button id="reloadWithdrawals" class="ghost" type="button">Refresh</button></div><div class="queue-tabs" data-queue-group="withdrawals"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="withdrawalList" class="ticket-list"></div></section></section>
+
+        <section id="page-plans" class="page"><div class="grid-form"><form id="planForm" class="panel stack"><span class="eyebrow">PLAN SETUP</span><h2>Create talk-time plan</h2><label>Plan name<input id="planName" required></label><label>Price in INR<input id="planPrice" type="number" min="1" required></label><label>Minutes<input id="planMinutes" type="number" min="1" required></label><label class="check"><input id="planPopular" type="checkbox"><span>Show popular badge</span></label><button class="primary">Create plan</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">PRICING</span><h2>Current plans</h2></div></div><div id="plansList" class="card-list"></div></section></div></section>
+        <section id="page-coupons" class="page"><div class="grid-form"><form id="couponForm" class="panel stack"><span class="eyebrow">WALLET CODE</span><h2>Create redeem code</h2><label>Code<input id="couponCode" placeholder="Leave blank to auto-generate"></label><label>Label or note<input id="couponLabel"></label><label>Minutes<input id="couponMinutes" type="number" min="1" required></label><label>Maximum uses<input id="couponUses" type="number" min="1" placeholder="Blank means unlimited"></label><label>Expiry date<input id="couponExpiry" type="datetime-local"></label><button class="primary">Create coupon</button></form><section class="panel"><div class="panel-head"><div><span class="eyebrow">REDEEM CODES</span><h2>Coupon inventory</h2></div><button id="reloadCoupons" class="ghost">Refresh</button></div><div id="couponsList" class="card-list"></div></section></div></section>
+        <section id="page-calls" class="page"><div class="toolbar"><div><span class="eyebrow">CALL AUDIT</span><h2>Every call and duration</h2></div><div class="toolbar-actions"><input id="callSearch" placeholder="Search customer or listener"><button id="reloadCalls" class="ghost">Refresh</button></div></div><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Listener</th><th>Status</th><th>Duration</th><th>Rate/min</th><th>Listener earning</th><th>Started</th><th>End reason</th></tr></thead><tbody id="callsTable"></tbody></table></div></section>
+        <section id="page-reports" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">SAFETY</span><h2>Reports</h2></div><button id="reloadReports" class="ghost">Refresh</button></div><div class="queue-tabs" data-queue-group="reports"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="reportsList" class="ticket-list"></div></section></section>
+        <section id="page-support" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">SUPPORT</span><h2>Support inbox</h2><p>Includes signed-in messages and OTP-verified login issues.</p></div><button id="reloadSupport" class="ghost">Refresh</button></div><div class="queue-tabs" data-queue-group="support"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="supportList" class="ticket-list"></div></section></section>
+        <section id="page-resets" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">ACCOUNT RECOVERY</span><h2>Password reset requests</h2><p>Verify the account owner through contact information already on record.</p></div><button id="reloadResets" class="ghost">Refresh</button></div><div class="queue-tabs" data-queue-group="resets"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="resetList" class="ticket-list"></div></section></section>
+        <section id="page-broadcast" class="page"><form id="broadcastForm" class="panel stack narrow"><span class="eyebrow">IN-APP + BROWSER NOTIFICATION</span><h2>Send a service message</h2><label>Recipient<select id="broadcastUser"><option value="">All customers and listeners</option></select></label><label>Title<input id="broadcastTitle" value="We Met"></label><label>Message<textarea id="broadcastBody" required placeholder="Write a clear platform update"></textarea></label><button class="primary">Send notification</button></form></section>
+        <section id="page-audit" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">ADMINISTRATOR ACTIVITY</span><h2>Audit log</h2><p>Successful account, wallet, plan and safety changes are recorded without sensitive request content.</p></div><button id="reloadAudit" class="ghost">Refresh</button></div><div id="auditList" class="audit-list"></div></section></section>
+        <section id="page-security" class="page"><div class="grid-two"><section class="panel"><form id="adminUsernameForm" class="stack"><span class="eyebrow">ADMIN LOGIN</span><h2>Change username</h2><label>New username<input id="adminNewUsername" required></label><label>Current password<input id="adminUsernamePassword" type="password" required></label><button class="ghost">Change username</button></form><hr><form id="adminPasswordForm" class="stack"><span class="eyebrow">ADMIN SECURITY</span><h2>Change password</h2><label>Current password<input id="adminCurrent" type="password" required></label><label>New password<input id="adminNew" type="password" minlength="8" required></label><button class="primary">Change password</button></form></section><section class="panel"><span class="eyebrow">PRODUCTION CONTROLS</span><h2>Operational safeguards</h2><ul class="checklist"><li>Use HTTPS for every customer, listener, admin and API domain.</li><li>Configure a production TURN server for reliable WebRTC calls.</li><li>Rotate privileged credentials and database secrets regularly.</li><li>Maintain encrypted database backups and uptime monitoring.</li><li>Review reports, support tickets and administrator audit records.</li><li>Keep legal and privacy policies aligned with operations.</li></ul></section></div></section>
+      </main>
+    </div>
+  </div>
+
+  <datalist id="listenerLanguages"><option value="Malayalam"><option value="English"><option value="Hindi"><option value="Tamil"><option value="Kannada"><option value="Telugu"></datalist>
+  <div id="actionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-card profile-modal"><button id="closeModal" class="close" type="button" aria-label="Close">×</button><h2 id="modalTitle">Account details</h2><div id="modalBody"></div></div></div>
+  <script src="config.js?v=8.5.0"></script><script src="api.js?v=8.5.0"></script><script src="app.js?v=8.5.0"></script>
+</body>
+</html>
