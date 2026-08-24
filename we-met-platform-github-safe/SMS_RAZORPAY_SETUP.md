@@ -46,15 +46,15 @@ Calls never require a membership and a membership never includes free calls. Ran
 
 ### Match Checkout to We Met
 
-The site first shows a dark We Met payment summary, then opens secure Razorpay Standard Checkout with the We Met logo, pink **#E62D7D** action colour and **#0C0D10** backdrop.
+The site keeps the exact wallet or listener-membership summary open underneath Razorpay Standard Checkout. It uses the square We Met PNG logo, pink **#E62D7D** action colour, a **#0C0D10** loading surface and a dark backdrop. Cancelling Checkout returns to the same summary instead of an empty page.
 
 1. Open Razorpay Dashboard → **Account & Settings** → **Checkout Styling**.
 2. Upload the We Met logo and use **We Met** as the brand name.
-3. Choose a dark background close to **#17181D** and accent **#E62D7D**.
+3. Choose background **#17181D** and accent **#E62D7D**. This Dashboard background setting is required to replace Razorpay's white payment-method surface on mobile.
 4. Choose rounded borders, a clean font, and enable the trusted-business badge if available.
 5. Preview desktop and mobile, save in Test mode, and repeat in Live mode if required.
 
-Secure card, UPI and bank fields are hosted by Razorpay. Browser security prevents the project CSS from redesigning those provider-owned fields. The project controls the branded in-site summary, backdrop, logo, description and theme options; the Dashboard controls the remaining provider surface.
+Secure card, UPI and bank fields are hosted by Razorpay. Browser security prevents the project CSS from redesigning those provider-owned fields. The project now preserves the correct underlying We Met page and controls the branded summary, loading background, logo, description and theme options; **Checkout Styling** controls Razorpay's inner payment-method background.
 
 ## 3. Add the signed webhook
 

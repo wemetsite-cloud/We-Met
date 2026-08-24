@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const esc = P.esc;
-  const NAV_MARKER = 'we-met-customer-v82';
+  const NAV_MARKER = 'we-met-customer-v83';
   const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'following', 'notifications', 'support']);
   const TAB_PARENT = { history: 'profile', following: 'profile', notifications: 'profile', support: 'profile' };
 
@@ -26,6 +26,7 @@
   let authState = { phone: '', challengeId: '', registrationToken: '' };
   let supportAuthState = { challengeId: '', registrationToken: '' };
   let postObjectUrls = [];
+  let customerPhotoObjectUrl = '';
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
   let directPollTimer = null;
@@ -92,7 +93,13 @@
     if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
     document.getElementById(id)?.classList.add('hidden');
     if (id === 'listenerProfileModal') releasePostUrls();
+    if (id === 'walletCheckoutModal') pendingWalletCheckout = null;
+    if (id === 'membershipCheckoutModal') pendingMembershipCheckout = null;
     syncBodyState();
+  }
+
+  function replaceOverlayHistory(overlay = null) {
+    history.replaceState({ marker: NAV_MARKER, tab: activeTab, ...(overlay ? { overlay } : {}) }, document.title);
   }
 
   function releasePostUrls() {
@@ -105,9 +112,13 @@
     window.addEventListener('popstate', (event) => {
       const state = event.state?.marker === NAV_MARKER ? event.state : { tab: 'home' };
       ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'walletCheckoutModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      if (state.overlay !== 'walletCheckoutModal') pendingWalletCheckout = null;
+      if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
+      document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
-      releasePostUrls();
+      if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
+      if (state.overlay !== 'listenerProfileModal') releasePostUrls();
       syncBodyState();
     });
   }
@@ -245,7 +256,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.2.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.3.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -317,6 +328,14 @@
   }
 
   async function handleActionClick(event) {
+    if (event.target.closest('[data-close-customer-conversation]')) {
+      activeConversation = null;
+      $('.direct-message-layout')?.classList.remove('conversation-open');
+      $('#directChat')?.classList.add('empty');
+      show('#directMessageForm', false);
+      renderConversations();
+      return;
+    }
     const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
     if (!target) return;
     const d = target.dataset;
@@ -370,6 +389,8 @@
   async function logout(clear = true) {
     if (clear) P.Store.clear();
     clearInterval(directPollTimer); socket?.disconnect(); audioCall?.stop(); me = null; currentCall = null;
+    if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
+    customerPhotoObjectUrl = '';
     document.body.classList.remove('signed-in');
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
     activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
@@ -436,7 +457,10 @@
       const status = liveStatus(listener);
       const subscribed = Boolean(listener.subscribed || isActiveMember(listener.id));
       const postsMarkup = subscribed ? await renderPrivatePosts(response.posts || []) : response.postsLocked ? `<button class="locked-posts" data-subscribe="${esc(listener.id)}" type="button"><span class="lock-art">✦</span><b>See exclusive posts</b><small>Subscribe to ${esc(listener.name)} for ₹399/month</small></button>` : '<div class="profile-no-posts">No exclusive posts yet.</div>';
-      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" type="button" ${status !== 'available' ? 'disabled' : ''}>${status === 'available' ? 'Call now' : statusLabel(status)}</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks this listener’s posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>`;
+      const callButton = status === 'available'
+        ? `<button class="listener-call-fab" data-listener-call="${esc(listener.id)}" type="button" aria-label="Call ${esc(listener.name)}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg></button>`
+        : '';
+      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
     } catch (error) { $('#listenerProfileContent').innerHTML = emptyState('Profile unavailable', error.message); }
   }
 
@@ -488,18 +512,41 @@
     payButton.disabled = true; button?.setAttribute('disabled', '');
     try {
       const order = await P.api('/api/subscriptions/create', { method: 'POST', body: JSON.stringify({ employeeId: listenerId }) });
-      show('#membershipCheckoutModal', false);
-      if (history.state?.marker === NAV_MARKER && history.state.overlay === 'membershipCheckoutModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title);
-      syncBodyState();
       document.body.classList.add('razorpay-open');
-      const finish = () => { document.body.classList.remove('razorpay-open'); button?.removeAttribute('disabled'); payButton.disabled = false; pendingMembershipCheckout = null; };
-      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('assets/logo.svg', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, escape: true, animation: true, ondismiss: finish }, handler: async (payment) => {
-        try { const verified = await P.api('/api/subscriptions/verify', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) }); await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]); closeOverlay('listenerProfileModal', false); P.toast(verified.message || 'Exclusive membership is active.', 'success'); openListenerProfile(listenerId); }
-        catch (error) { P.toast(error.message, 'error'); }
-        finally { finish(); }
+      $('#membershipCheckoutModal').setAttribute('aria-busy', 'true');
+      let handled = false;
+      const restore = (settled = false) => {
+        document.body.classList.remove('razorpay-open');
+        $('#membershipCheckoutModal').removeAttribute('aria-busy');
+        button?.removeAttribute('disabled');
+        payButton.disabled = false;
+        if (!settled) return;
+        pendingMembershipCheckout = null;
+        closeOverlay('membershipCheckoutModal', false);
+      };
+      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: true, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+        handled = true;
+        let verifiedSuccessfully = false;
+        try {
+          const verified = await P.api('/api/subscriptions/verify', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
+          await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]);
+          verifiedSuccessfully = true;
+          P.toast(verified.message || 'Exclusive membership is active.', 'success');
+        } catch (error) {
+          P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error');
+        } finally {
+          restore(true);
+          if (verifiedSuccessfully) {
+            closeOverlay('listenerProfileModal', false);
+            replaceOverlayHistory();
+            openListenerProfile(listenerId);
+          } else {
+            replaceOverlayHistory($('#listenerProfileModal').classList.contains('hidden') ? null : 'listenerProfileModal');
+          }
+        }
       } });
       checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Membership payment failed.', 'error')); checkout.open();
-    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
+    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; $('#membershipCheckoutModal').removeAttribute('aria-busy'); document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
   }
 
   async function cancelSubscription(id) {
@@ -515,14 +562,32 @@
   }
 
   function renderConversations() {
-    $('#conversationList').innerHTML = conversations.length ? conversations.map((item) => { const state = liveStatus(item); return `<button class="conversation-row ${activeConversation === item.listenerId ? 'active' : ''}" data-conversation="${esc(item.listenerId)}" type="button"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><span><b>${esc(item.listenerName)}</b><small>${esc(item.language || 'Malayalam')} · ${esc(item.lastMessage || (item.active ? 'Start a message' : 'Membership ended'))}</small></span>${item.unreadCount ? `<i>${item.unreadCount}</i>` : ''}</button>`; }).join('') : emptyState('No messages', 'Join a listener’s Exclusive membership to start messaging.');
+    const layout = $('.direct-message-layout');
+    const hasConversations = conversations.length > 0;
+    layout?.classList.toggle('no-conversations', !hasConversations);
+    if (!hasConversations) {
+      activeConversation = null;
+      layout?.classList.remove('conversation-open');
+      $('#conversationList').innerHTML = '<div class="messages-empty"><span aria-hidden="true">♡</span><strong>No messages yet</strong><small>Exclusive conversations will appear here.</small></div>';
+      $('#directChat').classList.add('empty');
+      show('#directMessageForm', false);
+      return;
+    }
+    $('#conversationList').innerHTML = conversations.map((item) => {
+      const state = liveStatus(item);
+      return `<button class="conversation-row ${activeConversation === item.listenerId ? 'active' : ''}" data-conversation="${esc(item.listenerId)}" type="button"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><span><b>${esc(item.listenerName)}</b><small>${esc(item.language || 'Malayalam')} · ${esc(statusLabel(state))}</small><em class="conversation-membership ${item.active ? 'active' : ''}">${item.active ? 'Member' : 'Ended'}</em></span>${item.unreadCount ? `<i>${item.unreadCount}</i>` : ''}</button>`;
+    }).join('');
   }
 
   async function openConversation(listenerId) {
     closeOverlay('listenerProfileModal', false); selectTab('messages'); activeConversation = listenerId; renderConversations();
     const conversation = conversations.find((item) => item.listenerId === listenerId);
     if (!conversation?.active) { P.toast('Subscribe to this listener to send messages.', 'info'); return openListenerProfile(listenerId); }
-    $('#directChat').classList.remove('empty'); $('#directChatHead').innerHTML = `<div><strong>${esc(conversation.listenerName)}</strong><small>${statusLabel(liveStatus(conversation))} · exclusive conversation</small></div><button class="button button-quiet button-small" data-listener-profile="${esc(listenerId)}" type="button">Profile</button>`; show('#directMessageForm'); await loadDirectMessages();
+    const state = liveStatus(conversation);
+    $('.direct-message-layout')?.classList.add('conversation-open');
+    $('#directChat').classList.remove('empty');
+    $('#directChatHead').innerHTML = `<button class="conversation-mobile-back" data-close-customer-conversation type="button" aria-label="Back to messages">‹</button><span class="conversation-avatar chat-profile-avatar"><img class="protected-media" src="${esc(listenerImage({ ...conversation, id: conversation.listenerId, profileImage: conversation.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><div><strong>${esc(conversation.listenerName)}</strong><small>${esc(conversation.language || 'Malayalam')} · ${esc(statusLabel(state))}</small></div><button class="button button-quiet button-small" data-listener-profile="${esc(listenerId)}" type="button">Profile</button>`;
+    show('#directMessageForm'); await loadDirectMessages();
   }
 
   async function loadDirectMessages() {
@@ -561,18 +626,27 @@
     button?.setAttribute('disabled', '');
     try {
       const order = await P.api('/api/create-order', { method: 'POST', body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }) });
-      show('#walletCheckoutModal', false);
-      if (history.state?.marker === NAV_MARKER && history.state.overlay === 'walletCheckoutModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title);
-      syncBodyState();
       document.body.classList.add('razorpay-open');
-      const finish = () => { button?.removeAttribute('disabled'); payButton.disabled = false; document.body.classList.remove('razorpay-open'); pendingWalletCheckout = null; };
-      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met', description: `Wallet · ${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/logo.svg', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, escape: true, animation: true, ondismiss: finish }, handler: async (payment) => {
+      $('#walletCheckoutModal').setAttribute('aria-busy', 'true');
+      let handled = false;
+      const restore = (settled = false) => {
+        button?.removeAttribute('disabled');
+        payButton.disabled = false;
+        document.body.classList.remove('razorpay-open');
+        $('#walletCheckoutModal').removeAttribute('aria-busy');
+        if (!settled) return;
+        pendingWalletCheckout = null;
+        closeOverlay('walletCheckoutModal', false);
+        replaceOverlayHistory();
+      };
+      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met', description: `Wallet · ${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: true, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+        handled = true;
         try { const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) }); updateBalance(verified.balance_seconds); await loadHistory(); P.toast(verified.message || 'Talk-time added.', 'success'); }
         catch (error) { P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error'); }
-        finally { finish(); }
+        finally { restore(true); }
       } });
       checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Payment failed.', 'error')); checkout.open();
-    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
+    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; $('#walletCheckoutModal').removeAttribute('aria-busy'); document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
   }
 
   async function redeem(event) {
@@ -668,7 +742,26 @@
 
   async function chooseCustomerPhoto(event) {
     const file = event.target.files?.[0]; if (!file) return;
-    try { customerPhotoDraft = await compressPhoto(file); $('#customerPhotoPreview').src = customerPhotoDraft; } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; }
+    const button = $('#customerPhotoButton');
+    button.disabled = true;
+    button.classList.add('uploading');
+    try {
+      customerPhotoDraft = await compressPhoto(file);
+      $('#customerPhotoPreview').src = customerPhotoDraft;
+      const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: me.name, username: me.username || '', profileImage: customerPhotoDraft }) });
+      me.profileImage = response.user.profileImage;
+      customerPhotoDraft = undefined;
+      await loadCustomerPhoto();
+      P.toast('Profile photo updated.', 'success');
+    } catch (error) {
+      customerPhotoDraft = undefined;
+      await loadCustomerPhoto();
+      P.toast(error.message, 'error');
+    } finally {
+      button.disabled = false;
+      button.classList.remove('uploading');
+      event.target.value = '';
+    }
   }
   async function compressPhoto(file) {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error('Choose a JPG, PNG or WebP photo smaller than 5 MB.');
@@ -676,8 +769,18 @@
     try { const image = new Image(); await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; }); const size = 560; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const ctx = canvas.getContext('2d'); const crop = Math.min(image.naturalWidth, image.naturalHeight); ctx.drawImage(image, (image.naturalWidth - crop) / 2, (image.naturalHeight - crop) / 2, crop, crop, 0, 0, size, size); const result = canvas.toDataURL('image/jpeg', 0.84); if (result.length > 610000) throw new Error('Choose a simpler or smaller photo.'); return result; }
     finally { URL.revokeObjectURL(url); }
   }
-  async function saveCustomerProfile(event) { event.preventDefault(); try { const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: $('#customerProfileName').value, username: $('#customerProfileUsername').value, ...(customerPhotoDraft !== undefined ? { profileImage: customerPhotoDraft } : {}) }) }); me.name = response.user.name; me.username = response.user.username; me.profileImage = response.user.profileImage; customerPhotoDraft = undefined; $('#profileName').textContent = me.name; $('#profileUsernameText').textContent = me.username ? `@${me.username}` : 'Add a username'; $('#customerProfileForm').classList.add('hidden'); P.toast('Profile updated.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
-  async function loadCustomerPhoto() { $('#customerPhotoPreview').src = 'assets/profile-placeholder.svg'; if (!me?.profileImage?.startsWith('photo:')) return; try { const blob = await P.apiBlob('/api/customer/profile/image'); $('#customerPhotoPreview').src = URL.createObjectURL(blob); } catch {} }
+  async function saveCustomerProfile(event) { event.preventDefault(); try { const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: $('#customerProfileName').value, username: $('#customerProfileUsername').value }) }); me.name = response.user.name; me.username = response.user.username; me.profileImage = response.user.profileImage; $('#profileName').textContent = me.name; $('#profileUsernameText').textContent = me.username ? `@${me.username}` : 'Add a username'; $('#customerProfileForm').classList.add('hidden'); P.toast('Profile updated.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function loadCustomerPhoto() {
+    if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
+    customerPhotoObjectUrl = '';
+    $('#customerPhotoPreview').src = 'assets/profile-placeholder.svg';
+    if (!me?.profileImage?.startsWith('photo:')) return;
+    try {
+      const blob = await P.apiBlob('/api/customer/profile/image');
+      customerPhotoObjectUrl = URL.createObjectURL(blob);
+      $('#customerPhotoPreview').src = customerPhotoObjectUrl;
+    } catch {}
+  }
   async function changePassword(event) { event.preventDefault(); try { await P.api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }) }); P.toast('Password updated. Please sign in again.', 'success'); setTimeout(() => logout(), 700); } catch (error) { P.toast(error.message, 'error'); } }
   async function reportCall(id) { const reason = prompt('Describe the issue for the safety team:'); if (!reason) return; try { await P.api('/api/customer/reports', { method: 'POST', body: JSON.stringify({ callId: id, reason, details: reason }) }); P.toast('Report sent.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
   async function loadLegal(type) { try { const response = await P.api(`/api/public/legal/${type}`); $('#legalTitle').textContent = ({ terms: 'Terms and Conditions', privacy: 'Privacy Policy', refund: 'Refund Policy', safety: 'Safety Centre' })[type] || 'Policy'; $('#legalBody').textContent = response.body; openOverlay('legalModal'); } catch (error) { P.toast(error.message, 'error'); } }

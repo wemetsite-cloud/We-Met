@@ -23,11 +23,13 @@
   let voiceChunks = [];
   let voiceBlob = null;
   let voiceStream = null;
-  let postObjectUrls = [];
+  let voicePreviewUrl = '';
+  let postPreviewUrl = '';
+  let renderedPostUrls = [];
+  let followerPhotoUrls = [];
   const inboxPhotoUrls = new Map();
   let inbox = [];
   let activeCustomerId = null;
-  const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let socket = null;
   let audioCall = null;
   let currentCall = null;
@@ -128,7 +130,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.2.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.3.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -137,8 +139,11 @@
     socket?.disconnect();
     audioCall?.stop();
     voiceStream?.getTracks().forEach((track) => track.stop());
-    postObjectUrls.forEach((url) => URL.revokeObjectURL(url));
-    postObjectUrls = [];
+    [voicePreviewUrl, postPreviewUrl, ...renderedPostUrls, ...followerPhotoUrls].filter(Boolean).forEach((url) => URL.revokeObjectURL(url));
+    voicePreviewUrl = '';
+    postPreviewUrl = '';
+    renderedPostUrls = [];
+    followerPhotoUrls = [];
     inboxPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
     inboxPhotoUrls.clear();
     stopRing();
@@ -175,9 +180,6 @@
   function renderProfileImageEditor() {
     const preview = $('#profileImagePreview');
     if (preview) preview.src = profileImageSrc(profileImageDraft, me?.name);
-    const grid = $('#profileAvatarGrid');
-    if (!grid) return;
-    grid.innerHTML = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-profile-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="assets/${avatar}" alt=""></button>`).join('');
     if ($('#profilePreviewUsername')) $('#profilePreviewUsername').textContent = `@${me?.username || 'listener'}`;
     if ($('#profileDisplayName')) $('#profileDisplayName').textContent = me?.name || 'Listener';
     if ($('#profileCodeText')) $('#profileCodeText').textContent = me?.employeeCode ? `Listener · ${me.employeeCode}` : 'Verified listener';
@@ -230,6 +232,52 @@
     } finally { URL.revokeObjectURL(url); }
   }
 
+  function applyProfileResponse(user) {
+    me = {
+      ...me,
+      ...user,
+      profileImage: user.profile_image ?? user.profileImage ?? me.profileImage,
+      bannerImage: user.banner_image ?? user.bannerImage ?? me.bannerImage,
+    };
+    profileImageDraft = me.profileImage || '';
+    bannerImageDraft = undefined;
+    $('#profileName').value = me.name || '';
+    $('#profileUsername').value = me.username || '';
+    $('#profileBio').value = me.bio || '';
+    renderProfileImageEditor();
+  }
+
+  async function saveProfileMedia(kind, image, trigger) {
+    const oldProfile = profileImageDraft;
+    const oldBanner = bannerImageDraft;
+    if (kind === 'profileImage') profileImageDraft = image;
+    else bannerImageDraft = image;
+    renderProfileImageEditor();
+    trigger.disabled = true;
+    trigger.classList.add('uploading');
+    try {
+      const response = await P.api('/api/employee/profile', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: me.name,
+          username: me.username || '',
+          bio: me.bio || '',
+          [kind]: image,
+        }),
+      });
+      applyProfileResponse(response.user);
+      P.toast(kind === 'profileImage' ? 'Profile photo updated.' : 'Banner updated.', 'success');
+    } catch (error) {
+      profileImageDraft = oldProfile;
+      bannerImageDraft = oldBanner;
+      renderProfileImageEditor();
+      P.toast(error.message, 'error');
+    } finally {
+      trigger.disabled = false;
+      trigger.classList.remove('uploading');
+    }
+  }
+
   function bind() {
     $('#listenerAuthBegin').addEventListener('click', () => showListenerAuthStep('phone'));
     $('#listenerPhoneForm').addEventListener('submit', startListenerPhone);
@@ -263,15 +311,16 @@
     $('#reportBtn').addEventListener('click', reportCurrent);
     $('#chatForm').addEventListener('submit', sendChat);
     $('#profileForm').addEventListener('submit', saveProfile);
-    $('#toggleListenerProfileEdit').addEventListener('click', () => show('#profileForm', $('#profileForm').classList.contains('hidden')));
+    $('#toggleListenerProfileEdit').addEventListener('click', () => {
+      const opening = $('#profileForm').classList.contains('hidden');
+      show('#profileForm', opening);
+      if (opening) setTimeout(() => $('#profileForm').scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+    });
     $('#closeListenerProfileEdit').addEventListener('click', () => show('#profileForm', false));
-    $('#profilePhotoMenu').addEventListener('click', () => { show('#profileForm'); show('#profileMediaChoices'); $('#profileForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-    $('#profileUploadPhoto').addEventListener('click', () => $('#profilePhotoFile').click());
-    $('#profilePhotoFile').addEventListener('change', async (event) => { try { profileImageDraft = await compressProfilePhoto(event.target.files?.[0]); renderProfileImageEditor(); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
-    $('#profileUploadBanner').addEventListener('click', () => $('#profileBannerFile').click());
-    $('#profileBannerFile').addEventListener('change', async (event) => { try { bannerImageDraft = await compressBannerPhoto(event.target.files?.[0]); renderProfileImageEditor(); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
-    $('#showAvatarChoices').addEventListener('click', () => show('#profileAvatarGrid', $('#profileAvatarGrid').classList.contains('hidden')));
-    $('#profileAvatarGrid').addEventListener('click', (event) => { const button = event.target.closest('[data-profile-avatar]'); if (!button) return; profileImageDraft = button.dataset.profileAvatar; renderProfileImageEditor(); });
+    $('#profilePhotoMenu').addEventListener('click', () => $('#profilePhotoFile').click());
+    $('#profileBannerEdit').addEventListener('click', () => $('#profileBannerFile').click());
+    $('#profilePhotoFile').addEventListener('change', async (event) => { try { const image = await compressProfilePhoto(event.target.files?.[0]); await saveProfileMedia('profileImage', image, $('#profilePhotoMenu')); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
+    $('#profileBannerFile').addEventListener('change', async (event) => { try { const image = await compressBannerPhoto(event.target.files?.[0]); await saveProfileMedia('bannerImage', image, $('#profileBannerEdit')); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
     $('#passwordForm').addEventListener('submit', changePassword);
     $('#refreshHistory').addEventListener('click', loadHistory);
     $('#refreshWallet').addEventListener('click', loadWallet);
@@ -557,8 +606,6 @@
     bannerImageDraft = undefined;
     renderProfileImageEditor();
     show('#profileForm', false);
-    show('#profileMediaChoices', false);
-    show('#profileAvatarGrid', false);
     $('#deskLanguage').textContent = `${me.listenerLanguage || 'Malayalam'} calls`;
     connect();
     loadStats();
@@ -616,13 +663,18 @@
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return P.toast('Voice recording is not supported in this browser. Use current Chrome, Edge or Safari.', 'error');
     try {
       voiceStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+      voicePreviewUrl = '';
+      show('#voicePreview', false);
+      show('#submitVoiceRecord', false);
       const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported?.(type));
       voiceRecorder = preferred ? new MediaRecorder(voiceStream, { mimeType: preferred }) : new MediaRecorder(voiceStream);
       voiceChunks = []; voiceBlob = null;
       voiceRecorder.ondataavailable = (event) => { if (event.data?.size) voiceChunks.push(event.data); };
       voiceRecorder.onstop = () => {
         voiceBlob = new Blob(voiceChunks, { type: String(voiceRecorder.mimeType || 'audio/webm').split(';')[0] });
-        const preview = $('#voicePreview'); preview.src = URL.createObjectURL(voiceBlob); show('#voicePreview'); show('#submitVoiceRecord');
+        voicePreviewUrl = URL.createObjectURL(voiceBlob);
+        const preview = $('#voicePreview'); preview.src = voicePreviewUrl; show('#voicePreview'); show('#submitVoiceRecord');
         $('#recordingStatus').textContent = 'Recording ready — listen before sending'; $('#recordingVisualizer').classList.remove('recording');
         voiceStream?.getTracks().forEach((track) => track.stop()); voiceStream = null;
       };
@@ -641,6 +693,8 @@
     try {
       const form = new FormData(); form.append('audio', voiceBlob, voiceBlob.type === 'audio/mp4' ? 'verification.m4a' : 'verification.webm');
       const response = await P.api('/api/employee/verification/audio', { method: 'POST', body: form, timeout: 30000 });
+      if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+      voicePreviewUrl = '';
       P.toast(response.message, 'success'); verificationState = await loadVerificationState(); renderVerification();
     } catch (error) { P.toast(error.message, 'error'); button.disabled = false; }
   }
@@ -921,9 +975,10 @@
   function previewPostPhoto(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file); postObjectUrls.push(url);
+    if (postPreviewUrl) URL.revokeObjectURL(postPreviewUrl);
+    postPreviewUrl = URL.createObjectURL(file);
     $('#postForm').classList.add('has-photo');
-    $('#postUploadPreview').innerHTML = `<img src="${url}" alt="Selected post" draggable="false"><b>${P.esc(file.name)}</b><small>${(file.size / 1024 / 1024).toFixed(1)} MB</small>`;
+    $('#postUploadPreview').innerHTML = `<img src="${postPreviewUrl}" alt="Selected post" draggable="false"><b>${P.esc(file.name)}</b><small>${(file.size / 1024 / 1024).toFixed(1)} MB</small>`;
   }
 
   async function publishPost(event) {
@@ -934,20 +989,25 @@
     try {
       const form = new FormData(); form.append('photo', file); form.append('caption', $('#postCaption').value);
       await P.api('/api/employee/posts', { method: 'POST', body: form, timeout: 30000 });
+      if (postPreviewUrl) URL.revokeObjectURL(postPreviewUrl);
+      postPreviewUrl = '';
       event.target.reset(); event.target.classList.remove('has-photo'); $('#postUploadPreview').innerHTML = '<span>＋</span><b>Choose a photo</b><small>JPG, PNG or WebP · max 4 MB</small>'; await loadPosts(); P.toast('Exclusive post published.', 'success');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
 
   async function loadPosts() {
+    const nextUrls = [];
     try {
       const response = await P.api('/api/employee/posts');
       const markup = await Promise.all((response.posts || []).map(async (post) => {
-        try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); postObjectUrls.push(url); return `<figure class="listener-post"><img src="${url}" alt="Your exclusive post" draggable="false"><figcaption><p>${P.esc(post.caption || 'No caption')}</p><small>${P.date(post.created_at)}</small><button data-delete-post="${P.esc(post.id)}" type="button">Delete</button></figcaption></figure>`; }
+        try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); nextUrls.push(url); return `<figure class="listener-post"><img src="${url}" alt="Your exclusive post" draggable="false"><figcaption><p>${P.esc(post.caption || 'No caption')}</p><small>${P.date(post.created_at)}</small><button data-delete-post="${P.esc(post.id)}" type="button">Delete</button></figcaption></figure>`; }
         catch { return ''; }
       }));
       $('#listenerPosts').innerHTML = markup.filter(Boolean).join('') || emptyState('No exclusive posts', 'Publish your first member-only photo from the form.');
-    } catch (error) { P.toast(error.message, 'error'); }
+      renderedPostUrls.forEach((url) => URL.revokeObjectURL(url));
+      renderedPostUrls = nextUrls;
+    } catch (error) { nextUrls.forEach((url) => URL.revokeObjectURL(url)); P.toast(error.message, 'error'); }
   }
 
   async function deletePost(id) {
@@ -959,6 +1019,8 @@
   async function loadInbox() {
     try {
       const response = await P.api('/api/employee/inbox'); inbox = response.conversations || [];
+      const liveCustomerIds = new Set(inbox.map((item) => item.customerId));
+      inboxPhotoUrls.forEach((url, customerId) => { if (!liveCustomerIds.has(customerId)) { URL.revokeObjectURL(url); inboxPhotoUrls.delete(customerId); } });
       await Promise.all(inbox.map(async (item) => {
         if (!String(item.customerImage || '').startsWith('photo:') || inboxPhotoUrls.has(item.customerId)) return;
         try {
@@ -997,14 +1059,19 @@
   }
 
   async function loadFollowers() {
+    const nextUrls = [];
     try {
-      const response = await P.api('/api/employee/followers'); $('#followerCount').textContent = Number(response.count || 0).toLocaleString('en-IN');
+      const response = await P.api('/api/employee/followers');
+      const count = Number(response.count || 0);
+      $('#followerCount').textContent = `${count.toLocaleString('en-IN')} ${count === 1 ? 'follower' : 'followers'}`;
       const cards = await Promise.all((response.followers || []).map(async (item) => {
-        let image = ''; if (String(item.profileImage || '').startsWith('photo:')) { try { const blob = await P.apiBlob(`/api/employee/followers/${encodeURIComponent(item.customerId)}/image`); image = URL.createObjectURL(blob); postObjectUrls.push(image); } catch {} }
-        return `<article class="follower-card">${image ? `<img src="${image}" alt="" draggable="false">` : `<span>${initials(item.name)}</span>`}<div><strong>${P.esc(item.name)}</strong><small>${item.subscribed ? 'Exclusive member' : 'Follower'} · ${P.date(item.followedAt)}</small></div>${item.subscribed ? '<i>Member</i>' : ''}</article>`;
+        let image = ''; if (String(item.profileImage || '').startsWith('photo:')) { try { const blob = await P.apiBlob(`/api/employee/followers/${encodeURIComponent(item.customerId)}/image`); image = URL.createObjectURL(blob); nextUrls.push(image); } catch {} }
+        return `<article class="follower-card">${image ? `<img src="${image}" alt="" draggable="false">` : `<span>${initials(item.name)}</span>`}<div><strong>${P.esc(item.name)}</strong><small><b>${item.subscribed ? 'Exclusive member' : 'Follower'}</b><time>${P.date(item.followedAt)}</time></small></div>${item.subscribed ? '<i>Member</i>' : ''}</article>`;
       }));
-      $('#followerGrid').innerHTML = cards.join('') || emptyState('No followers yet', 'Customers can follow your profile privately.');
-    } catch (error) { P.toast(error.message, 'error'); }
+      $('#followerGrid').innerHTML = cards.join('') || '<div class="followers-empty"><strong>No followers yet</strong><small>People who follow your profile will appear here.</small></div>';
+      followerPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
+      followerPhotoUrls = nextUrls;
+    } catch (error) { nextUrls.forEach((url) => URL.revokeObjectURL(url)); P.toast(error.message, 'error'); }
   }
 
   function handleListenerSocialClick(event) {
@@ -1161,19 +1228,10 @@
           name: $('#profileName').value,
           username: $('#profileUsername').value,
           bio: $('#profileBio').value,
-          profileImage: profileImageDraft,
-          ...(bannerImageDraft !== undefined ? { bannerImage: bannerImageDraft } : {}),
         }),
       });
-      me = { ...me, ...response.user, profileImage: response.user.profile_image ?? response.user.profileImage ?? profileImageDraft, bannerImage: response.user.banner_image ?? response.user.bannerImage ?? me.bannerImage };
-      profileImageDraft = me.profileImage || '';
-      bannerImageDraft = undefined;
-      renderProfileImageEditor();
-      $('#profilePreviewUsername').textContent = `@${me.username || 'listener'}`;
-      $('#profileDisplayName').textContent = me.name || 'Listener';
+      applyProfileResponse(response.user);
       show('#profileForm', false);
-      show('#profileMediaChoices', false);
-      show('#profileAvatarGrid', false);
       P.toast('Profile saved.', 'success');
     } catch (error) {
       P.toast(error.message, 'error');
@@ -1199,8 +1257,8 @@
     try {
       const response = await P.api('/api/employee/notifications');
       $('#notificationList').innerHTML = response.notifications.length
-        ? response.notifications.map((notification) => `<article class="list-item"><div><strong>${P.esc(notification.title)}</strong><p>${P.esc(notification.body)}</p></div><small>${P.date(notification.created_at)}</small></article>`).join('')
-        : emptyState('No admin messages', 'Important platform updates will appear here.');
+        ? response.notifications.map((notification) => `<article class="settings-notification"><div><strong>${P.esc(notification.title)}</strong><p>${P.esc(notification.body)}</p></div><time>${P.date(notification.created_at)}</time></article>`).join('')
+        : '<div class="settings-empty"><strong>No updates</strong><small>Important account notices will appear here.</small></div>';
     } catch (error) {
       P.toast(error.message, 'error');
     }

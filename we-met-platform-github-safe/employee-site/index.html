@@ -8,8 +8,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.2.0">
-  <link rel="stylesheet" href="style.css?v=8.2.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.3.0">
+  <link rel="stylesheet" href="style.css?v=8.3.0">
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -148,21 +148,16 @@
 
       <section id="tab-profile" class="tab">
         <section class="listener-profile-preview app-profile">
-          <div id="profileBannerPreview" class="profile-banner-preview"></div>
-          <button id="profilePhotoMenu" class="profile-photo-preview" type="button" aria-label="Change profile photo"><img id="profileImagePreview" alt="Your listener profile photo" draggable="false"><i>＋</i></button>
+          <div id="profileBannerPreview" class="profile-banner-preview"><button id="profileBannerEdit" class="profile-media-pencil banner-pencil" type="button" aria-label="Change banner"><svg viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4Z"/><path d="m13.5 6.5 4 4"/></svg></button></div>
+          <input id="profileBannerFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          <button id="profilePhotoMenu" class="profile-photo-preview" type="button" aria-label="Change profile photo"><img id="profileImagePreview" alt="Your listener profile photo" draggable="false"><i><svg viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4Z"/><path d="m13.5 6.5 4 4"/></svg></i></button>
+          <input id="profilePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
           <div class="profile-public-copy"><h2 id="profileDisplayName">Listener</h2><p id="profilePreviewUsername">@listener</p><small id="profileCodeText">Listener</small></div>
           <div class="profile-primary-actions"><button id="toggleListenerProfileEdit" class="button button-primary" type="button">Edit profile</button><button class="button button-soft" data-tab="followers" type="button">Followers</button></div>
         </section>
 
         <form id="profileForm" class="panel settings-panel stack listener-profile-editor hidden">
           <div class="editor-head"><div><span class="eyebrow">EDIT PROFILE</span><h2>Public details</h2></div><button id="closeListenerProfileEdit" class="icon-close" type="button" aria-label="Close">×</button></div>
-          <div id="profileMediaChoices" class="profile-media-choices hidden">
-            <button id="profileUploadPhoto" class="button button-soft" type="button">Choose from gallery</button>
-            <button id="showAvatarChoices" class="button button-quiet" type="button">Choose avatar</button>
-            <input id="profilePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
-          </div>
-          <div id="profileAvatarGrid" class="avatar-picker hidden" aria-label="Choose a profile avatar"></div>
-          <div class="banner-edit-row"><button id="profileUploadBanner" class="button button-soft" type="button">Change banner</button><input id="profileBannerFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
           <label>Public username<input id="profileUsername" autocomplete="username" required></label>
           <label>Private original name<input id="profileName" required><small>Only the admin can see this.</small></label>
           <label>Public bio<textarea id="profileBio" maxlength="500"></textarea></label>
@@ -181,13 +176,19 @@
         <div id="listenerPosts" class="listener-post-grid profile-post-grid"></div>
       </section>
 
-      <section id="tab-followers" class="tab"><div class="compact-page-title with-count"><div><h1>Followers</h1><small>Only you can see this list and count.</small></div><strong id="followerCount" class="follower-count">0</strong></div><div id="followerGrid" class="follower-grid"></div></section>
+      <section id="tab-followers" class="tab"><div class="compact-page-title with-count"><div><h1>Followers</h1><small>Private to you</small></div><strong id="followerCount" class="follower-count">0 followers</strong></div><div id="followerGrid" class="follower-grid"></div></section>
 
       <section id="tab-history" class="tab"><div class="compact-page-title row"><div><h1>Calls</h1><small>Your call activity.</small></div><button id="refreshHistory" class="button button-quiet" type="button">Refresh</button></div><div id="historyList" class="list"></div></section>
 
       <section id="tab-settings" class="tab">
-        <div class="compact-page-title"><h1>Settings</h1><small>Private account and security controls.</small></div>
-        <div class="grid-two"><section class="panel settings-panel"><span class="eyebrow">SECURITY</span><h2>Change password</h2><form id="passwordForm" class="stack"><label>Current password<input id="currentPassword" type="password" required></label><label>New password<input id="newPassword" type="password" minlength="8" required></label><button class="button button-primary">Update password</button></form></section><section class="panel settings-panel"><div class="section-head compact"><div><span class="eyebrow">ADMIN</span><h2>Updates</h2></div></div><div id="notificationList" class="list compact-list"></div></section></div>
+        <div class="compact-page-title"><h1>Settings</h1></div>
+        <div class="listener-settings-list">
+          <details class="listener-settings-item">
+            <summary><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/></svg></span><span><b>Account security</b><small>Change your password</small></span><svg class="settings-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <form id="passwordForm" class="stack listener-settings-body"><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form>
+          </details>
+          <section class="listener-settings-item updates-item"><div class="settings-static-head"><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Updates</b><small>Account and payment notices</small></span></div><div id="notificationList" class="settings-notification-list"></div></section>
+        </div>
       </section>
       <section id="tab-notifications" class="tab"><div id="notificationListLegacy" class="list"></div></section>
     </main>
@@ -209,6 +210,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.2.0"></script><script src="socket-loader.js?v=8.2.0"></script><script src="api.js?v=8.2.0"></script><script src="webrtc.js?v=8.2.0"></script><script src="app.js?v=8.2.0"></script>
+  <script src="config.js?v=8.3.0"></script><script src="socket-loader.js?v=8.3.0"></script><script src="api.js?v=8.3.0"></script><script src="webrtc.js?v=8.3.0"></script><script src="app.js?v=8.3.0"></script>
 </body>
 </html>

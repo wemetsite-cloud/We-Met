@@ -1,4 +1,4 @@
-# We Met v8.2 deployment
+# We Met v8.3 deployment
 
 This package contains the customer site, listener workspace, admin operations portal, API server and PostgreSQL schema.
 
@@ -57,12 +57,12 @@ The default local customer URL is `http://localhost:3000/`; listener and admin a
 6. Buy talk-time from Wallet, call any online verified listener and confirm billing starts only after audio connects.
 7. Confirm Admin → Payments records the top-up, subscription payment and ₹50 listener credit exactly once.
 8. Save a listener UPI ID, request a withdrawal, and use Admin → Withdrawals to mark it paid with the real UTR.
-9. Refresh each portal once so the v8.2 service worker replaces the old cache.
+9. Refresh each portal once so the v8.3 service worker replaces the old cache.
 
 ## Render duplicate-phone migration
 
-v8.2 repairs the legacy `uq_users_role_phone` startup failure before creating the unique index. If an older database contains more than one account with the same role and phone, the migration keeps the active account with the strongest wallet/activity record and clears the phone only from older duplicate rows. It does not delete an account, call, wallet entry, payment, post or message.
+v8.3 repairs the legacy `uq_users_role_phone` startup failure before creating the unique index. If an older database contains more than one account with the same role and phone, the migration keeps the active account with the strongest wallet/activity record and clears the phone only from older duplicate rows. It does not delete an account, call, wallet entry, payment, post or message.
 
-After uploading v8.2, use **Manual Deploy → Deploy latest commit** in Render. A successful log contains `We Met database initialized successfully`, followed by the server startup line. Then open `/api/health` before testing `/admin/`.
+After uploading v8.3, use **Manual Deploy → Deploy latest commit** in Render. A successful log contains `We Met database initialized successfully`, followed by the server startup line. Then open `/api/health` before testing `/admin/`.
 
 Listener payouts remain administrator-managed: the listener saves a UPI ID and requests a withdrawal, the admin pays it externally, then uses **Admin → Withdrawals → Mark paid** and enters the real UTR. The request, UTR and ledger entry remain auditable.

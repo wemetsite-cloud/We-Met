@@ -1,6 +1,6 @@
 {
-  "version": "8.2.0",
-  "name": "We Met v8.2.0 Professional Listener Platform",
+  "version": "8.3.0",
+  "name": "We Met v8.3.0 Mobile Application Polish",
   "changes": [
     "Introduces phone-first OTP onboarding with password login for returning customers and listeners",
     "Adds administrator-reviewed Malayalam voice verification for every self-created listener account",
@@ -14,6 +14,10 @@
     "Adds two-across wallet cards and branded in-site confirmations before secure Razorpay Checkout",
     "Rebuilds the listener workspace with bottom navigation, app-style inbox, photo-first posts and collapsed profile editing",
     "Adds international Twilio OTP support, OTP-verified pre-login help, listener UPI withdrawals and admin new/history queues",
-    "Makes admin-created listeners approved by default with an optional voice-verification control"
+    "Makes admin-created listeners approved by default with an optional voice-verification control",
+    "Keeps the real wallet or membership page behind Razorpay Checkout and restores it correctly after cancellation",
+    "Removes inline listener-profile call status buttons and adds one online-only floating phone control",
+    "Adds automatic gallery saving for customer photos and listener profile photos and banners",
+    "Corrects listener profile spacing, followers, settings, customer messages and taller wallet plan cards"
   ]
 }
