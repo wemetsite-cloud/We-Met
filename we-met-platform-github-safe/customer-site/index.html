@@ -14,8 +14,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.1.0">
-  <link rel="stylesheet" href="style.css?v=8.1.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.2.0">
+  <link rel="stylesheet" href="style.css?v=8.2.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -42,7 +42,7 @@
         <div class="hero-copy">
           <span class="eyebrow"><i></i> Real conversations, on your time</span>
           <h1>A real conversation,<br><em>whenever you need one.</em></h1>
-          <p class="hero-lead">Create a private phone-first account, choose a verified listener and open exclusive posts, messages and paid browser calls through one clear profile.</p>
+          <p class="hero-lead">Choose a verified listener and start a private, wallet-paid browser call. Exclusive membership is optional for photos and messages.</p>
           <div class="hero-buttons"><button class="button button-primary button-large" data-auth="start" type="button">Let’s start</button></div>
           <div class="trust-row" aria-label="Platform benefits">
             <span><b>Private</b>No phone number shown</span>
@@ -93,8 +93,8 @@
         <div class="steps">
           <article><b>1</b><h3>Verify your number</h3><p>New customers use one OTP. Returning customers enter the password for the same private number.</p></article>
           <article><b>2</b><h3>Choose a listener</h3><p>Open a verified listener’s profile, follow privately and see whether they are online.</p></article>
-          <article><b>3</b><h3>Join Exclusive</h3><p>A separate ₹399 membership unlocks that listener’s photos, direct messages and call button.</p></article>
-          <article><b>4</b><h3>Add talk-time and call</h3><p>Buy minutes in Wallet. Calls are always paid separately and billed only while audio is connected.</p></article>
+          <article><b>3</b><h3>Add talk-time</h3><p>Choose a wallet pack. Calls are billed only while both sides have live audio.</p></article>
+          <article><b>4</b><h3>Exclusive is optional</h3><p>Subscribe only when you want one listener’s private posts and messages.</p></article>
         </div>
       </section>
       <footer class="public-footer shell">
@@ -116,11 +116,11 @@
       <div class="tab active" id="tab-home">
         <section class="random-connect-card" aria-labelledby="randomConnectTitle">
           <div class="random-connect-mark" aria-hidden="true"><img src="assets/logo.svg" alt=""></div>
-          <div class="random-connect-copy"><span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking availability…</span></span><h1 id="randomConnectTitle">Connect with an available listener</h1><p>Randomly connects to one of your subscribed listeners.</p></div>
+          <div class="random-connect-copy"><span class="availability-line"><i class="status-dot"></i><span id="availabilityText">Checking availability…</span></span><h1 id="randomConnectTitle">Talk to someone available</h1><p>No membership needed. Your wallet pays only for connected time.</p></div>
           <button id="randomConnectButton" class="button button-primary button-large" type="button">Connect now</button>
         </section>
 
-        <label class="language-fallback-toggle language-fallback-bar"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>Show more verified listeners and include subscribed ones in Random Connect.</small></span></label>
+        <label class="language-fallback-toggle language-fallback-bar"><input id="otherLanguageToggle" type="checkbox"><span><b>Suggest other languages</b><small>Include available verified listeners outside Malayalam.</small></span></label>
 
         <section id="listenerDiscovery" class="listener-discovery" aria-live="polite">
           <div class="section-head listener-heading"><div><span class="eyebrow">VERIFIED LISTENERS</span><h2>Choose a listener</h2></div><button id="refreshListeners" class="button button-quiet" type="button" aria-label="Refresh listener availability"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.8-2L20 11M4 13l2.1 4a7 7 0 0 0 11.8-2"/></svg><span>Refresh</span></button></div>
@@ -146,12 +146,12 @@
       </div>
 
       <div class="tab" id="tab-subscriptions">
-        <div class="section-head"><div><span class="eyebrow">YOUR EXCLUSIVE SPACE</span><h2>Listener memberships</h2><p>Each ₹399 membership belongs to one listener and unlocks that listener’s posts, messages and call button.</p></div></div>
+        <div class="section-head compact-title"><div><h2>Exclusive</h2><p>Only completed memberships appear here.</p></div></div>
         <div id="subscriptionsList" class="membership-grid"></div>
       </div>
 
       <div class="tab" id="tab-messages">
-        <div class="section-head"><div><span class="eyebrow">PRIVATE MESSAGES</span><h2>Your conversations</h2><p>Messaging is available while the listener membership is active.</p></div></div>
+        <div class="section-head compact-title"><div><h2>Messages</h2></div></div>
         <div class="direct-message-layout">
           <aside id="conversationList" class="conversation-list" aria-label="Conversations"></aside>
           <section id="directChat" class="direct-chat empty">
@@ -162,8 +162,8 @@
         </div>
       </div>
 
-      <div class="tab" id="tab-history"><div class="section-head"><div><span class="eyebrow">YOUR CONVERSATIONS</span><h2>Recents</h2><p>Call again, report an issue or review your talk-time.</p></div><button class="button button-quiet" type="button" data-jump="favorites"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Favourites</button></div><div id="callHistory" class="list"></div></div>
-      <div class="tab" id="tab-favorites"><div class="section-head"><div><span class="eyebrow">SAVED LISTENERS</span><h2>Your favourites</h2></div></div><div id="favoritesList" class="listener-grid"></div></div>
+      <div class="tab" id="tab-history"><div class="section-head"><div><h2>Recent calls</h2></div><button class="button button-quiet" type="button" data-jump="following">Following</button></div><div id="callHistory" class="list"></div></div>
+      <div class="tab" id="tab-following"><div class="section-head compact-title"><div><h2>Following</h2><p>Listeners you chose to keep nearby.</p></div></div><div id="followingList" class="listener-grid"></div></div>
       <div class="tab" id="tab-notifications"><div class="section-head"><div><span class="eyebrow">UPDATES</span><h2>Notifications</h2></div><button id="readNotifications" class="button button-quiet" type="button">Mark all read</button></div><div id="notificationsList" class="list"></div></div>
 
       <div class="tab" id="tab-support">
@@ -181,11 +181,11 @@
 
       <div class="tab" id="tab-profile">
         <div class="profile-layout">
-          <section class="panel customer-profile-editor"><div class="customer-photo"><img id="customerPhotoPreview" src="assets/avatar-01.svg" alt="Your profile photo"></div><div><span class="eyebrow">YOUR PRIVATE PROFILE</span><h2 id="profileName">—</h2><p id="profileEmail">Phone-first account</p><p id="profilePhoneText">—</p><div class="profile-photo-actions"><button id="customerPhotoButton" class="button button-soft" type="button">Choose profile photo</button><input id="customerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div><form id="customerProfileForm" class="stack"><label>Display name<input id="customerProfileName" minlength="2" maxlength="80" required></label><button class="button button-primary" type="submit">Save profile</button></form></section>
+          <section class="panel customer-profile-card"><div class="customer-profile-summary"><button id="customerPhotoButton" class="customer-photo" type="button" aria-label="Change profile photo"><img id="customerPhotoPreview" src="assets/profile-placeholder.svg" alt="Your profile photo" draggable="false"><span>＋</span></button><input id="customerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div><h2 id="profileName">—</h2><p id="profileUsernameText">Add a username</p><small id="profilePhoneText">—</small></div></div><div class="profile-summary-actions"><button id="toggleCustomerProfileEdit" class="button button-primary" type="button">Edit profile</button><button class="button button-soft" type="button" data-jump="following">Following</button></div><form id="customerProfileForm" class="stack profile-editor-collapsed hidden"><label>Name<input id="customerProfileName" minlength="2" maxlength="80" required></label><label>Username <small>Optional</small><input id="customerProfileUsername" minlength="3" maxlength="50" pattern="[a-zA-Z0-9._-]{3,50}" placeholder="your.name"></label><button class="button button-primary" type="submit">Save profile</button></form></section>
 
           <section class="profile-menu-group" aria-labelledby="activityMenuTitle">
             <h2 id="activityMenuTitle">Your activity</h2>
-            <button class="profile-menu-row" type="button" data-jump="favorites"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span><b>Favourite listeners</b><small>People you saved</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="profile-menu-row" type="button" data-jump="following"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c.5-4 2.5-6 6-6s5.5 2 6 6M17 8h4M19 6v4"/></svg></span><span><b>Following</b><small>Listeners you follow</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
             <button class="profile-menu-row" type="button" data-jump="notifications"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Notifications</b><small>Account and payment updates</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
             <button class="profile-menu-row" type="button" data-jump="support"><span class="profile-menu-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 13a8 8 0 0 1 16 0M4 13v5h3v-6H4M20 13v5h-3v-6h3M17 18c0 2-2 3-5 3"/></svg></span><span><b>Help &amp; support</b><small>Contact the We Met team</small></span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
           </section>
@@ -220,7 +220,7 @@
       <div class="auth-progress-line"><i id="authProgressFill"></i></div>
       <div class="auth-brand"><img class="auth-logo" src="assets/logo.svg" alt=""><span><b>We Met</b><small>Private by design</small></span></div>
       <section class="phone-auth-step active" data-phone-step="welcome"><span class="eyebrow">WELCOME</span><h2 id="authTitle">Let’s start</h2><p>One private phone-first account. No email needed.</p><button id="authBegin" class="button button-primary button-large" type="button">Let’s start</button></section>
-      <form id="phoneStartForm" class="phone-auth-step stack" data-phone-step="phone"><span class="auth-step-number">1 / 4</span><h2>Your mobile number</h2><p>We use it only to secure your account. It is never shown to listeners.</p><label>Mobile number<div class="phone-field"><span>+91</span><input id="authPhone" inputmode="numeric" autocomplete="tel" maxlength="10" pattern="[6-9][0-9]{9}" placeholder="98765 43210" required></div></label><button class="button button-primary button-large" type="submit">Continue</button></form>
+      <form id="phoneStartForm" class="phone-auth-step stack" data-phone-step="phone"><span class="auth-step-number">1 / 4</span><h2>Your mobile number</h2><p>Used only to secure your account.</p><label>Mobile number<div class="phone-field international"><select id="authCountry" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option><option value="+49">🇩🇪 +49</option><option value="+33">🇫🇷 +33</option><option value="+81">🇯🇵 +81</option></select><input id="authPhone" inputmode="tel" autocomplete="tel-national" maxlength="14" placeholder="Mobile number" required></div></label><button class="button button-primary button-large" type="submit">Continue</button></form>
       <form id="phonePasswordForm" class="phone-auth-step stack" data-phone-step="password"><span class="auth-step-number">2 / 2</span><h2>Welcome back</h2><p>Enter the password for <b id="authPhonePreview">your number</b>.</p><label>Password<div class="password-field"><input id="authPassword" type="password" minlength="8" autocomplete="current-password" required><button type="button" data-password-toggle="authPassword">Show</button></div></label><button class="button button-primary button-large" type="submit">Open We Met</button><button class="auth-previous" data-auth-phone-back type="button">← Change number</button></form>
       <form id="phoneOtpForm" class="phone-auth-step stack" data-phone-step="otp"><span class="auth-step-number">2 / 4</span><h2>Enter your OTP</h2><p>We sent a code to <b id="otpPhonePreview">your number</b>.</p><label>6-digit OTP<input id="authOtp" class="otp-input" inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="6" pattern="[0-9]{6}" required></label><small id="developmentOtp" class="dev-otp hidden"></small><button class="button button-primary button-large" type="submit">Verify OTP</button><button class="auth-previous" data-auth-phone-back type="button">← Change number</button></form>
       <form id="phoneDetailsForm" class="phone-auth-step stack" data-phone-step="details"><span class="auth-step-number">3–4 / 4</span><h2>Finish your profile</h2><p>This name is shown only inside your account.</p><label>Your name<input id="authName" autocomplete="name" minlength="2" maxlength="80" required></label><label>Create password<div class="password-field"><input id="authNewPassword" type="password" minlength="8" autocomplete="new-password" required><button type="button" data-password-toggle="authNewPassword">Show</button></div></label><label class="check"><input id="authTerms" type="checkbox" required><span>I am 18+ and accept the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label><button class="button button-primary button-large" type="submit">Get started</button></form>
@@ -237,25 +237,30 @@
     </div>
   </div>
 
+  <div id="membershipCheckoutModal" class="modal wallet-checkout-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="membershipCheckoutTitle"><div class="modal-card wallet-checkout-card"><button class="close" data-close="membershipCheckoutModal" type="button" aria-label="Close">×</button><div class="wallet-checkout-brand"><img src="assets/logo.svg" alt=""><span><b>We Met Exclusive</b><small>Listener-specific access</small></span></div><div id="membershipCheckoutContent"></div><button id="membershipCheckoutPay" class="button button-primary button-large" type="button">Continue securely</button><small class="wallet-checkout-provider">Razorpay securely completes the recurring payment.</small></div></div>
+
   <div id="listenerProfileModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerProfileName"><div class="modal-card listener-profile-modal"><button class="close" data-close="listenerProfileModal" type="button" aria-label="Close">×</button><div id="listenerProfileContent"></div></div></div>
 
   <div id="callModal" class="call-modal hidden" role="dialog" aria-modal="true" aria-label="Active call">
     <div class="call-shell">
       <div class="call-top"><span id="callState">Finding a listener…</span><button id="minimizeCall" class="call-back" type="button" aria-label="Return to the dashboard"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button></div>
-      <div class="call-person"><div class="call-avatar"><img src="assets/logo.svg" alt=""></div><span class="language-chip">Malayalam voice call</span><h2 id="callPerson">Listener</h2><p id="callBio">A private conversation</p><strong id="callTimer">0:00</strong></div>
+      <div class="call-person"><div class="call-avatar"><img id="callAvatarImage" src="assets/logo.svg" alt="" draggable="false"></div><span class="language-chip">Voice call</span><h2 id="callPerson">Listener</h2><p id="callBio">A private conversation</p><strong id="callTimer">0:00</strong><div class="call-profile-actions"><button id="callProfileButton" class="button button-soft button-small" type="button">View profile</button><button id="callFollowButton" class="button button-soft button-small" type="button">Follow</button><button id="callSubscribeButton" class="button button-primary button-small" type="button">Exclusive</button></div></div>
       <div class="chat-box"><div id="chatMessages" class="chat-messages" aria-live="polite"></div><form id="chatForm" class="chat-form"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Type a message…"><button type="submit" aria-label="Send message"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button></form></div>
       <div class="call-actions"><button id="muteBtn" class="round-action" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg><small>Mute</small></button><button id="reportCallBtn" class="round-action" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 22V4M5 5c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></svg><small>Report</small></button><button id="endCallBtn" class="round-action end" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 15c4.8-4 11.2-4 16 0l-2.5 4-3.3-2v-3.2a12 12 0 0 0-4.4 0V17l-3.3 2Z"/></svg><small>End</small></button></div>
     </div>
   </div>
   <button id="restoreCall" class="restore-call hidden" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg><b>Return to call</b><small id="restoreTimer">0:00</small></button>
 
+  <button id="preloginSupportButton" class="prelogin-support" type="button">Need login help?</button>
+  <div id="preloginSupportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="preloginSupportTitle"><div class="modal-card support-auth-card"><button class="close" data-close="preloginSupportModal" type="button" aria-label="Close">×</button><span class="eyebrow">LOGIN SUPPORT</span><h2 id="preloginSupportTitle">Verify your number</h2><form id="preloginSupportPhoneForm" class="stack"><label>Mobile number<div class="phone-field international"><select id="supportCountry" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option></select><input id="supportPhone" inputmode="tel" maxlength="14" required></div></label><button class="button button-primary">Send OTP</button></form><form id="preloginSupportOtpForm" class="stack hidden"><p>Enter the OTP sent to <b id="supportPhonePreview">your number</b>.</p><label>OTP<input id="supportOtp" class="otp-input" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required></label><small id="supportDevelopmentOtp" class="dev-otp hidden"></small><button class="button button-primary">Verify</button></form><form id="preloginSupportIssueForm" class="stack hidden"><label>What is stopping you?<textarea id="supportIssue" maxlength="3000" minlength="5" placeholder="Describe the login problem" required></textarea></label><button class="button button-primary">Submit issue</button></form></div></div>
+
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.1.0"></script>
-  <script src="socket-loader.js?v=8.1.0"></script>
-  <script src="api.js?v=8.1.0"></script>
-  <script src="webrtc.js?v=8.1.0"></script>
+  <script src="config.js?v=8.2.0"></script>
+  <script src="socket-loader.js?v=8.2.0"></script>
+  <script src="api.js?v=8.2.0"></script>
+  <script src="webrtc.js?v=8.2.0"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app.js?v=8.1.0"></script>
+  <script src="app.js?v=8.2.0"></script>
 </body>
 </html>

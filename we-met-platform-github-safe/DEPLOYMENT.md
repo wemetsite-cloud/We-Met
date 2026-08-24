@@ -1,4 +1,4 @@
-# We Met v8.1 deployment
+# We Met v8.2 deployment
 
 This package contains the customer site, listener workspace, admin operations portal, API server and PostgreSQL schema.
 
@@ -33,7 +33,8 @@ Never add these values to frontend files or commit them to source control:
 - `ADMIN_PASSWORD` — at least 10 characters
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
 - `RAZORPAY_WEBHOOK_SECRET`
-- `FAST2SMS_API_KEY` and `FAST2SMS_OTP_TEMPLATE_ID`
+- Fast2SMS: `FAST2SMS_API_KEY` and `FAST2SMS_OTP_TEMPLATE_ID`
+- Twilio: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender number or Messaging Service SID
 
 Use matching Razorpay test credentials while testing and matching live credentials only after the account is approved for production. HTTPS is required in production.
 
@@ -50,17 +51,18 @@ The default local customer URL is `http://localhost:3000/`; listener and admin a
 
 1. Register a new customer by OTP and confirm returning login asks for the password.
 2. Register a listener, record the Malayalam line and approve the submission from Admin → Verifications.
-3. Confirm the customer can follow the listener but cannot view exclusive posts or message/call before membership.
+3. Confirm the customer can follow and make a wallet-funded random/direct call without membership, but cannot view exclusive posts or message before membership.
 4. Buy the listener's ₹399 membership and confirm posts and messages unlock.
-5. Confirm a subscribed customer with insufficient talk-time is sent to Wallet, and that membership never provides a free call.
-6. Buy talk-time from Wallet, call an online subscribed listener and confirm billing starts only after audio connects.
+5. Confirm any customer with an empty talk-time wallet is sent to Wallet, including an active member; membership never provides a free call.
+6. Buy talk-time from Wallet, call any online verified listener and confirm billing starts only after audio connects.
 7. Confirm Admin → Payments records the top-up, subscription payment and ₹50 listener credit exactly once.
-8. Refresh each portal once so the v8.1 service worker replaces the old cache.
+8. Save a listener UPI ID, request a withdrawal, and use Admin → Withdrawals to mark it paid with the real UTR.
+9. Refresh each portal once so the v8.2 service worker replaces the old cache.
 
 ## Render duplicate-phone migration
 
-v8.1 repairs the legacy `uq_users_role_phone` startup failure before creating the unique index. If an older database contains more than one account with the same role and phone, the migration keeps the active account with the strongest wallet/activity record and clears the phone only from older duplicate rows. It does not delete an account, call, wallet entry, payment, post or message.
+v8.2 repairs the legacy `uq_users_role_phone` startup failure before creating the unique index. If an older database contains more than one account with the same role and phone, the migration keeps the active account with the strongest wallet/activity record and clears the phone only from older duplicate rows. It does not delete an account, call, wallet entry, payment, post or message.
 
-After uploading v8.1, use **Manual Deploy → Deploy latest commit** in Render. A successful log contains `We Met database initialized successfully`, followed by the server startup line. Then open `/api/health` before testing `/admin/`.
+After uploading v8.2, use **Manual Deploy → Deploy latest commit** in Render. A successful log contains `We Met database initialized successfully`, followed by the server startup line. Then open `/api/health` before testing `/admin/`.
 
-Listener payouts remain administrator-managed: pay the listener by the agreed external method, then use **Admin → Listener wallets → Record paid** to create the audited ledger entry.
+Listener payouts remain administrator-managed: the listener saves a UPI ID and requests a withdrawal, the admin pays it externally, then uses **Admin → Withdrawals → Mark paid** and enters the real UTR. The request, UTR and ledger entry remain auditable.
