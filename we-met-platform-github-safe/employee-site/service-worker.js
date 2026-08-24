@@ -1,4 +1,4 @@
-const VERSION = '8.8.0';
+const VERSION = '8.5.0';
 const CACHE_PREFIX = 'we-met-listener-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = ['./','index.html','style.css','app.js','api.js','socket-loader.js','webrtc.js','config.js','manifest.webmanifest','assets/logo.svg','assets/favicon.png','assets/icon-192.png','assets/icon-512.png','assets/default-listener-banner.png','assets/avatar-01.svg','assets/avatar-02.svg','assets/avatar-03.svg','assets/avatar-04.svg','assets/avatar-05.svg','assets/avatar-06.svg','assets/avatar-07.svg','assets/avatar-08.svg','assets/avatar-09.svg','assets/avatar-10.svg','assets/avatar-11.svg','assets/avatar-12.svg','assets/avatar-13.svg','assets/avatar-14.svg','assets/avatar-15.svg','assets/avatar-16.svg','assets/avatar-17.svg','assets/avatar-18.svg','assets/avatar-19.svg','assets/avatar-20.svg'];

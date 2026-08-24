@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const esc = P.esc;
-  const NAV_MARKER = 'we-met-customer-v88';
+  const NAV_MARKER = 'we-met-customer-v86';
   const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'following', 'notifications', 'support']);
   const TAB_PARENT = { history: 'profile', following: 'profile', notifications: 'profile', support: 'profile' };
 
@@ -22,6 +22,7 @@
   let conversations = [];
   let activeConversation = null;
   let activeTab = 'home';
+  let paymentPlans = [];
   let followingListeners = [];
   let authState = { phone: '', challengeId: '', registrationToken: '' };
   let supportAuthState = { challengeId: '', registrationToken: '' };
@@ -30,7 +31,9 @@
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
   let directPollTimer = null;
+  let pendingMembershipCheckout = null;
   let pendingCallRequest = null;
+  let razorpayLoader = null;
   let activeListenerProfileId = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
@@ -75,7 +78,7 @@
   }
 
   function currentOverlay() {
-    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
+    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
   function syncBodyState() {
@@ -96,6 +99,7 @@
     if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
     document.getElementById(id)?.classList.add('hidden');
     if (id === 'listenerProfileModal') { activeListenerProfileId = null; releasePostUrls(); }
+    if (id === 'membershipCheckoutModal') pendingMembershipCheckout = null;
     syncBodyState();
   }
 
@@ -116,7 +120,9 @@
       const state = event.state?.marker === NAV_MARKER
         ? event.state
         : { tab: activeTab || 'home' };
-      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
+      document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
@@ -258,7 +264,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.8.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.6.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -293,6 +299,7 @@
     $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
+    $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
     $('#couponForm').onsubmit = redeem;
     $('#supportForm').onsubmit = sendSupport;
     $('#passwordForm').onsubmit = changePassword;
@@ -313,6 +320,7 @@
     $('#reportCallBtn').onclick = () => currentCall && reportCall(currentCall.id);
     $('#callProfileButton').onclick = openCurrentCallProfile;
     $('#callFollowButton').onclick = () => currentCall?.employee?.id && toggleFollow(currentCall.employee.id, Boolean(currentCall.employee.following));
+    $('#callSubscribeButton').onclick = () => currentCall?.employee?.id && subscribeToListener(currentCall.employee.id, $('#callSubscribeButton'));
     $('#preloginSupportButton').onclick = openPreloginSupport;
     $('#preloginSupportPhoneForm').onsubmit = startPreloginSupport;
     $('#preloginSupportOtpForm').onsubmit = verifyPreloginSupport;
@@ -337,14 +345,19 @@
     }
     const postLike = event.target.closest('button[data-post-like]');
     if (postLike) return togglePostLike(postLike);
-    const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-listener-call],button[data-listener-message],button[data-conversation]');
+    const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
     if (!target) return;
     const d = target.dataset;
     if (d.listenerProfile) return openListenerProfile(d.listenerProfile);
     if (d.follow) return toggleFollow(d.follow, d.following === 'true');
+    if (d.subscribe) return subscribeToListener(d.subscribe, target);
     if (d.listenerCall) return requestCall(d.listenerCall);
-    if (d.listenerMessage) return openConversation(d.listenerMessage);
+    if (d.listenerMessage) return isActiveMember(d.listenerMessage)
+      ? openConversation(d.listenerMessage)
+      : subscribeToListener(d.listenerMessage, target);
+    if (d.buyPlan) return openPayment(d.buyPlan, target);
     if (d.conversation) return openConversation(d.conversation);
+    if (d.cancelSubscription) return cancelSubscription(d.cancelSubscription);
   }
 
   async function togglePostLike(button) {
@@ -389,7 +402,7 @@
     $('#profilePhone').textContent = me.phone || 'Private mobile';
     updateBalance(me.balanceSeconds);
     const requestedTab = activeTab;
-    await Promise.allSettled([loadSubscriptions(false), loadDirectory(), loadConversations(), loadHistory(), loadFollowing(), loadNotifications(), loadSupport(), loadCustomerPhoto()]);
+    await Promise.allSettled([loadSubscriptions(false), loadDirectory(), loadConversations(), loadPlans(), loadHistory(), loadFollowing(), loadNotifications(), loadSupport(), loadCustomerPhoto()]);
     renderSubscriptions(); renderDirectory(); connectSocket();
     if (requestedTab !== 'home') selectTab(requestedTab, { historyMode: 'none' });
     clearInterval(directPollTimer);
@@ -406,6 +419,7 @@
     clearInterval(directPollTimer);
     clearPendingCallRequest();
     currentCall = null;
+    pendingMembershipCheckout = null;
     activeListenerProfileId = null;
     socket?.disconnect();
     audioCall?.stop();
@@ -414,7 +428,7 @@
     liveListeners = [];
     if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
     customerPhotoObjectUrl = '';
-    document.body.classList.remove('signed-in');
+    document.body.classList.remove('signed-in', 'razorpay-open');
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
     activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
   }
@@ -428,7 +442,7 @@
     if (historyMode === 'push') history.pushState({ marker: NAV_MARKER, tab }, document.title);
     if (tab === 'subscriptions') loadSubscriptions();
     if (tab === 'messages') loadConversations();
-    if (tab === 'wallet') loadHistory();
+    if (tab === 'wallet') { loadPlans(); loadHistory(); }
     if (tab === 'history') loadHistory();
     if (tab === 'following') loadFollowing();
     if (tab === 'notifications') loadNotifications();
@@ -478,11 +492,11 @@
       const listener = response.listener;
       const status = liveStatus(listener);
       const subscribed = Boolean(listener.subscribed || isActiveMember(listener.id));
-      const postsMarkup = subscribed ? await renderPrivatePosts(response.posts || []) : response.postsLocked ? '<div class="locked-posts"><span class="lock-art">✦</span><b>Private posts</b><small>New access is not available on the website right now.</small></div>' : '<div class="profile-no-posts">No private posts yet.</div>';
+      const postsMarkup = subscribed ? await renderPrivatePosts(response.posts || []) : response.postsLocked ? `<button class="locked-posts" data-subscribe="${esc(listener.id)}" type="button"><span class="lock-art">✦</span><b>See exclusive posts</b><small>Subscribe to ${esc(listener.name)} for ₹399/month</small></button>` : '<div class="profile-no-posts">No exclusive posts yet.</div>';
       const callButton = status === 'available'
         ? `<button class="listener-call-fab" data-listener-call="${esc(listener.id)}" data-call-available="true" type="button" aria-label="Call ${esc(listener.name)}" ${pendingCallRequest || currentCall ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg></button>`
         : '';
-      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions">${subscribed ? `<button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button><span class="member-confirmed">Private access active</span>` : '<span class="member-confirmed">Private access unavailable</span>'}</div><p class="call-wallet-note">Calls use available talk-time and do not require private-content access.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Private access active' : 'Private access unavailable'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
+      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
     } catch (error) { $('#listenerProfileContent').innerHTML = emptyState('Profile unavailable', error.message); }
   }
 
@@ -515,7 +529,96 @@
 
   function renderSubscriptions() {
     const node = $('#subscriptionsList'); if (!node) return;
-    node.innerHTML = subscriptions.length ? subscriptions.map((item) => `<article class="membership-card ${item.active ? 'active' : 'expired'}"><div class="membership-listener"><img src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt=""><div><span>${item.active ? 'ACTIVE ACCESS' : esc(String(item.status).toUpperCase())}</span><h3>${esc(item.listenerName)}</h3><p>${esc(item.language)}</p></div></div><div class="membership-date"><small>${item.active ? 'Access until' : 'Last updated'}</small><strong>${P.date(item.currentPeriodEnd)}</strong></div><div class="membership-actions"><button class="button button-soft" data-listener-profile="${esc(item.listenerId)}" type="button">View profile</button>${item.active ? `<button class="button button-primary" data-listener-message="${esc(item.listenerId)}" type="button">Message${item.unreadCount ? ` · ${item.unreadCount}` : ''}</button>` : ''}</div></article>`).join('') : emptyState('No private access', 'New private-content access is not available on the website right now.');
+    node.innerHTML = subscriptions.length ? subscriptions.map((item) => `<article class="membership-card ${item.active ? 'active' : 'expired'}"><div class="membership-listener"><img src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt=""><div><span>${item.active ? 'ACTIVE MEMBERSHIP' : esc(String(item.status).toUpperCase())}</span><h3>${esc(item.listenerName)}</h3><p>${esc(item.language)}</p></div></div><div class="membership-date"><small>${item.active ? 'Access until' : 'Last updated'}</small><strong>${P.date(item.currentPeriodEnd)}</strong></div><div class="membership-actions"><button class="button button-soft" data-listener-profile="${esc(item.listenerId)}" type="button">View profile</button>${item.active ? `<button class="button button-primary" data-listener-message="${esc(item.listenerId)}" type="button">Message${item.unreadCount ? ` · ${item.unreadCount}` : ''}</button>` : ''}${item.active && !item.cancelAtCycleEnd ? `<button class="text-action" data-cancel-subscription="${esc(item.id)}" type="button">Turn off renewal</button>` : item.cancelAtCycleEnd ? '<small>Renewal is off</small>' : ''}</div></article>`).join('') : emptyState('No listener memberships yet', 'Open a listener profile and subscribe to unlock their exclusive posts and messages.');
+  }
+
+  function loadRazorpayCheckout() {
+    if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
+    if (razorpayLoader) return razorpayLoader;
+    razorpayLoader = new Promise((resolve, reject) => {
+      document.querySelector('script[data-we-met-razorpay]')?.remove();
+      const script = document.createElement('script');
+      let timeout = 0;
+      const cleanup = () => { clearTimeout(timeout); script.onload = null; script.onerror = null; };
+      script.onload = () => {
+        cleanup();
+        if (typeof window.Razorpay === 'function') resolve(window.Razorpay);
+        else reject(new Error('Secure checkout did not initialize. Please try again.'));
+      };
+      script.onerror = () => { cleanup(); script.remove(); reject(new Error('Secure checkout could not load. Check your connection and try again.')); };
+      timeout = window.setTimeout(() => {
+        cleanup();
+        script.remove();
+        reject(new Error('Secure checkout is taking too long to load. Please try again.'));
+      }, 15000);
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.dataset.weMetRazorpay = 'true';
+      document.head.appendChild(script);
+    }).catch((error) => {
+      razorpayLoader = null;
+      throw error;
+    });
+    return razorpayLoader;
+  }
+
+  async function subscribeToListener(listenerId, button) {
+    const listener = directory.find((item) => item.id === listenerId) || { id: listenerId, name: 'this listener' };
+    pendingMembershipCheckout = { listenerId, listener, button };
+    $('#membershipCheckoutContent').innerHTML = `<div class="wallet-checkout-summary membership-summary"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="" draggable="false"><div><small>Exclusive membership</small><h2 id="membershipCheckoutTitle">${esc(listener.name)}</h2><p>Posts and direct messages for this listener.</p></div><strong>₹399</strong></div><div class="wallet-checkout-trust"><span>Listener-specific access</span><span>Renews monthly</span><span>Calls still use wallet minutes</span></div>`;
+    $('#membershipCheckoutPay').textContent = 'Subscribe securely · ₹399';
+    openOverlay('membershipCheckoutModal');
+  }
+
+  async function beginMembershipCheckout() {
+    if (!pendingMembershipCheckout) return;
+    const { listenerId, button } = pendingMembershipCheckout;
+    const payButton = $('#membershipCheckoutPay');
+    payButton.disabled = true; button?.setAttribute('disabled', '');
+    try {
+      await loadRazorpayCheckout();
+      const order = await P.api('/api/subscriptions/create', { method: 'POST', body: JSON.stringify({ employeeId: listenerId }) });
+      document.body.classList.add('razorpay-open');
+      $('#membershipCheckoutModal').setAttribute('aria-busy', 'true');
+      let handled = false;
+      const restore = (settled = false) => {
+        document.body.classList.remove('razorpay-open');
+        $('#membershipCheckoutModal').removeAttribute('aria-busy');
+        button?.removeAttribute('disabled');
+        payButton.disabled = false;
+        if (!settled) return;
+        pendingMembershipCheckout = null;
+        closeOverlay('membershipCheckoutModal', false);
+      };
+      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+        handled = true;
+        let verifiedSuccessfully = false;
+        try {
+          const verified = await P.api('/api/subscriptions/verify', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
+          await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]);
+          verifiedSuccessfully = true;
+          P.toast(verified.message || 'Exclusive membership is active.', 'success');
+        } catch (error) {
+          P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error');
+        } finally {
+          restore(true);
+          if (verifiedSuccessfully) {
+            closeOverlay('listenerProfileModal', false);
+            replaceOverlayHistory();
+            openListenerProfile(listenerId);
+          } else {
+            replaceOverlayHistory($('#listenerProfileModal').classList.contains('hidden') ? null : 'listenerProfileModal');
+          }
+        }
+      } });
+      checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Membership payment failed.', 'error')); checkout.open();
+    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; $('#membershipCheckoutModal').removeAttribute('aria-busy'); document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
+  }
+
+  async function cancelSubscription(id) {
+    if (!confirm('Turn off automatic renewal? Your access continues until the paid period ends.')) return;
+    try { const response = await P.api(`/api/subscriptions/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: '{}' }); P.toast(response.message, 'success'); loadSubscriptions(); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
   async function loadConversations(render = true) {
@@ -531,21 +634,21 @@
     if (!hasConversations) {
       activeConversation = null;
       layout?.classList.remove('conversation-open');
-      $('#conversationList').innerHTML = '<div class="messages-empty"><span aria-hidden="true">♡</span><strong>No messages yet</strong><small>Private conversations will appear here.</small></div>';
+      $('#conversationList').innerHTML = '<div class="messages-empty"><span aria-hidden="true">♡</span><strong>No messages yet</strong><small>Exclusive conversations will appear here.</small></div>';
       $('#directChat').classList.add('empty');
       show('#directMessageForm', false);
       return;
     }
     $('#conversationList').innerHTML = conversations.map((item) => {
       const state = liveStatus(item);
-      return `<button class="conversation-row ${activeConversation === item.listenerId ? 'active' : ''}" data-conversation="${esc(item.listenerId)}" type="button"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><span><b>${esc(item.listenerName)}</b><small>${esc(item.language || 'Malayalam')} · ${esc(statusLabel(state))}</small><em class="conversation-membership ${item.active ? 'active' : ''}">${item.active ? 'Access' : 'Ended'}</em></span>${item.unreadCount ? `<i>${item.unreadCount}</i>` : ''}</button>`;
+      return `<button class="conversation-row ${activeConversation === item.listenerId ? 'active' : ''}" data-conversation="${esc(item.listenerId)}" type="button"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><span><b>${esc(item.listenerName)}</b><small>${esc(item.language || 'Malayalam')} · ${esc(statusLabel(state))}</small><em class="conversation-membership ${item.active ? 'active' : ''}">${item.active ? 'Member' : 'Ended'}</em></span>${item.unreadCount ? `<i>${item.unreadCount}</i>` : ''}</button>`;
     }).join('');
   }
 
   async function openConversation(listenerId) {
     closeOverlay('listenerProfileModal', false); selectTab('messages'); activeConversation = listenerId; renderConversations();
     const conversation = conversations.find((item) => item.listenerId === listenerId);
-    if (!conversation?.active) { P.toast('Private messaging is not available for this listener.', 'info'); return openListenerProfile(listenerId); }
+    if (!conversation?.active) { P.toast('Subscribe to this listener to send messages.', 'info'); return openListenerProfile(listenerId); }
     const state = liveStatus(conversation);
     $('.direct-message-layout')?.classList.add('conversation-open');
     $('#directChat').classList.remove('empty');
@@ -563,6 +666,18 @@
     event.preventDefault(); const input = $('#directMessageInput'); const message = input.value.trim(); if (!message || !activeConversation) return; const submit = event.submitter; submit.disabled = true;
     try { await P.api(`/api/customer/conversations/${encodeURIComponent(activeConversation)}/messages`, { method: 'POST', body: JSON.stringify({ message }) }); input.value = ''; await loadDirectMessages(); }
     catch (error) { P.toast(error.message, 'error'); } finally { submit.disabled = false; }
+  }
+
+  async function loadPlans() {
+    if (!me) return;
+    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
+    catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function openPayment(planId) {
+    const plan = paymentPlans.find((item) => item.id === planId);
+    if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
+    window.location.assign(`checkout.html?plan=${encodeURIComponent(plan.id)}`);
   }
 
   async function redeem(event) {
@@ -707,7 +822,7 @@
     const employee = directory.find((item) => item.id === currentCall.employee?.id) || currentCall.employee;
     if (employee?.id) currentCall.employee = { ...employee, ...currentCall.employee, following: Boolean(employee.following) };
     $('#callAvatarImage').src = employee?.id ? listenerImage(employee) : 'assets/logo.svg';
-    show('#callProfileButton', Boolean(employee?.id)); show('#callFollowButton', Boolean(employee?.id));
+    show('#callProfileButton', Boolean(employee?.id)); show('#callFollowButton', Boolean(employee?.id)); show('#callSubscribeButton', Boolean(employee?.id) && !isActiveMember(employee.id) && !employee.subscribed);
     if (employee?.id) $('#callFollowButton').textContent = employee.following ? 'Following' : 'Follow';
   }
 
@@ -726,7 +841,7 @@
 
   async function loadHistory() {
     if (!me) return;
-    try { const response = await P.api('/api/customer/history'); $('#callHistory').innerHTML = response.calls?.length ? response.calls.map((call) => `<article class="list-item"><div><strong>${esc(call.employee_name)}</strong><p>${P.date(call.created_at)} · ${P.duration(call.billed_seconds)}</p></div><button class="button button-quiet" data-listener-profile="${esc(call.employee_id)}">Profile</button></article>`).join('') : emptyState('No calls yet', 'Your private call history appears here.'); $('#walletHistory').innerHTML = response.wallet?.length ? response.wallet.map((entry) => `<article class="list-item"><div><strong>${entry.seconds_delta > 0 ? '+' : '−'}${P.duration(Math.abs(entry.seconds_delta))}</strong><p>${esc(entry.note || entry.type)}</p></div><small>${P.date(entry.created_at)}</small></article>`).join('') : emptyState('No wallet activity', 'Redeemed talk-time and call usage appear here.'); }
+    try { const response = await P.api('/api/customer/history'); $('#callHistory').innerHTML = response.calls?.length ? response.calls.map((call) => `<article class="list-item"><div><strong>${esc(call.employee_name)}</strong><p>${P.date(call.created_at)} · ${P.duration(call.billed_seconds)}</p></div><button class="button button-quiet" data-listener-profile="${esc(call.employee_id)}">Profile</button></article>`).join('') : emptyState('No calls yet', 'Your private call history appears here.'); $('#walletHistory').innerHTML = response.wallet?.length ? response.wallet.map((entry) => `<article class="list-item"><div><strong>${entry.seconds_delta > 0 ? '+' : '−'}${P.duration(Math.abs(entry.seconds_delta))}</strong><p>${esc(entry.note || entry.type)}</p></div><small>${P.date(entry.created_at)}</small></article>`).join('') : emptyState('No wallet activity', 'Top-ups and call charges appear here.'); }
     catch (error) { P.toast(error.message, 'error'); }
   }
 
@@ -735,7 +850,7 @@
     try { const response = await P.api('/api/customer/following'); followingListeners = response.listeners || []; if (render) $('#followingList').innerHTML = followingListeners.length ? followingListeners.map((item) => `<article class="mini-listener"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage(item))}" alt="" draggable="false"><i class="${liveStatus(item) === 'available' ? 'online' : ''}"></i></span><div><strong>${esc(item.name)}</strong><small>${esc(item.language || 'Malayalam')} · ${esc(statusLabel(liveStatus(item)))}</small></div><button class="button button-soft" data-listener-profile="${esc(item.id)}">Profile</button></article>`).join('') : emptyState('Not following anyone yet', 'Tap Follow on any listener profile.'); }
     catch (error) { P.toast(error.message, 'error'); }
   }
-  async function loadNotifications() { if (!me) return; try { const response = await P.api('/api/customer/notifications'); $('#notificationsList').innerHTML = response.notifications?.length ? response.notifications.map((n) => `<article class="list-item"><div><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p></div><small>${P.date(n.created_at)}</small></article>`).join('') : emptyState('No notifications', 'Account and service updates appear here.'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function loadNotifications() { if (!me) return; try { const response = await P.api('/api/customer/notifications'); $('#notificationsList').innerHTML = response.notifications?.length ? response.notifications.map((n) => `<article class="list-item"><div><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p></div><small>${P.date(n.created_at)}</small></article>`).join('') : emptyState('No notifications', 'Account and payment updates appear here.'); } catch (error) { P.toast(error.message, 'error'); } }
   async function markNotificationsRead() { try { await P.api('/api/customer/notifications/read', { method: 'POST', body: '{}' }); loadNotifications(); } catch (error) { P.toast(error.message, 'error'); } }
   async function loadSupport() { if (!me) return; try { const r = await P.api('/api/customer/support'); $('#supportList').innerHTML = r.tickets?.length ? r.tickets.map((t) => `<article class="list-item"><div><strong>${esc(t.subject)}</strong><p>${esc(t.message)}</p>${t.admin_reply ? `<p><b>Reply:</b> ${esc(t.admin_reply)}</p>` : ''}</div><span>${esc(t.status)}</span></article>`).join('') : emptyState('No support messages', 'Messages to the team appear here.'); } catch {} }
   async function sendSupport(event) { event.preventDefault(); try { await P.api('/api/customer/support', { method: 'POST', body: JSON.stringify({ subject: $('#supportSubject').value, message: $('#supportMessage').value }) }); event.target.reset(); loadSupport(); P.toast('Message sent.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
@@ -783,7 +898,7 @@
   }
   async function changePassword(event) { event.preventDefault(); try { await P.api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }) }); P.toast('Password updated. Please sign in again.', 'success'); setTimeout(() => logout(), 700); } catch (error) { P.toast(error.message, 'error'); } }
   async function reportCall(id) { const reason = prompt('Describe the issue for the safety team:'); if (!reason) return; try { await P.api('/api/customer/reports', { method: 'POST', body: JSON.stringify({ callId: id, reason, details: reason }) }); P.toast('Report sent.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
-  async function loadLegal(type) { try { const response = await P.api(`/api/public/legal/${type}`); $('#legalTitle').textContent = ({ terms: 'Terms and Conditions', privacy: 'Privacy Policy', safety: 'Safety Centre' })[type] || 'Policy'; $('#legalBody').textContent = response.body; openOverlay('legalModal'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function loadLegal(type) { try { const response = await P.api(`/api/public/legal/${type}`); $('#legalTitle').textContent = ({ terms: 'Terms and Conditions', privacy: 'Privacy Policy', refund: 'Refund Policy', safety: 'Safety Centre' })[type] || 'Policy'; $('#legalBody').textContent = response.body; openOverlay('legalModal'); } catch (error) { P.toast(error.message, 'error'); } }
 
   init();
 })();

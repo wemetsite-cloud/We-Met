@@ -1,11 +1,12 @@
-const VERSION = '8.8.0';
+const VERSION = '8.6.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
   './',
   'index.html',
-  'privacy-guard.css',
-  'privacy-guard.js',
+  'checkout.html',
+  'checkout.css',
+  'checkout.js',
   'style.css',
   'app.js',
   'api.js',
@@ -16,8 +17,11 @@ const STATIC = [
   'legal.css',
   'about.html',
   'contact.html',
+  'pricing.html',
+  'delivery.html',
   'terms.html',
   'privacy.html',
+  'refund.html',
   'safety.html',
   'community-guidelines.html',
   'child-safety.html',

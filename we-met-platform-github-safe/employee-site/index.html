@@ -8,8 +8,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.8.0">
-  <link rel="stylesheet" href="style.css?v=8.8.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.5.0">
+  <link rel="stylesheet" href="style.css?v=8.5.0">
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -64,7 +64,7 @@
         <label>Original name<small>Private. Use your real name for admin verification.</small><input id="listenerLegalName" autocomplete="name" minlength="2" maxlength="100" required></label>
         <label>Create password<input id="listenerNewPassword" type="password" minlength="8" autocomplete="new-password" required></label>
         <label class="check"><input id="listenerTerms" type="checkbox" required><span>I am 18+ and accept the Terms and Privacy Policy.</span></label>
-        <div class="automatic-terms"><span>₹1/min starting rate</span><span>Connected-time earnings</span><small>The admin can update your private call rate.</small></div>
+        <div class="automatic-terms"><span>₹1/min starting rate</span><span>₹50/paid membership</span><small>The admin can update your private call rate.</small></div>
         <button class="button button-primary button-large">Create listener account</button>
       </form>
     </section>
@@ -130,7 +130,7 @@
 
       <section id="tab-wallet" class="tab">
         <section class="wallet-hero">
-          <div><span class="eyebrow">EARNINGS</span><h2>Available balance</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus">Connected-call earnings appear here.</p></div>
+          <div><span class="eyebrow">EARNINGS</span><h2>Available balance</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus">Call and paid-membership earnings appear here.</p></div>
           <div class="wallet-rate-card"><small>Your private rate</small><strong id="walletRate">₹0.00/min</strong><span>Only you and the admin see this rate.</span></div>
         </section>
         <div class="wallet-metrics"><article><small>Today</small><strong id="walletToday">₹0.00</strong></article><article><small>Week</small><strong id="walletWeek">₹0.00</strong></article><article><small>Lifetime</small><strong id="walletLifetime">₹0.00</strong></article><article><small>Paid</small><strong id="walletPaid">₹0.00</strong></article></div>
@@ -229,6 +229,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.8.0"></script><script src="socket-loader.js?v=8.8.0"></script><script src="api.js?v=8.8.0"></script><script src="webrtc.js?v=8.8.0"></script><script src="app.js?v=8.8.0"></script>
+  <script src="config.js?v=8.5.0"></script><script src="socket-loader.js?v=8.5.0"></script><script src="api.js?v=8.5.0"></script><script src="webrtc.js?v=8.5.0"></script><script src="app.js?v=8.5.0"></script>
 </body>
 </html>
