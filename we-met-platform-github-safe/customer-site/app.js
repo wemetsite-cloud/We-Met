@@ -4,953 +4,780 @@
   const P = window.Portal;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
-  window.addEventListener('portal:session-invalid', (event) => {
-    P.toast(event.detail?.message || 'Your session expired. Please sign in again.', 'error');
-    setTimeout(() => logout(false), 0);
-  });
+  const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
+  const esc = P.esc;
+  const NAV_MARKER = 'we-met-customer-v86';
+  const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'following', 'notifications', 'support']);
+  const TAB_PARENT = { history: 'profile', following: 'profile', notifications: 'profile', support: 'profile' };
 
   let me = null;
   let publicConfig = null;
   let socket = null;
   let audioCall = null;
   let currentCall = null;
-  let listeners = [];
-  let deferredInstallPrompt = null;
-  let historyCalls = [];
-  let paymentPlans = [];
-  let favoriteIds = new Set();
+  let directory = [];
+  let liveListeners = [];
+  let liveDirectoryReady = false;
+  let subscriptions = [];
+  let conversations = [];
+  let activeConversation = null;
   let activeTab = 'home';
-  let serviceWorkerRegistration = null;
-  let pushSubscriptionActive = false;
-  let otherLanguagesEnabled = localStorage.getItem('we_met_other_languages') === '1';
+  let paymentPlans = [];
+  let followingListeners = [];
+  let authState = { phone: '', challengeId: '', registrationToken: '', otpPurpose: 'registration' };
+  let customerRecoveryState = { challengeId: '', resetToken: '' };
+  let supportAuthState = { challengeId: '', registrationToken: '' };
+  let postObjectUrls = [];
+  let activeProfilePosts = [];
+  let activeProfileListener = null;
+  let customerPhotoObjectUrl = '';
+  let customerPhotoDraft;
+  let deferredInstallPrompt = null;
+  let directPollTimer = null;
+  let pendingCallRequest = null;
+  let activeListenerProfileId = null;
 
-  const NAVIGATION_MARKER = 'we-met-customer-navigation';
-  const VALID_TABS = new Set(['home', 'wallet', 'history', 'favorites', 'notifications', 'support', 'profile']);
+  window.addEventListener('portal:session-invalid', (event) => {
+    P.toast(event.detail?.message || 'Your session expired. Please start again.', 'error');
+    setTimeout(() => logout(false), 0);
+  });
 
-  const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
-  const setModalState = () => {
-    document.body.classList.toggle('modal-open', Boolean($('.modal:not(.hidden), .call-modal:not(.hidden)')));
-    syncBackButton();
-  };
+  function emptyState(title, message) {
+    return `<div class="panel empty-state"><img src="/shared/logo.svg" alt=""><h3>${esc(title)}</h3><p>${esc(message)}</p></div>`;
+  }
 
-  function navigationState(tab = activeTab, overlay = null) {
-    return { marker: NAVIGATION_MARKER, tab: VALID_TABS.has(tab) ? tab : 'home', overlay };
+  function generatedAvatar(seed, name = 'Listener') {
+    const palettes = [['#ff4f9a','#6d1748'],['#8b5cf6','#3b1f75'],['#23b5a9','#135b60'],['#f59e5b','#963b52'],['#51a7f9','#294678']];
+    let total = 0;
+    for (const char of String(seed || name)) total = (total * 31 + char.charCodeAt(0)) >>> 0;
+    const [start, end] = palettes[total % palettes.length];
+    const letters = String(name || 'Listener').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'WM';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="320" height="320" rx="160" fill="url(#g)"/><circle cx="240" cy="72" r="52" fill="#fff" opacity=".12"/><text x="160" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="104" font-weight="700" fill="#fff">${letters}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }
+
+  function listenerImage(listener, kind = 'profile') {
+    const reference = String(kind === 'banner' ? listener.bannerImage || listener.banner || listener.banner_image || '' : listener.profileImage || listener.listenerImage || listener.avatar || listener.profile_image || '');
+    const listenerId = listener.id || listener.listenerId;
+    const mediaVersion = listener.updatedAt || listener.updated_at || 'current';
+    if (reference.startsWith('photo:')) {
+      const endpoint = kind === 'banner' ? 'listener-banner-image' : 'listener-profile-image';
+      return `${P.base}/api/public/${endpoint}/${encodeURIComponent(listenerId)}?v=${encodeURIComponent(mediaVersion)}`;
+    }
+    if (/^data:image\/(?:jpeg|png|webp);base64,/.test(reference)) return reference;
+    if (kind === 'banner') return '/shared/default-listener-banner.png';
+    const seed = String(listenerId || listener.name || 'listener');
+    return generatedAvatar(`${reference}:${seed}`, listener.name || listener.username || 'Listener');
+  }
+
+  function liveStatus(listener) {
+    if (!liveDirectoryReady || !socket?.connected) return 'offline';
+    const live = liveListeners.find((item) => item.id === (listener.id || listener.listenerId));
+    return live?.status || 'offline';
+  }
+
+  function statusLabel(status) {
+    return ({ available: 'Online', online: 'Online', busy: 'In a call', ringing: 'Ringing', break: 'On a break', offline: 'Offline' })[status] || 'Offline';
+  }
+
+  function isActiveMember(listenerId) {
+    return subscriptions.some((item) => item.listenerId === listenerId && item.active)
+      || directory.some((item) => item.id === listenerId && item.subscribed);
   }
 
   function currentOverlay() {
-    if (!$('#authModal')?.classList.contains('hidden')) return 'authModal';
-    if (!$('#legalModal')?.classList.contains('hidden')) return 'legalModal';
-    if (!$('#callModal')?.classList.contains('hidden')) return 'callModal';
-    return null;
+    return ['customerPostFeed', 'listenerProfileModal', 'authModal', 'customerRecoveryModal', 'preloginSupportModal', 'legalModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
-  function syncBackButton() {
-    const visible = Boolean(currentOverlay() || (me && activeTab !== 'home'));
-    $('#appBackButton')?.classList.toggle('hidden', !visible);
+  function syncBodyState() {
+    document.body.classList.toggle('modal-open', Boolean(currentOverlay()));
+    $('#appBackButton')?.classList.toggle('hidden', !(currentOverlay() || (me && activeTab !== 'home')));
   }
 
-  function setNavigationState({ tab = activeTab, overlay = null } = {}, mode = 'push') {
-    const state = navigationState(tab, overlay);
-    if (mode === 'replace') history.replaceState(state, document.title);
-    else history.pushState(state, document.title);
-    syncBackButton();
+  function openOverlay(id) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    const opening = node.classList.contains('hidden');
+    node.classList.remove('hidden');
+    if (opening) history.pushState({ marker: NAV_MARKER, tab: activeTab, overlay: id }, document.title);
+    syncBodyState();
   }
 
-  function openManagedOverlay(selector, overlay) {
-    const element = $(selector);
-    const opening = element?.classList.contains('hidden');
-    show(selector);
-    if (opening) setNavigationState({ overlay });
-    setModalState();
+  function closeOverlay(id, useHistory = true) {
+    if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
+    document.getElementById(id)?.classList.add('hidden');
+    if (id === 'listenerProfileModal') { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
+    syncBodyState();
   }
 
-  function hideManagedOverlays({ preserveCall = false } = {}) {
-    show('#authModal', false);
-    show('#legalModal', false);
-    if (!preserveCall && !$('#callModal')?.classList.contains('hidden')) minimizeCall({ historyMode: 'none' });
-    setModalState();
+  function replaceOverlayHistory(overlay = null) {
+    history.replaceState({ marker: NAV_MARKER, tab: activeTab, ...(overlay ? { overlay } : {}) }, document.title);
   }
 
-  function closeManagedOverlay(overlay, { historyMode = 'back' } = {}) {
-    if (historyMode === 'back' && history.state?.marker === NAVIGATION_MARKER && history.state.overlay === overlay) {
-      history.back();
-      return;
-    }
-    if (overlay === 'callModal') minimizeCall({ historyMode: 'none' });
-    else show(`#${overlay}`, false);
-    setNavigationState({ overlay: null }, 'replace');
-    setModalState();
-  }
-
-  function goBackInApp() {
-    if (currentOverlay() || activeTab !== 'home') history.back();
+  function releasePostUrls() {
+    postObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    postObjectUrls = [];
+    activeProfilePosts = [];
   }
 
   function initNavigation() {
-    history.replaceState(navigationState('home', null), document.title);
+    const requestedTab = new URLSearchParams(location.search).get('tab');
+    activeTab = VALID_TABS.has(requestedTab) ? requestedTab : 'home';
+    history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title);
     window.addEventListener('popstate', (event) => {
-      const state = event.state?.marker === NAVIGATION_MARKER
+      const state = event.state?.marker === NAV_MARKER
         ? event.state
-        : navigationState('home', null);
-      hideManagedOverlays();
-      if (me) selectTab(state.tab, null, { historyMode: 'none' });
-      syncBackButton();
+        : { tab: activeTab || 'home' };
+      ['authModal', 'customerRecoveryModal', 'preloginSupportModal', 'listenerProfileModal', 'customerPostFeed', 'legalModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
+      if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
+      if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
+      if (!['listenerProfileModal', 'customerPostFeed'].includes(state.overlay)) { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
+      syncBodyState();
     });
   }
 
-  const isInstalledApp = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  function syncInstallControls() {
-    const installed = isInstalledApp();
-    document.querySelectorAll('[data-install-app]').forEach((button) => {
-      button.classList.toggle('hidden', installed || !deferredInstallPrompt);
-    });
-    document.querySelectorAll('.install-banner,.install-inline').forEach((section) => {
-      section.classList.toggle('hidden', installed || !deferredInstallPrompt);
-    });
+  function showPhoneStep(step) {
+    $$('.phone-auth-step').forEach((section) => section.classList.toggle('active', section.dataset.phoneStep === step));
+    const progress = { welcome: 0, phone: 18, password: 100, otp: 52, details: 100 }[step] || 0;
+    $('#authProgressFill').style.width = `${progress}%`;
+    setTimeout(() => $(`[data-phone-step="${step}"] input`)?.focus(), 60);
   }
-  window.addEventListener('beforeinstallprompt', (event) => {
-    if (isInstalledApp()) return;
+
+  function openAuth() {
+    authState = { phone: '', challengeId: '', registrationToken: '', otpPurpose: 'registration' };
+    ['phoneStartForm', 'phonePasswordForm', 'phoneOtpForm', 'phoneDetailsForm'].forEach((id) => document.getElementById(id)?.reset());
+    show('#developmentOtp', false);
+    showPhoneStep('welcome');
+    openOverlay('authModal');
+  }
+
+  function composedPhone(countrySelector, inputSelector) {
+    const raw = $(inputSelector).value.trim();
+    const digits = raw.replace(/\D/g, '');
+    if (raw.startsWith('+')) return `+${digits}`;
+    return `${$(countrySelector).value}${digits.replace(/^0+/, '')}`;
+  }
+
+  async function startPhone(event) {
     event.preventDefault();
-    deferredInstallPrompt = event;
-    syncInstallControls();
-  });
-  window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    syncInstallControls();
-    P.toast('We Met is installed. Enjoy the app-like experience.', 'success');
-  });
-  window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', syncInstallControls);
+    const submit = event.submitter;
+    const phone = composedPhone('#authCountry', '#authPhone');
+    submit.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/start', { method: 'POST', body: JSON.stringify({ phone, role: 'customer' }) });
+      authState.phone = phone;
+      $('#authPhonePreview').textContent = response.phone;
+      $('#otpPhonePreview').textContent = response.phone;
+      if (response.mode === 'password') showPhoneStep('password');
+      else {
+        authState.challengeId = response.challengeId;
+        authState.otpPurpose = 'registration';
+        if (response.developmentOtp) { $('#developmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#developmentOtp'); }
+        showPhoneStep('otp');
+      }
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { submit.disabled = false; }
+  }
+
+  async function passwordLogin(event) {
+    event.preventDefault();
+    const submit = event.submitter;
+    submit.disabled = true;
+    try {
+      const response = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: authState.phone, password: $('#authPassword').value, role: 'customer' }) });
+      completeAuthentication(response);
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { submit.disabled = false; }
+  }
+
+  async function startCustomerOtpLogin() {
+    const button = $('#customerOtpLogin');
+    button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/login/start', { method: 'POST', body: JSON.stringify({ phone: authState.phone, role: 'customer' }) });
+      authState.challengeId = response.challengeId;
+      authState.otpPurpose = 'login';
+      $('#otpPhonePreview').textContent = response.phone;
+      if (response.developmentOtp) { $('#developmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#developmentOtp'); }
+      showPhoneStep('otp');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function verifyOtp(event) {
+    event.preventDefault();
+    const submit = event.submitter;
+    submit.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: authState.challengeId, otp: $('#authOtp').value }) });
+      if (response.mode === 'login' && response.token) return completeAuthentication(response);
+      authState.registrationToken = response.registrationToken;
+      showPhoneStep('details');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { submit.disabled = false; }
+  }
+
+  function openCustomerRecovery() {
+    customerRecoveryState = { challengeId: '', resetToken: '' };
+    ['customerRecoveryPhoneForm', 'customerRecoveryOtpForm', 'customerRecoveryPasswordForm'].forEach((id) => document.getElementById(id)?.reset());
+    show('#customerRecoveryPhoneForm'); show('#customerRecoveryOtpForm', false); show('#customerRecoveryPasswordForm', false); show('#customerRecoveryDevelopmentOtp', false);
+    if (authState.phone) $('#customerRecoveryPhone').value = authState.phone;
+    openOverlay('customerRecoveryModal');
+    setTimeout(() => $('#customerRecoveryPhone').focus(), 60);
+  }
+
+  async function startCustomerRecovery(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier: $('#customerRecoveryPhone').value, role: 'customer' }) });
+      customerRecoveryState.challengeId = response.challengeId;
+      $('#customerRecoveryPhonePreview').textContent = response.phone;
+      if (response.developmentOtp) { $('#customerRecoveryDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#customerRecoveryDevelopmentOtp'); }
+      show('#customerRecoveryPhoneForm', false); show('#customerRecoveryOtpForm'); $('#customerRecoveryOtp').focus();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function verifyCustomerRecovery(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: customerRecoveryState.challengeId, otp: $('#customerRecoveryOtp').value }) });
+      if (!response.resetToken) throw new Error('Password reset verification failed. Request a new OTP.');
+      customerRecoveryState.resetToken = response.resetToken;
+      show('#customerRecoveryOtpForm', false); show('#customerRecoveryPasswordForm'); $('#customerRecoveryPassword').focus();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function completeCustomerRecovery(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    const password = $('#customerRecoveryPassword').value;
+    if (password !== $('#customerRecoveryConfirm').value) { button.disabled = false; return P.toast('The new passwords do not match.', 'error'); }
+    try {
+      const response = await P.api('/api/auth/password-reset/complete', { method: 'POST', body: JSON.stringify({ resetToken: customerRecoveryState.resetToken, role: 'customer', newPassword: password }) });
+      closeOverlay('customerRecoveryModal');
+      showPhoneStep('password');
+      P.toast(response.message || 'Password changed. Sign in now.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function registerCustomer(event) {
+    event.preventDefault();
+    const submit = event.submitter;
+    submit.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/register/customer', { method: 'POST', body: JSON.stringify({ registrationToken: authState.registrationToken, name: $('#authName').value, password: $('#authNewPassword').value, termsAccepted: $('#authTerms').checked }) });
+      completeAuthentication(response);
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { submit.disabled = false; }
+  }
+
+  function openPreloginSupport() {
+    supportAuthState = { challengeId: '', registrationToken: '' };
+    $('#preloginSupportPhoneForm').reset(); $('#preloginSupportOtpForm').reset(); $('#preloginSupportIssueForm').reset();
+    show('#preloginSupportPhoneForm'); show('#preloginSupportOtpForm', false); show('#preloginSupportIssueForm', false); show('#supportDevelopmentOtp', false);
+    openOverlay('preloginSupportModal');
+    setTimeout(() => $('#supportPhone').focus(), 60);
+  }
+
+  async function startPreloginSupport(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const phone = composedPhone('#supportCountry', '#supportPhone');
+      const response = await P.api('/api/auth/support/phone/start', { method: 'POST', body: JSON.stringify({ phone }) });
+      supportAuthState.challengeId = response.challengeId;
+      $('#supportPhonePreview').textContent = response.phone;
+      if (response.developmentOtp) { $('#supportDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#supportDevelopmentOtp'); }
+      show('#preloginSupportPhoneForm', false); show('#preloginSupportOtpForm'); $('#supportOtp').focus();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function verifyPreloginSupport(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: supportAuthState.challengeId, otp: $('#supportOtp').value }) });
+      supportAuthState.registrationToken = response.registrationToken;
+      show('#preloginSupportOtpForm', false); show('#preloginSupportIssueForm'); $('#supportIssue').focus();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function submitPreloginSupport(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/support/submit', { method: 'POST', body: JSON.stringify({ registrationToken: supportAuthState.registrationToken, issue: $('#supportIssue').value }) });
+      closeOverlay('preloginSupportModal', false); P.toast(response.message || 'Login issue submitted.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  function completeAuthentication(response) {
+    if (response.user?.role !== 'customer') throw new Error('This is not a customer account.');
+    P.Store.token = response.token;
+    me = response.user;
+    closeOverlay('authModal', false);
+    enterApp();
+  }
+
+  function togglePassword(button) {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    button.textContent = input.type === 'password' ? 'Show' : 'Hide';
+  }
+
+  async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.1', { updateViaCache: 'none' }); } catch {}
+  }
+
+  function syncInstallControls() {
+    const installed = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+    $$('[data-install-app],.install-banner,.install-inline').forEach((node) => node.classList.toggle('hidden', installed || !deferredInstallPrompt));
+  }
+
   async function installApp() {
-    if (isInstalledApp()) return syncInstallControls();
-    if (!deferredInstallPrompt) { P.toast('Use your browser menu and choose Install We Met or Add to Home screen.', 'info'); return; }
+    if (!deferredInstallPrompt) return P.toast('Use your browser menu and choose “Add to Home screen”.', 'info');
     deferredInstallPrompt.prompt();
     await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
     syncInstallControls();
   }
-  async function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('service-worker.js?v=6.9.2', { updateViaCache: 'none' });
-      return serviceWorkerRegistration;
-    } catch {}
+
+  function bind() {
+    $('#openAuth').onclick = openAuth;
+    $$('[data-auth]').forEach((button) => { button.onclick = openAuth; });
+    $('#authBegin').onclick = () => showPhoneStep('phone');
+    $('#phoneStartForm').onsubmit = startPhone;
+    $('#phonePasswordForm').onsubmit = passwordLogin;
+    $('#customerOtpLogin').onclick = startCustomerOtpLogin;
+    $('#customerForgotPassword').onclick = openCustomerRecovery;
+    $('#phoneOtpForm').onsubmit = verifyOtp;
+    $('#phoneDetailsForm').onsubmit = registerCustomer;
+    $('#customerRecoveryPhoneForm').onsubmit = startCustomerRecovery;
+    $('#customerRecoveryOtpForm').onsubmit = verifyCustomerRecovery;
+    $('#customerRecoveryPasswordForm').onsubmit = completeCustomerRecovery;
+    $$('[data-auth-phone-back]').forEach((button) => { button.onclick = () => showPhoneStep('phone'); });
+    $$('[data-password-toggle]').forEach((button) => { button.onclick = () => togglePassword(button); });
+    $$('[data-close]').forEach((button) => { button.onclick = () => closeOverlay(button.dataset.close); });
+    $('#appBackButton').onclick = () => history.back();
+    $('#logoutBtn').onclick = () => logout();
+    $('#tabs').onclick = (event) => { const button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); };
+    $$('[data-jump]').forEach((button) => { button.onclick = () => selectTab(button.dataset.jump); });
+    $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
+    $('#randomConnectButton').onclick = requestRandomCall;
+    $('#otherLanguageToggle').onchange = renderDirectory;
+    $('#couponForm').onsubmit = redeem;
+    $('#supportForm').onsubmit = sendSupport;
+    $('#passwordForm').onsubmit = changePassword;
+    $('#readNotifications').onclick = markNotificationsRead;
+    $('#directMessageForm').onsubmit = sendDirectMessage;
+    $('#customerProfileForm').onsubmit = saveCustomerProfile;
+    $('#toggleCustomerProfileEdit').onclick = () => {
+      $('#customerProfileForm').classList.toggle('hidden');
+      if (!$('#customerProfileForm').classList.contains('hidden')) $('#customerProfileName').focus();
+    };
+    $('#customerPhotoButton').onclick = () => $('#customerPhotoFile').click();
+    $('#customerPhotoFile').onchange = chooseCustomerPhoto;
+    $('#endCallBtn').onclick = () => socket?.emit('call:end', { callId: currentCall?.id });
+    $('#minimizeCall').onclick = () => minimizeCall();
+    $('#restoreCall').onclick = restoreCall;
+    $('#muteBtn').onclick = toggleMute;
+    $('#chatForm').onsubmit = sendCallChat;
+    $('#reportCallBtn').onclick = () => currentCall && reportCall(currentCall.id);
+    $('#callProfileButton').onclick = openCurrentCallProfile;
+    $('#callFollowButton').onclick = () => currentCall?.employee?.id && toggleFollow(currentCall.employee.id, Boolean(currentCall.employee.following));
+    $('#callSubscribeButton').onclick = () => currentCall?.employee?.id && subscribeToListener(currentCall.employee.id, $('#callSubscribeButton'));
+    $('#preloginSupportButton').onclick = openPreloginSupport;
+    $('#preloginSupportPhoneForm').onsubmit = startPreloginSupport;
+    $('#preloginSupportOtpForm').onsubmit = verifyPreloginSupport;
+    $('#preloginSupportIssueForm').onsubmit = submitPreloginSupport;
+    $$('.legal-btn').forEach((button) => { button.onclick = () => loadLegal(button.dataset.legal); });
+    document.addEventListener('click', handleActionClick);
+    document.addEventListener('contextmenu', (event) => { if (event.target.closest('img,.protected-media,.exclusive-post')) event.preventDefault(); });
+    document.addEventListener('dragstart', (event) => { if (event.target.closest('img,.protected-media')) event.preventDefault(); });
+    document.addEventListener('copy', (event) => { if (me && !event.target.closest('input,textarea')) event.preventDefault(); });
+    document.addEventListener('click', (event) => { if (event.target.closest('[data-install-app]')) installApp(); });
+    window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); deferredInstallPrompt = event; syncInstallControls(); });
   }
 
-  function setAuth(mode) {
-    openManagedOverlay('#authModal', 'authModal');
-    show('#loginForm', mode === 'login');
-    show('#registerForm', mode === 'register');
-    show('#forgotForm', mode === 'forgot');
-    $$('.auth-switch button').forEach((button) => button.classList.toggle('active', button.dataset.mode === mode));
-    $('#authTitle').textContent = mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Recover your account' : 'Welcome back';
-    $('#authSubtitle').textContent = mode === 'register'
-      ? 'Create your private We Met account.'
-      : mode === 'forgot'
-        ? 'The administrator will review your request.'
-        : 'Sign in to continue.';
-    if (mode === 'forgot') restoreRecovery();
-    else show('#recoveryPanel', false);
-    setTimeout(() => $('#authModal input:not(.hidden)')?.focus(), 50);
+  async function handleActionClick(event) {
+    if (event.target.closest('[data-close-customer-conversation]')) {
+      activeConversation = null;
+      $('.direct-message-layout')?.classList.remove('conversation-open');
+      $('#directChat')?.classList.add('empty');
+      show('#directMessageForm', false);
+      renderConversations();
+      return;
+    }
+    const postLike = event.target.closest('button[data-post-like]');
+    if (postLike) return togglePostLike(postLike);
+    const openPost = event.target.closest('button[data-open-customer-post]');
+    if (openPost) return openCustomerPostFeed(openPost.dataset.openCustomerPost);
+    const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
+    if (!target) return;
+    const d = target.dataset;
+    if (d.listenerProfile) return openListenerProfile(d.listenerProfile);
+    if (d.follow) return toggleFollow(d.follow, d.following === 'true');
+    if (d.subscribe) return subscribeToListener(d.subscribe, target);
+    if (d.listenerCall) return requestCall(d.listenerCall);
+    if (d.listenerMessage) return isActiveMember(d.listenerMessage)
+      ? openConversation(d.listenerMessage)
+      : subscribeToListener(d.listenerMessage, target);
+    if (d.buyPlan) { event.preventDefault(); event.stopPropagation(); return openPayment(d.buyPlan, target); }
+    if (d.conversation) return openConversation(d.conversation);
+    if (d.cancelSubscription) return cancelSubscription(d.cancelSubscription);
+  }
+
+  async function togglePostLike(button) {
+    const postId = button.dataset.postLike;
+    const liked = button.dataset.liked === 'true';
+    button.disabled = true;
+    try {
+      const response = await P.api(`/api/customer/listener-posts/${encodeURIComponent(postId)}/like`, {
+        method: liked ? 'DELETE' : 'POST',
+        body: '{}',
+      });
+      button.dataset.liked = String(response.liked);
+      const saved = activeProfilePosts.find((post) => post.id === postId);
+      if (saved) saved.liked = response.liked;
+      $$(`button[data-post-like="${CSS.escape(postId)}"]`).forEach((control) => {
+        control.dataset.liked = String(response.liked);
+        control.classList.toggle('liked', response.liked);
+        control.setAttribute('aria-pressed', String(response.liked));
+        control.setAttribute('aria-label', `${response.liked ? 'Unlike' : 'Like'} this post`);
+      });
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
   }
 
   async function init() {
-    initNavigation();
-    bind();
-    syncInstallControls();
-    registerServiceWorker();
-    try {
-      publicConfig = await P.api('/api/public/config');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-
+    initNavigation(); bind(); registerServiceWorker(); syncInstallControls();
+    try { publicConfig = await P.api('/api/public/config'); } catch (error) { P.toast(error.message, 'error'); }
     if (P.Store.token) await loadMe();
-  }
-
-  function bind() {
-    document.addEventListener('click', (e) => { if (e.target.closest('[data-install-app]')) installApp(); });
-    $('#appBackButton').addEventListener('click', goBackInApp);
-    $('.brand').addEventListener('click', (event) => {
-      event.preventDefault();
-      if (me) selectTab('home');
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-    $('#openAuth').addEventListener('click', () => setAuth('login'));
-    $$('[data-auth]').forEach((button) => button.addEventListener('click', () => setAuth(button.dataset.auth)));
-    $$('[data-close]').forEach((button) => button.addEventListener('click', () => closeManagedOverlay(button.dataset.close)));
-    $$('[data-app-back]').forEach((button) => button.addEventListener('click', goBackInApp));
-    $$('.auth-switch button').forEach((button) => button.addEventListener('click', () => setAuth(button.dataset.mode)));
-    $('#forgotOpen').addEventListener('click', () => setAuth('forgot'));
-    $('#backLogin').addEventListener('click', () => setAuth('login'));
-    $('#loginForm').addEventListener('submit', login);
-    $('#registerForm').addEventListener('submit', register);
-    $('#forgotForm').addEventListener('submit', forgot);
-    $('#logoutBtn').addEventListener('click', () => logout());
-    $('#notificationPermission').addEventListener('click', requestNotifications);
-    $('#tabs').addEventListener('click', (event) => {
-      const button = event.target.closest('[data-tab]');
-      if (button) selectTab(button.dataset.tab, button);
-    });
-    $$('[data-jump]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.jump)));
-    $$('[data-purchase]').forEach((button) => button.addEventListener('click', openPurchaseSection));
-    $('#otherLanguageToggle').checked = otherLanguagesEnabled;
-    $('#otherLanguageToggle').addEventListener('change', (event) => { otherLanguagesEnabled = event.target.checked; localStorage.setItem('we_met_other_languages', otherLanguagesEnabled ? '1' : '0'); renderListeners(); });
-    $('#callNow').addEventListener('click', () => requestCall());
-    $('#refreshListeners').addEventListener('click', () => socket?.emit('listeners:get'));
-    $('#couponForm').addEventListener('submit', redeem);
-    $('#copyRecoveryKey').addEventListener('click', () => copyValue($('#recoveryKey').value, 'Recovery key copied.'));
-    $('#checkRecovery').addEventListener('click', checkRecovery);
-    $('#resetCompleteForm').addEventListener('submit', completeRecovery);
-    $('#supportForm').addEventListener('submit', sendSupport);
-    $('#phoneForm').addEventListener('submit', changePhone);
-    $('#passwordForm').addEventListener('submit', changePassword);
-    $('#loginChangeForm').addEventListener('submit', changeLogin);
-    $('#endCallBtn').addEventListener('click', () => socket?.emit('call:end', { callId: currentCall?.id }));
-    $('#muteBtn').addEventListener('click', toggleMute);
-    $('#chatForm').addEventListener('submit', sendChat);
-    $('#reportCallBtn').addEventListener('click', reportCurrent);
-    $('#readNotifications').addEventListener('click', markNotificationsRead);
-    $('#minimizeCall').addEventListener('click', minimizeCall);
-    $('#restoreCall').addEventListener('click', restoreCall);
-    $$('.legal-btn').forEach((button) => button.addEventListener('click', () => loadLegal(button.dataset.legal)));
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !$('#authModal').classList.contains('hidden')) {
-        closeManagedOverlay('authModal');
-      }
-    });
-  }
-
-  function applicationServerKey(value) {
-    const padding = '='.repeat((4 - (value.length % 4)) % 4);
-    const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const bytes = atob(base64);
-    return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
-  }
-
-  function syncAlertControls() {
-    const granted = 'Notification' in window && Notification.permission === 'granted';
-    show('#notificationPermission', Boolean(me && publicConfig?.pushEnabled));
-    $('#notificationPermission').textContent = pushSubscriptionActive
-      ? 'Alerts enabled'
-      : (granted ? 'Finish alert setup' : 'Enable alerts');
-    $('#notificationPermission').disabled = pushSubscriptionActive;
-  }
-
-  async function subscribeToPush({ prompt = false } = {}) {
-    if (!publicConfig?.pushEnabled || !publicConfig?.vapidPublicKey) {
-      if (prompt) P.toast('Notification-bar alerts are not configured yet.', 'info');
-      return false;
-    }
-    if (!('Notification' in window) || !('PushManager' in window)) {
-      if (prompt) P.toast('Push notifications are not supported on this browser.', 'info');
-      return false;
-    }
-    let permission = Notification.permission;
-    if (permission === 'default' && prompt) permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      pushSubscriptionActive = false;
-      syncAlertControls();
-      if (prompt) P.toast('Notification permission was not enabled.', 'info');
-      return false;
-    }
-
-    try {
-      const registration = serviceWorkerRegistration || await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey(publicConfig.vapidPublicKey),
-        });
-      }
-      await P.api('/api/push/subscriptions', {
-        method: 'POST',
-        body: JSON.stringify(subscription.toJSON()),
-      });
-      pushSubscriptionActive = true;
-      syncAlertControls();
-      if (prompt) P.toast('Notification-bar alerts are enabled.', 'success');
-      return true;
-    } catch (error) {
-      pushSubscriptionActive = false;
-      syncAlertControls();
-      if (prompt) P.toast(error.message || 'Push notifications could not be enabled.', 'error');
-      return false;
-    }
-  }
-
-  async function requestNotifications() {
-    await subscribeToPush({ prompt: true });
-  }
-
-  async function removePushSubscription() {
-    try {
-      const registration = serviceWorkerRegistration || await navigator.serviceWorker?.ready;
-      const subscription = await registration?.pushManager?.getSubscription();
-      if (!subscription) return;
-      if (P.Store.token) {
-        await P.api('/api/push/subscriptions', {
-          method: 'DELETE',
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-        }).catch(() => null);
-      }
-      await subscription.unsubscribe();
-      pushSubscriptionActive = false;
-      syncAlertControls();
-    } catch {}
-  }
-
-  function openPurchaseSection() {
-    selectTab('wallet');
-    requestAnimationFrame(() => $('#plansGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }
-
-  function selectTab(tab, button = null, { historyMode = 'push' } = {}) {
-    if (!VALID_TABS.has(tab)) tab = 'home';
-    const changed = activeTab !== tab;
-    if (changed && historyMode === 'push') setNavigationState({ tab, overlay: null });
-    activeTab = tab;
-    const targetButton = button || $(`[data-tab="${tab}"]`);
-    $$('#tabs button').forEach((item) => item.classList.toggle('active', item === targetButton));
-    $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
-    targetButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-
-    if (tab === 'history' || tab === 'wallet') loadHistory();
-    if (tab === 'wallet') {
-      loadPlans();
-    }
-    if (tab === 'favorites') loadFavorites();
-    if (tab === 'notifications') loadNotifications();
-    if (tab === 'support') loadSupport();
-
-    const top = $('#dashboard').getBoundingClientRect().top + window.scrollY - 74;
-    if (window.scrollY > top + 120) window.scrollTo({ top, behavior: 'smooth' });
-    syncBackButton();
-  }
-
-  async function login(event) {
-    event.preventDefault();
-    const submit = event.submitter;
-    submit?.setAttribute('disabled', '');
-    try {
-      const response = await P.api('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ identifier: $('#loginIdentifier').value, password: $('#loginPassword').value }),
-      });
-      if (response.user.role !== 'customer') throw new Error('This is not a customer account.');
-      P.Store.token = response.token;
-      me = response.user;
-      closeManagedOverlay('authModal', { historyMode: 'replace' });
-      enterApp();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    } finally {
-      submit?.removeAttribute('disabled');
-    }
-  }
-
-  async function register(event) {
-    event.preventDefault();
-    const submit = event.submitter;
-    submit?.setAttribute('disabled', '');
-    try {
-      const response = await P.api('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: $('#regName').value,
-          email: $('#regEmail').value,
-          phone: $('#regPhone').value,
-          password: $('#regPassword').value,
-          termsAccepted: $('#regTerms').checked,
-        }),
-      });
-      P.Store.token = response.token;
-      me = response.user;
-      closeManagedOverlay('authModal', { historyMode: 'replace' });
-      enterApp();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    } finally {
-      submit?.removeAttribute('disabled');
-    }
-  }
-
-  async function forgot(event) {
-    event.preventDefault();
-    try {
-      const response = await P.api('/api/auth/forgot-password', {
-        method: 'POST',
-        body: JSON.stringify({ identifier: $('#forgotIdentifier').value }),
-      });
-      if (response.requestId && response.recoveryKey) {
-        saveRecovery({ requestId: response.requestId, recoveryKey: response.recoveryKey });
-        $('#recoveryRequestId').value = response.requestId;
-        $('#recoveryKey').value = response.recoveryKey;
-        $('#recoveryStatus').textContent = 'Request sent. Save this recovery key and check again after the administrator reviews it.';
-        show('#recoveryPanel');
-        show('#resetCompleteForm', false);
-      }
-      P.toast(response.message || 'Recovery request sent.', 'success');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
   }
 
   async function loadMe() {
     try {
       const response = await P.api('/api/auth/me');
-      if (response.user.role !== 'customer') throw new Error('Wrong account type.');
-      me = response.user;
-      enterApp();
-    } catch (error) {
-      if (P.isAuthError(error)) return;
-      P.toast('The server is temporarily unavailable. Your login is still saved; try again shortly.', 'error');
-    }
+      if (response.user.role !== 'customer') throw new Error('Wrong portal for this account.');
+      me = response.user; enterApp();
+    } catch (error) { if (!P.isAuthError(error)) P.toast('The server is temporarily unavailable. Try again shortly.', 'error'); }
   }
 
-  function enterApp() {
-    show('#landing', false);
-    show('#dashboard');
-    show('#openAuth', false);
-    show('#logoutBtn');
-    show('#notificationPermission');
-    $('#helloName').textContent = `Hello, ${me.name}`;
-    $('#profileName').textContent = me.name;
-    $('#profileEmail').textContent = me.email || '—';
-    $('#profilePhoneText').textContent = me.phone || 'Phone not added';
-    $('#profilePhone').value = me.phone || '';
+  async function enterApp() {
+    document.body.classList.add('signed-in');
+    show('#landing', false); show('#dashboard'); show('#openAuth', false); show('#logoutBtn');
+    $('#profileName').textContent = me.name || 'Customer';
+    $('#customerProfileName').value = me.name || '';
+    $('#customerProfileUsername').value = me.username || '';
+    $('#profileUsernameText').textContent = me.username ? `@${me.username}` : 'Add a username';
+    $('#profilePhoneText').textContent = me.phone || 'Private mobile';
+    $('#profilePhone').textContent = me.phone || 'Private mobile';
     updateBalance(me.balanceSeconds);
-    connectSocket();
-    loadHistory();
-    loadSupport();
-    loadFavorites();
-    loadNotifications();
-    loadPlans();
-    syncAlertControls();
-    if ('Notification' in window && Notification.permission === 'granted') {
-      subscribeToPush().catch(() => null);
-    }
+    const requestedTab = activeTab;
+    await Promise.allSettled([loadSubscriptions(false), loadDirectory(), loadConversations(), loadPlans(), loadHistory(), loadFollowing(), loadNotifications(), loadSupport(), loadCustomerPhoto()]);
+    renderSubscriptions(); renderDirectory(); connectSocket();
+    if (requestedTab !== 'home') selectTab(requestedTab, { historyMode: 'none' });
+    clearInterval(directPollTimer);
+    directPollTimer = window.setInterval(() => {
+      if (activeTab !== 'messages') return;
+      if (activeConversation) loadDirectMessages();
+      else loadConversations(false);
+    }, 8000);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    syncBackButton();
   }
 
   async function logout(clear = true) {
-    if (clear) await removePushSubscription();
     if (clear) P.Store.clear();
+    clearInterval(directPollTimer);
+    clearPendingCallRequest();
+    currentCall = null;
+    activeListenerProfileId = null;
     socket?.disconnect();
     audioCall?.stop();
     me = null;
-    pushSubscriptionActive = false;
-    currentCall = null;
-    show('#landing');
-    show('#dashboard', false);
-    show('#openAuth');
-    show('#logoutBtn', false);
-    show('#notificationPermission', false);
-    show('#callModal', false);
-    show('#restoreCall', false);
-    history.replaceState(navigationState('home', null), document.title);
-    activeTab = 'home';
-    setModalState();
-    syncAlertControls();
+    liveDirectoryReady = false;
+    liveListeners = [];
+    if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
+    customerPhotoObjectUrl = '';
+    document.body.classList.remove('signed-in');
+    show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
+    activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
+  }
+
+  function selectTab(tab, { historyMode = 'push' } = {}) {
+    if (!VALID_TABS.has(tab)) tab = 'home';
+    activeTab = tab;
+    const parent = TAB_PARENT[tab] || tab;
+    $$('#tabs [data-tab]').forEach((button) => button.classList.toggle('active', button.dataset.tab === parent));
+    $$('.tab').forEach((node) => node.classList.toggle('active', node.id === `tab-${tab}`));
+    if (historyMode === 'push') history.pushState({ marker: NAV_MARKER, tab }, document.title);
+    if (tab === 'subscriptions') loadSubscriptions();
+    if (tab === 'messages') loadConversations();
+    if (tab === 'wallet') { loadPlans(); loadHistory(); }
+    if (tab === 'history') loadHistory();
+    if (tab === 'following') loadFollowing();
+    if (tab === 'notifications') loadNotifications();
+    if (tab === 'support') loadSupport();
+    window.scrollTo({ top: Math.max(0, $('#dashboard').offsetTop - 70), behavior: 'smooth' }); syncBodyState();
   }
 
   function updateBalance(value) {
     if (!me) return;
     me.balanceSeconds = Number(value) || 0;
-    ['#balanceTop', '#balanceRing', '#walletBalance', '#callBalance'].forEach((selector) => {
-      const element = $(selector);
-      if (element) element.textContent = P.duration(me.balanceSeconds);
-    });
+    $('#walletBalance').textContent = P.duration(me.balanceSeconds);
   }
 
-  async function refreshCustomerBalance() {
+  async function loadDirectory() {
     if (!me) return;
-    try {
-      const response = await P.api('/api/auth/me');
-      if (response.user.role !== 'customer') return;
-      me = { ...me, ...response.user };
-      updateBalance(me.balanceSeconds);
-    } catch {}
+    try { const response = await P.api('/api/customer/listeners', { cache: 'no-store' }); directory = response.listeners || []; renderDirectory(); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function connectSocket() {
-    socket?.disconnect();
-    try { await window.SocketIOReady; } catch (error) { P.toast(error.message, 'error'); return; }
-    socket = io(P.socketUrl, {
-      auth: { token: P.Store.token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelayMax: 10000,
-    });
+  function renderDirectory() {
+    const node = $('#listenerGrid');
+    if (!node) return;
+    const showOtherLanguages = Boolean($('#otherLanguageToggle')?.checked);
+    const primaryListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam');
+    const otherListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam');
+    $('#availabilityText').textContent = 'Listeners available';
 
-    audioCall = new AudioCall({
-      socket,
-      iceServers: publicConfig?.iceServers || [],
-      remoteAudio: $('#remoteAudio'),
-      onState: (state) => {
-        if (!currentCall) return;
-        if (state === 'connected' && currentCall.mediaConnected !== true) {
-          currentCall.mediaConnected = true;
-          socket.emit('call:media-state', { callId: currentCall.id, connected: true });
-        }
-        if (['failed', 'disconnected', 'closed'].includes(state)) {
-          $('#callState').textContent = 'Audio paused while the connection recovers…';
-          if (currentCall.mediaConnected !== false) {
-            currentCall.mediaConnected = false;
-            socket.emit('call:media-state', { callId: currentCall.id, connected: false });
+    const cards = (listeners) => listeners.map((listener) => {
+      const status = liveStatus(listener);
+      const subscribed = isActiveMember(listener.id) || listener.subscribed;
+      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="verified-listener-label">Verified listener</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>🎧 ${esc(listener.language || 'Malayalam')}</span><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span>${subscribed ? '<span class="exclusive-tag">Exclusive</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">Profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" data-call-available="${status === 'available'}" type="button" ${status !== 'available' || pendingCallRequest || currentCall ? 'disabled' : ''}>Call</button></div></article>`;
+    }).join('');
+
+    node.innerHTML = primaryListeners.length ? cards(primaryListeners) : '';
+    $('#otherLanguageGrid').innerHTML = otherListeners.length ? cards(otherListeners) : '';
+    show('#listenerDiscovery');
+    show('#otherLanguageSection', showOtherLanguages);
+    syncCallRequestControls();
+  }
+
+  async function openListenerProfile(listenerId) {
+    activeListenerProfileId = listenerId;
+    activeProfileListener = null;
+    releasePostUrls(); openOverlay('listenerProfileModal');
+    $('#listenerProfileContent').innerHTML = '<div class="profile-loading"><span></span><p>Opening listener profile…</p></div>';
+    try {
+      const response = await P.api(`/api/customer/listeners/${encodeURIComponent(listenerId)}/profile`);
+      const listener = response.listener;
+      activeProfileListener = listener;
+      const status = liveStatus(listener);
+      const subscribed = Boolean(listener.subscribed || isActiveMember(listener.id));
+      const postsMarkup = subscribed ? await renderPrivatePosts(response.posts || []) : response.postsLocked ? `<button class="locked-posts" data-subscribe="${esc(listener.id)}" type="button"><span class="lock-art">✦</span><b>See exclusive posts</b><small>Subscribe to ${esc(listener.name)} for ₹399/month</small></button>` : '<div class="profile-no-posts">No exclusive posts yet.</div>';
+      const callButton = status === 'available'
+        ? `<button class="listener-call-fab" data-listener-call="${esc(listener.id)}" data-call-available="true" type="button" aria-label="Call ${esc(listener.name)}" ${pendingCallRequest || currentCall ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg></button>`
+        : '';
+      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
+    } catch (error) { $('#listenerProfileContent').innerHTML = emptyState('Profile unavailable', error.message); }
+  }
+
+  async function renderPrivatePosts(posts) {
+    activeProfilePosts = [];
+    if (!posts.length) return '<div class="profile-no-posts">No exclusive posts yet.</div>';
+    const items = await Promise.all(posts.map(async (post) => {
+      try {
+        const blob = await P.apiBlob(post.imageUrl);
+        const url = URL.createObjectURL(blob);
+        postObjectUrls.push(url);
+        return {
+          post: { ...post, image: url },
+          markup: `<button class="exclusive-post protected-media" data-open-customer-post="${esc(post.id)}" type="button" aria-label="Open post"><img src="${esc(url)}" alt="Exclusive listener post" draggable="false"></button>`,
+        };
+      } catch { return null; }
+    }));
+    activeProfilePosts = items.filter(Boolean).map((item) => item.post);
+    return items.filter(Boolean).map((item) => item.markup).join('') || '<div class="profile-no-posts">Posts could not be loaded.</div>';
+  }
+
+  function renderCustomerPostFeed() {
+    const feed = $('#customerPostFeedList');
+    if (!feed) return;
+    feed.innerHTML = activeProfilePosts.map((post) => `<article class="customer-feed-post" data-customer-feed-post="${esc(post.id)}"><div class="customer-feed-media protected-media"><img src="${esc(post.image)}" alt="Exclusive listener post" draggable="false"></div><footer><p>${esc(post.caption || '')}</p><button class="customer-feed-like ${post.liked ? 'liked' : ''}" data-post-like="${esc(post.id)}" data-liked="${Boolean(post.liked)}" type="button" aria-label="${post.liked ? 'Unlike' : 'Like'} this post" aria-pressed="${Boolean(post.liked)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg><span>${post.liked ? 'Liked' : 'Like'}</span></button></footer></article>`).join('');
+    $('#customerPostFeedTitle').textContent = activeProfileListener?.name ? `${activeProfileListener.name}'s posts` : 'Posts';
+  }
+
+  function openCustomerPostFeed(postId) {
+    if (!activeProfilePosts.some((post) => post.id === postId)) return;
+    renderCustomerPostFeed();
+    openOverlay('customerPostFeed');
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-customer-feed-post="${CSS.escape(postId)}"]`)?.scrollIntoView({ block: 'start' });
+    });
+  }
+
+  async function toggleFollow(listenerId, following) {
+    try {
+      const result = await P.api(`/api/customer/listeners/${encodeURIComponent(listenerId)}/follow`, { method: following ? 'DELETE' : 'POST', body: '{}' });
+      const listener = directory.find((item) => item.id === listenerId); if (listener) listener.following = result.following;
+      if (currentCall?.employee?.id === listenerId) currentCall.employee.following = result.following;
+      $$(`[data-follow="${CSS.escape(listenerId)}"]`).forEach((button) => { button.dataset.following = String(result.following); button.textContent = result.following ? 'Following' : 'Follow'; });
+      if (currentCall?.employee?.id === listenerId) $('#callFollowButton').textContent = result.following ? 'Following' : 'Follow';
+      renderDirectory(); loadFollowing(false); P.toast(result.following ? 'Following listener.' : 'Listener unfollowed.', 'success');
+    }
+    catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function loadSubscriptions(render = true) {
+    if (!me) return;
+    try { const response = await P.api('/api/customer/subscriptions'); subscriptions = response.subscriptions || []; if (render) renderSubscriptions(); renderDirectory(); }
+    catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function renderSubscriptions() {
+    const node = $('#subscriptionsList'); if (!node) return;
+    node.innerHTML = subscriptions.length ? subscriptions.map((item) => `<article class="membership-card ${item.active ? 'active' : 'expired'}"><div class="membership-listener"><img src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt=""><div><span>${item.active ? 'ACTIVE MEMBERSHIP' : esc(String(item.status).toUpperCase())}</span><h3>${esc(item.listenerName)}</h3><p>${esc(item.language)}</p></div></div><div class="membership-date"><small>${item.active ? 'Access until' : 'Last updated'}</small><strong>${P.date(item.currentPeriodEnd)}</strong></div><div class="membership-actions"><button class="button button-soft" data-listener-profile="${esc(item.listenerId)}" type="button">View profile</button>${item.active ? `<button class="button button-primary" data-listener-message="${esc(item.listenerId)}" type="button">Message${item.unreadCount ? ` · ${item.unreadCount}` : ''}</button>` : ''}${item.active && !item.cancelAtCycleEnd ? `<button class="text-action" data-cancel-subscription="${esc(item.id)}" type="button">Turn off renewal</button>` : item.cancelAtCycleEnd ? '<small>Renewal is off</small>' : ''}</div></article>`).join('') : emptyState('No listener memberships yet', 'Open a listener profile and subscribe to unlock their exclusive posts and messages.');
+  }
+
+  function ensureRazorpayReady() {
+    if (typeof window.Razorpay !== 'function') {
+      P.toast('Secure checkout could not load. Check your connection and try again.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  async function subscribeToListener(listenerId, button = null) {
+    if (!me) {
+      P.toast('Sign in before starting a subscription.', 'info');
+      return openAuth();
+    }
+    if (!ensureRazorpayReady()) return;
+
+    const listener = directory.find((item) => item.id === listenerId) || { id: listenerId, name: 'Listener' };
+    const originalLabel = button?.textContent || 'Subscribe';
+    button?.setAttribute('disabled', '');
+
+    try {
+      const order = await P.api('/api/subscriptions/create', {
+        method: 'POST',
+        body: JSON.stringify({ employeeId: listenerId }),
+      });
+      if (!order?.subscription_id || !order?.key_id) {
+        throw new Error('Secure subscription checkout could not start. Please try again.');
+      }
+
+      let handled = false;
+      let paymentFailureShown = false;
+      const checkout = new window.Razorpay({
+        key: order.key_id,
+        subscription_id: order.subscription_id,
+        name: publicConfig?.appName || 'We Met',
+        description: `${order.listener?.name || listener.name} · Exclusive ₹399/month`,
+        image: new URL('/shared/icon-192.png', window.location.origin).href,
+        prefill: {
+          name: me.name || '',
+          contact: me.phone || '',
+        },
+        readonly: { contact: true },
+        remember_customer: false,
+        theme: { color: '#e62d7d' },
+        modal: {
+          ondismiss: () => {
+            button?.removeAttribute('disabled');
+            if (button) button.textContent = originalLabel;
+            if (!handled && !paymentFailureShown) {
+              P.toast('Subscription checkout closed. No membership was activated.', 'info');
+            }
+          },
+        },
+        handler: async (payment) => {
+          handled = true;
+          try {
+            const verified = await P.api('/api/subscriptions/verify', {
+              method: 'POST',
+              timeout: 30000,
+              body: JSON.stringify(payment),
+            });
+            await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]);
+            P.toast(verified.message || 'Exclusive membership is active.', 'success');
+            if (activeListenerProfileId === listenerId) openListenerProfile(listenerId);
+          } catch (error) {
+            const reference = payment?.razorpay_payment_id || 'unavailable';
+            P.toast(`${error.message || 'Subscription verification failed.'} · Ref ${reference}`, 'error');
+          } finally {
+            button?.removeAttribute('disabled');
+            if (button) button.textContent = originalLabel;
           }
-        }
-      },
-    });
+        },
+      });
 
-    socket.on('connect', () => {
-      socket.emit('listeners:get');
-      if (currentCall) {
-        $('#callState').textContent = 'Restoring the secure call…';
-        if (['connecting', 'active'].includes(currentCall.status)) {
-          socket.emit('call:media-state', {
-            callId: currentCall.id,
-            connected: audioCall?.isConnected() === true,
-          });
-        }
-      }
-    });
-    socket.on('disconnect', () => {
-      if (!currentCall) return;
-      currentCall.mediaConnected = false;
-      $('#callState').textContent = 'Reconnecting… talk-time is paused';
-      P.toast('Connection interrupted. Restoring your call…', 'info');
-    });
-    socket.on('connect_error', (error) => console.warn('Calling server reconnecting:', error?.message || error));
-    socket.on('call:idle', () => {
-      if (!currentCall) return;
-      closeCall();
-      P.toast('The previous call is no longer active.', 'info');
-    });
-    socket.on('call:resume', async (data) => {
-      const hadCall = currentCall?.id === data.callId;
-      const sameMediaCall = audioCall?.callId === data.callId;
-      currentCall = {
-        ...currentCall,
-        id: data.callId,
-        employee: data.employee || currentCall?.employee,
-        status: data.status,
-        billed: Number(data.billedSeconds || 0),
-        mediaConnected: false,
-      };
-      if (!hadCall) openCall();
-      $('#callTimer').textContent = P.duration(currentCall.billed);
-      $('#restoreTimer').textContent = P.duration(currentCall.billed);
-      if (Number.isFinite(Number(data.balanceSeconds))) updateBalance(Number(data.balanceSeconds));
-
-      if (data.status === 'connecting') {
-        $('#callState').textContent = 'Restoring secure audio…';
-        try {
-          if (!sameMediaCall) await audioCall.prepare(data.callId);
-          socket.emit('webrtc:ready', { callId: data.callId });
-        } catch (error) {
-          P.toast(error.message || 'The microphone could not be restored.', 'error');
-          socket.emit('call:end', { callId: data.callId });
-        }
-        return;
-      }
-
-      const mediaConnected = sameMediaCall && audioCall.isConnected();
-      currentCall.mediaConnected = mediaConnected;
-      $('#callState').textContent = mediaConnected
-        ? 'Connected · billing is active'
-        : 'Restoring audio… talk-time is paused';
-      socket.emit('call:media-state', { callId: data.callId, connected: mediaConnected });
-    });
-    socket.on('listeners:update', ({ listeners: next = [] }) => {
-      listeners = next;
-      renderListeners();
-    });
-    socket.on('call:ringing', (data) => {
-      currentCall = { id: data.callId, employee: data.employee, status: 'ringing', billed: 0 };
-      openCall();
-      $('#callState').textContent = `Ringing ${data.employee?.name || 'listener'}…`;
-    });
-    socket.on('call:retrying', (data) => {
-      $('#callState').textContent = 'Trying the next available listener…';
-      P.toast(data.reason || 'The listener did not answer.');
-    });
-    socket.on('call:unavailable', (data) => {
-      closeCall();
-      P.toast(data.message || 'No active listener is ready for a call right now. Please refresh shortly.', 'info');
-      if (data.otherLanguagesAvailable && !otherLanguagesEnabled) $('#otherLanguageToggle')?.focus();
-    });
-    socket.on('call:error', (data) => {
-      closeCall();
-      P.toast(data.message || 'The call could not be started.', 'error');
-      if (data.needsTopup) openPurchaseSection();
-    });
-    socket.on('call:accepted', async (data) => {
-      if (!currentCall) currentCall = { id: data.callId };
-      currentCall.status = 'connecting';
-      currentCall.mediaConnected = false;
-      $('#callState').textContent = 'Preparing microphone…';
-      try {
-        await audioCall.prepare(data.callId);
-        if (!currentCall || currentCall.id !== data.callId) return;
-        $('#callState').textContent = 'Connecting secure audio…';
-        socket.emit('webrtc:ready', { callId: data.callId });
-      } catch (error) {
-        P.toast(error.message || 'Please allow microphone access.', 'error');
-        socket.emit('call:end', { callId: data.callId });
-      }
-    });
-    socket.on('webrtc:start', async ({ callId } = {}) => {
-      if (!currentCall || currentCall.id !== callId) return;
-      try {
-        await audioCall.createOffer();
-      } catch (error) {
-        P.toast(error.message || 'The audio connection could not start.', 'error');
-        socket.emit('call:end', { callId });
-      }
-    });
-    socket.on('call:connected', () => {
-      if (!currentCall) return;
-      currentCall.status = 'active';
-      $('#callState').textContent = 'Connected · billing is active';
-      P.notify('We Met', `Your ${currentCall.employee?.language || 'listener'} conversation is connected.`);
-    });
-    socket.on('call:audio-paused', () => {
-      if (currentCall) $('#callState').textContent = 'Audio paused · talk-time is not being charged';
-    });
-    socket.on('call:audio-restored', () => {
-      if (currentCall) $('#callState').textContent = 'Connected · billing is active';
-    });
-    socket.on('call:tick', (data) => {
-      if (!currentCall || data.callId !== currentCall.id) return;
-      currentCall.billed = data.billedSeconds;
-      $('#callTimer').textContent = P.duration(data.billedSeconds);
-      $('#restoreTimer').textContent = P.duration(data.billedSeconds);
-      updateBalance(data.balanceSeconds);
-    });
-    socket.on('call:low-balance', () => P.notify('Low talk-time', 'Only one minute remains in your wallet.'));
-    socket.on('call:ended', (data) => {
-      const needsTopup = data.needsTopup;
-      P.toast(data.reason || 'The call ended.', needsTopup ? 'error' : 'info');
-      closeCall();
-      loadMe();
-      loadHistory();
-      if (needsTopup) openPurchaseSection();
-    });
-    socket.on('chat:message', addChat);
-    socket.on('notification:new', (notification) => {
-      if (/payment/i.test(notification.title || '')) {
-        refreshCustomerBalance();
-      }
-      P.notify(notification.title, notification.body);
-    });
-    socket.on('session:revoked', (data) => {
-      P.toast(data.reason || 'Your login changed. Sign in again.', 'error');
-      P.Store.clear();
-      logout(false);
-    });
-    socket.on('account:restricted', (data) => {
-      P.toast(data.reason || 'Your account has been restricted.', 'error');
-      logout();
-    });
+      checkout.on('payment.failed', (response) => {
+        paymentFailureShown = true;
+        const reason = response?.error?.description || response?.error?.reason || 'Subscription payment failed. Try again.';
+        P.toast(reason, 'error');
+      });
+      checkout.open();
+    } catch (error) {
+      button?.removeAttribute('disabled');
+      if (button) button.textContent = originalLabel;
+      P.toast(error.message || 'The Razorpay subscription checkout could not be prepared.', 'error');
+    }
   }
 
-  function listenerTone(id = '') {
-    let total = 0;
-    for (const character of String(id)) total += character.charCodeAt(0);
-    return total % 4;
+  async function cancelSubscription(id) {
+    if (!confirm('Turn off automatic renewal? Your access continues until the paid period ends.')) return;
+    try { const response = await P.api(`/api/subscriptions/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: '{}' }); P.toast(response.message, 'success'); loadSubscriptions(); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
-  function initials(name = 'Listener') {
-    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  async function loadConversations(render = true) {
+    if (!me) return;
+    try { const response = await P.api('/api/customer/conversations'); conversations = response.conversations || []; if (render) renderConversations(); }
+    catch (error) { if (render) P.toast(error.message, 'error'); }
   }
 
-  function statusText(status) { return ({ available: 'Available', busy: 'On a call', break: 'On break', ringing: 'Ringing', offline:'Offline' })[status] || 'Offline'; }
-  function avatarFor(listener) {
-    const avatar = String(listener.avatar || '');
-    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(avatar)) return `assets/${avatar}`;
-    if (avatar === `photo:${listener.id}` || avatar === 'photo') return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(listener.id)}`;
-    if (/^data:image\/(?:jpeg|png|webp);base64,/.test(avatar)) return avatar;
-    let n = 0; for (const c of String(listener.id || '')) n += c.charCodeAt(0);
-    return `assets/avatar-${String((n % 20) + 1).padStart(2,'0')}.svg`;
-  }
-
-  function listenerLanguage(listener) {
-    return String(listener?.language || listener?.listener_language || 'Malayalam').trim() || 'Malayalam';
-  }
-
-  function listenerCardsMarkup(items, emptyTitle, emptyMessage) {
-    return items.length
-      ? items.map((listener) => `
-        <article class="listener-card">
-          <div class="abstract-avatar tone-${listenerTone(listener.id)}"><img src="${P.esc(avatarFor(listener))}" alt="" loading="lazy"></div>
-          <button class="favorite-btn" data-favorite="${listener.id}" title="${favoriteIds.has(listener.id) ? 'Remove favourite' : 'Add favourite'}" aria-label="Favourite listener">${favoriteIds.has(listener.id) ? '♥' : '♡'}</button>
-          <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge ${listener.status}">${statusText(listener.status)}</span></div>
-          <div class="language-line">● ${P.esc(listenerLanguage(listener))} conversations</div>
-          <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
-          <button class="button ${listener.status === 'available' ? 'button-primary' : 'button-quiet'}" data-call="${listener.id}" ${listener.status !== 'available' ? 'disabled' : ''}>${listener.status === 'available' ? 'Call this listener' : statusText(listener.status)}</button>
-        </article>`).join('')
-      : emptyState(emptyTitle, emptyMessage);
-  }
-
-  function renderListeners() {
-    const malayalam = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() === 'malayalam');
-    const others = listeners.filter((listener) => listenerLanguage(listener).toLowerCase() !== 'malayalam');
-    const malayalamAvailable = malayalam.some((listener) => listener.status === 'available');
-    const otherAvailable = others.some((listener) => listener.status === 'available');
-    const anyAvailable = malayalamAvailable || otherAvailable;
-    const anyoneOnline = listeners.length > 0;
-
-    $('#availabilityText').textContent = anyAvailable
-      ? 'Listeners are available now'
-      : anyoneOnline
-        ? 'Live listener status is updating'
-        : 'Listener availability updates live';
-
-    // Hide listener discovery completely when nobody is online.
-    // This keeps the customer home clean and avoids showing an empty live-listener section.
-    if (!anyoneOnline) {
-      show('#listenerDiscovery', false);
-      $('#listenerGrid').innerHTML = '';
-      $('#otherLanguageGrid').innerHTML = '';
-      show('#otherLanguageSection', false);
+  function renderConversations() {
+    const layout = $('.direct-message-layout');
+    const hasConversations = conversations.length > 0;
+    layout?.classList.toggle('no-conversations', !hasConversations);
+    if (!hasConversations) {
+      activeConversation = null;
+      layout?.classList.remove('conversation-open');
+      $('#conversationList').innerHTML = '<div class="messages-empty"><span aria-hidden="true">♡</span><strong>No messages yet</strong><small>Exclusive conversations will appear here.</small></div>';
+      $('#directChat').classList.add('empty');
+      show('#directMessageForm', false);
       return;
     }
-    show('#listenerDiscovery', true);
-
-    $('#listenerGrid').innerHTML = listenerCardsMarkup(
-      malayalam,
-      'Malayalam listener list',
-      otherAvailable ? 'Turn on “Suggest other languages” to see another active listener.' : 'Active profiles will appear here as soon as a listener is ready.',
-    );
-    show('#otherLanguageSection', otherLanguagesEnabled);
-    if (otherLanguagesEnabled) {
-      $('#otherLanguageGrid').innerHTML = listenerCardsMarkup(others, 'Other-language listener list', 'Active profiles will appear here when another language listener is ready.');
-    }
-
-    $$('[data-call]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.call)));
-    $$('[data-favorite]').forEach((button) => button.addEventListener('click', () => toggleFavorite(button.dataset.favorite)));
+    $('#conversationList').innerHTML = conversations.map((item) => {
+      const state = liveStatus(item);
+      return `<button class="conversation-row ${activeConversation === item.listenerId ? 'active' : ''}" data-conversation="${esc(item.listenerId)}" type="button"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><span><b>${esc(item.listenerName)}</b><small>${esc(item.language || 'Malayalam')} · ${esc(statusLabel(state))}</small><em class="conversation-membership ${item.active ? 'active' : ''}">${item.active ? 'Member' : 'Ended'}</em></span>${item.unreadCount ? `<i>${item.unreadCount}</i>` : ''}</button>`;
+    }).join('');
   }
 
-  function emptyState(title, message) {
-    return `<div class="panel empty-state"><img src="assets/logo.svg" alt=""><h3>${P.esc(title)}</h3><p>${P.esc(message)}</p></div>`;
+  async function openConversation(listenerId) {
+    closeOverlay('listenerProfileModal', false); selectTab('messages'); activeConversation = listenerId; renderConversations();
+    const conversation = conversations.find((item) => item.listenerId === listenerId);
+    if (!conversation?.active) { P.toast('Subscribe to this listener to send messages.', 'info'); return openListenerProfile(listenerId); }
+    const state = liveStatus(conversation);
+    $('.direct-message-layout')?.classList.add('conversation-open');
+    $('#directChat').classList.remove('empty');
+    $('#directChatHead').innerHTML = `<button class="conversation-mobile-back" data-close-customer-conversation type="button" aria-label="Back to messages">‹</button><span class="conversation-avatar chat-profile-avatar"><img class="protected-media" src="${esc(listenerImage({ ...conversation, id: conversation.listenerId, profileImage: conversation.listenerImage }))}" alt="" draggable="false"><i class="${state === 'available' ? 'online' : ''}"></i></span><div><strong>${esc(conversation.listenerName)}</strong><small>${esc(conversation.language || 'Malayalam')} · ${esc(statusLabel(state))}</small></div><button class="button button-quiet button-small" data-listener-profile="${esc(listenerId)}" type="button">Profile</button>`;
+    show('#directMessageForm'); await loadDirectMessages();
   }
 
-  function requestCall(employeeId = null) {
-    if (!socket?.connected) return P.toast('The calling server is not connected yet. Please try again.', 'error');
-    if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 120)) {
-      P.toast('You need at least two minutes of talk-time to start a call.', 'error');
-      return openPurchaseSection();
-    }
-    if (currentCall) return P.toast('You already have a call in progress.', 'error');
-    socket.emit('call:request', { employeeId, allowOtherLanguages: otherLanguagesEnabled });
+  async function loadDirectMessages() {
+    if (!activeConversation) return;
+    try { const response = await P.api(`/api/customer/conversations/${encodeURIComponent(activeConversation)}/messages`); $('#directMessages').innerHTML = response.messages.length ? response.messages.map((message) => `<div class="direct-bubble ${message.sender_id === me.id ? 'mine' : ''}"><p>${esc(message.message)}</p><small>${P.date(message.created_at)}</small></div>`).join('') : '<div class="chat-first-message">Say hello. Keep conversations respectful and private.</div>'; $('#directMessages').scrollTop = $('#directMessages').scrollHeight; loadConversations(false); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
-  function openCall() {
-    openManagedOverlay('#callModal', 'callModal');
-    show('#restoreCall', false);
-    $('#callPerson').textContent = currentCall.employee?.name || 'Listener';
-    $('#callBio').textContent = currentCall.employee?.bio || `A private ${currentCall.employee?.language || ''} conversation`.replace('  ', ' ');
-    $('#callTimer').textContent = '0:00';
-    $('#restoreTimer').textContent = '0:00';
-    $('#chatMessages').innerHTML = '<div class="bubble">Your private text chat starts here.</div>';
-    updateBalance(me.balanceSeconds);
-  }
-
-  function minimizeCall({ historyMode = 'back' } = {}) {
-    if (!currentCall) return;
-    if (historyMode === 'back' && history.state?.overlay === 'callModal') {
-      history.back();
-      return;
-    }
-    show('#callModal', false);
-    show('#restoreCall');
-    setModalState();
-  }
-
-  function restoreCall() {
-    if (!currentCall) return;
-    openManagedOverlay('#callModal', 'callModal');
-    show('#restoreCall', false);
-  }
-
-  function closeCall() {
-    show('#callModal', false);
-    show('#restoreCall', false);
-    audioCall?.stop();
-    currentCall = null;
-    if (history.state?.marker === NAVIGATION_MARKER && history.state.overlay === 'callModal') {
-      setNavigationState({ overlay: null }, 'replace');
-    }
-    setModalState();
-  }
-
-  function toggleMute() {
-    const muted = audioCall?.toggleMute();
-    $('#muteBtn').innerHTML = `<span>${muted ? '🔇' : '🎙'}</span><small>${muted ? 'Unmute' : 'Mute'}</small>`;
-  }
-
-  function sendChat(event) {
-    event.preventDefault();
-    const input = $('#chatInput');
-    const message = input.value.trim();
-    if (!message || !currentCall) return;
-    const callId = currentCall.id;
-    input.value = '';
-    socket.timeout(8000).emit('chat:send', { callId, message }, (error, response) => {
-      if (!error && response?.ok) return;
-      if (currentCall?.id === callId && !input.value) input.value = message;
-      P.toast(response?.error || 'The message was not delivered. Please try again.', 'error');
-    });
-  }
-
-  function addChat(message) {
-    if (!currentCall || message.callId !== currentCall.id) return;
-    const bubble = document.createElement('div');
-    bubble.className = `bubble ${message.senderId === me.id ? 'mine' : ''}`;
-    bubble.innerHTML = `<b>${P.esc(message.senderName)}</b><br>${P.esc(message.message)}`;
-    $('#chatMessages').append(bubble);
-    $('#chatMessages').scrollTo({ top: $('#chatMessages').scrollHeight, behavior: 'smooth' });
-  }
-
-  async function loadFavorites() {
-    if (!me) return;
-    try {
-      const response = await P.api('/api/customer/favorites');
-      favoriteIds = new Set(response.favorites.map((listener) => listener.employee_id));
-      $('#favoritesList').innerHTML = response.favorites.length
-        ? response.favorites.map((listener) => `
-          <article class="listener-card">
-            <div class="abstract-avatar tone-${listenerTone(listener.employee_id)}">${P.esc(initials(listener.name))}</div>
-            <div class="listener-meta"><strong>${P.esc(listener.name)}</strong><span class="badge">Favourite</span></div>
-            <div class="language-line">● ${P.esc(listener.listener_language || 'Malayalam')} conversations</div>
-            <p>${P.esc(listener.bio || 'A calm listener who is here for a real conversation.')}</p>
-            <div class="list-actions"><button class="button button-primary" data-fav-call="${listener.employee_id}">Call</button><button class="button button-quiet" data-fav-remove="${listener.employee_id}">Remove</button></div>
-          </article>`).join('')
-        : emptyState('No favourites yet', 'Tap the heart on a listener card to save them here.');
-      $$('[data-fav-call]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.favCall)));
-      $$('[data-fav-remove]').forEach((button) => button.addEventListener('click', () => toggleFavorite(button.dataset.favRemove)));
-      renderListeners();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function toggleFavorite(id) {
-    try {
-      const saved = favoriteIds.has(id);
-      await P.api(`/api/customer/favorites/${id}`, { method: saved ? 'DELETE' : 'POST' });
-      P.toast(saved ? 'Listener removed from favourites.' : 'Listener added to favourites.', 'success');
-      await loadFavorites();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function loadNotifications() {
-    if (!me) return;
-    try {
-      const response = await P.api('/api/customer/notifications');
-      $('#notificationsList').innerHTML = response.notifications.length
-        ? response.notifications.map((notification) => `
-          <article class="list-item"><div><strong>${P.esc(notification.title)}</strong><p>${P.esc(notification.body)}</p></div><div><small>${P.date(notification.created_at)}</small>${notification.read_at ? '' : '<span class="badge available">New</span>'}</div></article>`).join('')
-        : emptyState('No notifications', 'Important account and call updates will appear here.');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function markNotificationsRead() {
-    try {
-      await P.api('/api/customer/notifications/read', { method: 'POST', body: '{}' });
-      loadNotifications();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function loadHistory() {
-    if (!me) return;
-    try {
-      const response = await P.api('/api/customer/history');
-      historyCalls = response.calls || [];
-      $('#callHistory').innerHTML = historyCalls.length
-        ? historyCalls.map((call) => `
-          <article class="list-item"><div><strong>${P.esc(call.employee_name)}</strong><p>${P.date(call.created_at)} · ${P.duration(call.billed_seconds)}</p><small>${P.esc(call.end_reason || call.status)}</small></div><div class="list-actions"><button class="button button-soft" data-reconnect="${call.employee_id}">Call again</button><button class="button button-quiet" data-report="${call.id}">Report</button><button class="button button-quiet" data-block-request="${call.id}">Request restriction</button></div></article>`).join('')
-        : emptyState('No call history', 'Your completed and missed calls will appear here.');
-
-      $('#walletHistory').innerHTML = (response.wallet || []).length
-        ? response.wallet.map((entry) => `
-          <article class="list-item"><div><strong>${entry.seconds_delta > 0 ? '+' : '−'}${P.duration(Math.abs(entry.seconds_delta))}</strong><p>${P.esc(entry.note || entry.type)}</p></div><small>${P.date(entry.created_at)}</small></article>`).join('')
-        : emptyState('No wallet activity', 'Redeemed minutes and call deductions will appear here.');
-
-      $$('[data-reconnect]').forEach((button) => button.addEventListener('click', () => requestCall(button.dataset.reconnect)));
-      $$('[data-report]').forEach((button) => button.addEventListener('click', () => reportCall(button.dataset.report, false)));
-      $$('[data-block-request]').forEach((button) => button.addEventListener('click', () => reportCall(button.dataset.blockRequest, true)));
-
-      const previous = historyCalls[0];
-      if (previous) {
-        show('#previousBox');
-        $('#previousBox').innerHTML = `<div><strong>Continue with ${P.esc(previous.employee_name)}</strong><p>Reconnect with your most recent listener.</p></div><button class="button button-soft" id="previousCall" type="button">Call again</button>`;
-        $('#previousCall').addEventListener('click', () => requestCall(previous.employee_id));
-      } else {
-        show('#previousBox', false);
-      }
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
+  async function sendDirectMessage(event) {
+    event.preventDefault(); const input = $('#directMessageInput'); const message = input.value.trim(); if (!message || !activeConversation) return; const submit = event.submitter; submit.disabled = true;
+    try { await P.api(`/api/customer/conversations/${encodeURIComponent(activeConversation)}/messages`, { method: 'POST', body: JSON.stringify({ message }) }); input.value = ''; await loadDirectMessages(); }
+    catch (error) { P.toast(error.message, 'error'); } finally { submit.disabled = false; }
   }
 
   async function loadPlans() {
     if (!me) return;
-    try {
-      const response = await P.api('/api/customer/plans');
-      renderPlans(response.plans || []);
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  function renderPlans(plans = []) {
-    paymentPlans = plans;
-    const planDescription = 'Secure Razorpay checkout · UPI, cards and supported methods · billed by connected second.';
-    $('#walletPaymentIntro').textContent = 'Choose a pack and complete the secure Razorpay checkout. Verified payments add talk-time automatically.';
-    $('#plansGrid').innerHTML = plans.map((plan) => `
-      <article class="plan-card ${plan.popular ? 'popular' : ''}">
-        ${plan.popular ? '<span class="popular-tag">POPULAR</span>' : ''}
-        <span class="plan-kicker">TALK-TIME</span>
-        <h3>${Math.round(plan.seconds / 60)} <small>min</small></h3>
-        <strong>${P.money(plan.price_paise)}</strong>
-        <p>${P.esc(planDescription)}</p>
-        <button class="button button-primary" type="button" data-buy-plan="${plan.id}">Get this pack <span>→</span></button>
-      </article>`).join('');
-    $$('[data-buy-plan]').forEach((button) => button.addEventListener('click', (event) => {
-      openPayment(button.dataset.buyPlan, event.currentTarget);
-    }));
-  }
-
-  async function copyValue(value, message = 'Copied.') {
-    if (!value) return;
-    try {
-      if (navigator.clipboard?.writeText && window.isSecureContext) {
-        await navigator.clipboard.writeText(value);
-      } else {
-        const area = document.createElement('textarea');
-        area.value = value;
-        area.style.position = 'fixed';
-        area.style.opacity = '0';
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand('copy');
-        area.remove();
-      }
-      P.toast(message, 'success');
-    } catch {
-      P.toast('Copy failed. Select the value and copy it manually.', 'error');
-    }
+    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Pay ${P.money(plan.price_paise)}</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
   async function verifyRazorpayCheckout(payment) {
@@ -975,14 +802,13 @@
   async function openPayment(planId, button = null) {
     if (!me) {
       P.toast('Sign in before starting a payment.', 'info');
-      return setAuth('login');
+      return openAuth();
     }
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
-    if (typeof window.Razorpay !== 'function') {
-      return P.toast('Secure checkout could not load. Check your connection and try again.', 'error');
-    }
+    if (!ensureRazorpayReady()) return;
 
+    const originalLabel = button?.textContent || `Pay ${P.money(plan.price_paise)}`;
     button?.setAttribute('disabled', '');
     try {
       const order = await P.api('/api/create-order', {
@@ -994,6 +820,9 @@
           receipt: `checkout_${Date.now()}`,
         }),
       });
+      if (!order?.order_id || !order?.key_id) {
+        throw new Error('Secure payment could not start. Please try again.');
+      }
 
       let paymentHandled = false;
       let paymentFailureShown = false;
@@ -1003,19 +832,21 @@
         currency: order.currency,
         name: publicConfig?.appName || 'We Met',
         description: `${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
-        image: new URL('assets/logo.svg', window.location.href).href,
+        image: new URL('/shared/icon-192.png', window.location.origin).href,
         order_id: order.order_id,
         prefill: {
           name: me.name || '',
-          email: me.email || '',
           contact: me.phone || '',
         },
+        readonly: { contact: true },
+        remember_customer: false,
         notes: { plan_id: plan.id },
-        theme: { color: '#f0448f' },
+        theme: { color: '#e62d7d' },
         retry: { enabled: true },
         modal: {
           ondismiss: () => {
             button?.removeAttribute('disabled');
+            if (button) button.textContent = originalLabel;
             if (!paymentHandled && !paymentFailureShown) {
               P.toast('Payment cancelled. No talk-time was added.', 'info');
             }
@@ -1029,13 +860,11 @@
             await loadHistory();
             P.toast(verified.message || 'Payment verified and talk-time added.', 'success');
           } catch (error) {
-            const reference = payment.razorpay_payment_id || 'unavailable';
-            P.toast(
-              `${error.message || 'Payment verification failed.'} Payment reference: ${reference}`,
-              'error',
-            );
+            const reference = payment?.razorpay_payment_id || 'unavailable';
+            P.toast(`${error.message || 'Payment verification failed.'} · Ref ${reference}`, 'error');
           } finally {
             button?.removeAttribute('disabled');
+            if (button) button.textContent = originalLabel;
           }
         },
       });
@@ -1048,198 +877,232 @@
       checkout.open();
     } catch (error) {
       button?.removeAttribute('disabled');
+      if (button) button.textContent = originalLabel;
       P.toast(error.message || 'The Razorpay checkout could not be prepared.', 'error');
-    }
-  }
-
-  function saveRecovery(value) {
-    try { localStorage.setItem('we_met_password_recovery', JSON.stringify(value)); } catch {}
-  }
-
-  function restoreRecovery() {
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem('we_met_password_recovery') || 'null'); } catch {}
-    if (!saved?.recoveryKey) {
-      $('#recoveryRequestId').value = '';
-      $('#recoveryKey').value = '';
-      $('#recoveryStatus').textContent = 'Already have a recovery key? Paste it below to check the request.';
-      show('#resetCompleteForm', false);
-      return show('#recoveryPanel');
-    }
-    $('#recoveryRequestId').value = saved.requestId;
-    $('#recoveryKey').value = saved.recoveryKey;
-    show('#recoveryPanel');
-  }
-
-  async function checkRecovery() {
-    try {
-      const response = await P.api('/api/auth/password-reset/status', {
-        method: 'POST',
-        body: JSON.stringify({ requestId: $('#recoveryRequestId').value, recoveryKey: $('#recoveryKey').value.trim() }),
-      });
-      const request = response.request;
-      const labels = {
-        open: 'Waiting for administrator review.',
-        approved: 'Approved. Enter a new password below.',
-        declined: 'Declined. Submit a new request or contact support.',
-        completed: 'This recovery request was already used.',
-      };
-      $('#recoveryStatus').textContent = `${labels[request.status] || request.status}${request.adminMessage ? ` Admin message: ${request.adminMessage}` : ''}`;
-      show('#resetCompleteForm', request.status === 'approved');
-      saveRecovery({ requestId: request.id, recoveryKey: $('#recoveryKey').value.trim() });
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function completeRecovery(event) {
-    event.preventDefault();
-    const password = $('#recoveryNewPassword').value;
-    if (password !== $('#recoveryConfirmPassword').value) return P.toast('The two passwords do not match.', 'error');
-    try {
-      const response = await P.api('/api/auth/password-reset/complete', {
-        method: 'POST',
-        body: JSON.stringify({ requestId: $('#recoveryRequestId').value, recoveryKey: $('#recoveryKey').value.trim(), newPassword: password }),
-      });
-      localStorage.removeItem('we_met_password_recovery');
-      event.target.reset();
-      show('#recoveryPanel', false);
-      P.toast(response.message, 'success');
-      setAuth('login');
-    } catch (error) {
-      P.toast(error.message, 'error');
     }
   }
 
   async function redeem(event) {
     event.preventDefault();
-    const button = event.submitter;
-    button?.setAttribute('disabled', '');
-    try {
-      const response = await P.api('/api/customer/redeem', {
-        method: 'POST',
-        body: JSON.stringify({ code: $('#couponCode').value }),
-      });
-      updateBalance(response.balanceSeconds);
-      $('#couponCode').value = '';
-      P.notify('Code redeemed', `${P.duration(response.seconds)} was added to your wallet.`);
-      loadHistory();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    } finally {
-      button?.removeAttribute('disabled');
-    }
+    try { const response = await P.api('/api/customer/redeem', { method: 'POST', body: JSON.stringify({ code: $('#couponCode').value }) }); updateBalance(response.balanceSeconds); event.target.reset(); loadHistory(); P.toast('Talk-time added.', 'success'); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function loadSupport() {
+  async function connectSocket() {
+    socket?.disconnect();
+    try { await window.SocketIOReady; } catch (error) { return P.toast(error.message, 'error'); }
+    socket = io(P.socketUrl, { auth: { token: P.Store.token }, transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelayMax: 10000 });
+    audioCall = new AudioCall({ socket, iceServers: publicConfig?.iceServers || [], remoteAudio: $('#remoteAudio'), onState: (state) => {
+      if (!currentCall) return;
+      if (state === 'connected' && currentCall.mediaConnected !== true) { currentCall.mediaConnected = true; socket.emit('call:media-state', { callId: currentCall.id, connected: true }); }
+      if (['failed', 'disconnected', 'closed'].includes(state) && currentCall.mediaConnected !== false) { currentCall.mediaConnected = false; socket.emit('call:media-state', { callId: currentCall.id, connected: false }); $('#callState').textContent = 'Audio reconnecting…'; }
+    } });
+    socket.on('connect', () => socket.emit('listeners:get'));
+    socket.on('disconnect', () => {
+      const wasRequesting = Boolean(pendingCallRequest);
+      const hadCall = Boolean(currentCall);
+      liveDirectoryReady = false;
+      liveListeners = [];
+      clearPendingCallRequest();
+      if (currentCall) closeCall();
+      renderDirectory();
+      if (wasRequesting || hadCall) P.toast('Calling is reconnecting. Please try again shortly.', 'error');
+    });
+    socket.on('listeners:update', ({ listeners = [] }) => {
+      liveListeners = listeners;
+      liveDirectoryReady = true;
+      for (const live of listeners) {
+        const saved = directory.find((item) => item.id === live.id);
+        if (!saved) continue;
+        saved.name = live.name || saved.name;
+        saved.bio = live.bio || saved.bio;
+        saved.profileImage = live.avatar || saved.profileImage;
+        saved.bannerImage = live.banner || saved.bannerImage;
+        saved.language = live.language || saved.language;
+        saved.updatedAt = live.updatedAt || saved.updatedAt;
+      }
+      renderDirectory();
+    });
+    socket.on('listener:profile-updated', ({ listener = {} } = {}) => {
+      if (!listener.id) return;
+      const saved = directory.find((item) => item.id === listener.id);
+      if (saved) {
+        saved.name = listener.name || saved.name;
+        saved.bio = listener.bio ?? saved.bio;
+        saved.profileImage = listener.avatar ?? saved.profileImage;
+        saved.bannerImage = listener.banner ?? saved.bannerImage;
+        saved.language = listener.language || saved.language;
+        saved.updatedAt = listener.updatedAt || new Date().toISOString();
+        renderDirectory();
+      }
+      if (activeListenerProfileId === listener.id && !$('#listenerProfileModal').classList.contains('hidden')) {
+        openListenerProfile(listener.id);
+      }
+    });
+    socket.on('call:ringing', (data) => {
+      clearPendingCallRequest();
+      currentCall = { id: data.callId, employee: data.employee, billed: 0, mediaConnected: false };
+      closeOverlay('listenerProfileModal', false);
+      openCall();
+      $('#callState').textContent = `Ringing ${data.employee?.name || 'listener'}…`;
+      syncCallRequestControls();
+    });
+    socket.on('call:retrying', (data) => { $('#callState').textContent = 'Trying another available listener…'; P.toast(data.reason || 'The listener did not answer.', 'info'); });
+    socket.on('call:unavailable', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.message || 'No listener is available right now.', 'info'); });
+    socket.on('call:error', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.message || 'The call could not start.', 'error'); if (data.needsTopup) selectTab('wallet'); });
+    socket.on('call:accepted', async (data) => { if (!currentCall) currentCall = { id: data.callId }; currentCall.mediaConnected = false; $('#callState').textContent = 'Preparing microphone…'; try { await audioCall.prepare(data.callId); if (currentCall?.id === data.callId) { $('#callState').textContent = 'Connecting secure audio…'; socket.emit('webrtc:ready', { callId: data.callId }); } } catch (error) { P.toast(error.message || 'Allow microphone access.', 'error'); socket.emit('call:end', { callId: data.callId }); } });
+    socket.on('webrtc:start', async ({ callId }) => { if (currentCall?.id === callId) { try { await audioCall.createOffer(); } catch { socket.emit('call:end', { callId }); } } });
+    socket.on('call:connected', () => { if (currentCall) { $('#callState').textContent = 'Connected · wallet billing active'; P.notify('We Met', 'Your private call is connected.'); } });
+    socket.on('call:audio-paused', () => { if (currentCall) $('#callState').textContent = 'Audio paused · wallet billing paused'; });
+    socket.on('call:audio-restored', () => { if (currentCall) $('#callState').textContent = 'Connected · wallet billing active'; });
+    socket.on('call:tick', (data) => { if (currentCall?.id === data.callId) { $('#callTimer').textContent = P.duration(data.billedSeconds); $('#restoreTimer').textContent = P.duration(data.billedSeconds); updateBalance(data.balanceSeconds); } });
+    socket.on('call:low-balance', () => P.notify('Low talk-time', 'Only one minute remains in your wallet.'));
+    socket.on('call:ended', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.reason || 'The call ended.', data.needsTopup ? 'error' : 'info'); loadMe(); if (data.needsTopup) selectTab('wallet'); });
+    socket.on('chat:message', addCallChat);
+    socket.on('notification:new', (notification) => { P.notify(notification.title, notification.body); loadSubscriptions(false); loadConversations(false); });
+    socket.on('account:restricted', (data) => { P.toast(data.reason || 'Account restricted.', 'error'); logout(); });
+  }
+
+  function requestCall(listenerId) {
+    const listener = directory.find((item) => item.id === listenerId);
+    if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
+    if (liveStatus(listener || { id: listenerId }) !== 'available') return P.toast('This listener is not online right now.', 'info');
+    if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
+    if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
+    beginCallRequest({ employeeId: listenerId, allowOtherLanguages: false });
+  }
+
+  function requestRandomCall() {
+    if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
+    if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
+    if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
+    beginCallRequest({ employeeId: null, allowOtherLanguages: Boolean($('#otherLanguageToggle')?.checked) });
+  }
+
+  function syncCallRequestControls() {
+    const locked = Boolean(pendingCallRequest || currentCall);
+    const randomButton = $('#randomConnectButton');
+    if (randomButton) {
+      randomButton.disabled = locked;
+      randomButton.textContent = pendingCallRequest ? 'Checking availability…' : currentCall ? 'Call in progress' : 'Connect now';
+    }
+    $$('[data-listener-call]').forEach((button) => {
+      button.disabled = locked || button.dataset.callAvailable === 'false';
+    });
+  }
+
+  function clearPendingCallRequest() {
+    if (pendingCallRequest?.timer) clearTimeout(pendingCallRequest.timer);
+    pendingCallRequest = null;
+    syncCallRequestControls();
+  }
+
+  function beginCallRequest(payload) {
+    const request = { employeeId: payload.employeeId || null, timer: null };
+    pendingCallRequest = request;
+    request.timer = setTimeout(() => {
+      if (pendingCallRequest !== request || currentCall) return;
+      clearPendingCallRequest();
+      P.toast('Calling took too long to respond. Please try again.', 'error');
+    }, 15_000);
+    syncCallRequestControls();
+    socket.timeout(12_000).emit('call:request', payload, (timeoutError, response) => {
+      if (pendingCallRequest !== request || currentCall) return;
+      if (timeoutError) {
+        clearPendingCallRequest();
+        return P.toast('Calling is taking too long. Please try again.', 'error');
+      }
+      if (response?.ok) return;
+      clearPendingCallRequest();
+      if (response?.needsTopup) selectTab('wallet');
+      if (response?.error || response?.message) P.toast(response.error || response.message, response?.unavailable ? 'info' : 'error');
+    });
+  }
+
+  function openCall() {
+    openOverlay('callModal'); show('#restoreCall', false); $('#callPerson').textContent = currentCall.employee?.name || 'Listener'; $('#callBio').textContent = currentCall.employee?.bio || 'A private conversation'; $('#callTimer').textContent = '0:00'; $('#restoreTimer').textContent = '0:00'; $('#chatMessages').innerHTML = '<div class="bubble">Private call chat starts here.</div>';
+    const employee = directory.find((item) => item.id === currentCall.employee?.id) || currentCall.employee;
+    if (employee?.id) currentCall.employee = { ...employee, ...currentCall.employee, following: Boolean(employee.following) };
+    $('#callAvatarImage').src = employee?.id ? listenerImage(employee) : '/shared/logo.svg';
+    const callShell = $('#callModal .call-shell');
+    if (callShell) callShell.style.setProperty('--call-profile-bg', `url("${employee?.id ? listenerImage(employee, 'banner') : '/shared/default-listener-banner.png'}")`);
+    show('#callProfileButton', Boolean(employee?.id)); show('#callFollowButton', Boolean(employee?.id)); show('#callSubscribeButton', Boolean(employee?.id) && !isActiveMember(employee.id) && !employee.subscribed);
+    if (employee?.id) $('#callFollowButton').textContent = employee.following ? 'Following' : 'Follow';
+  }
+
+  function openCurrentCallProfile() {
+    const listenerId = currentCall?.employee?.id;
+    if (!listenerId) return;
+    minimizeCall(false);
+    openListenerProfile(listenerId);
+  }
+  function minimizeCall(useHistory = true) { if (!currentCall) return; if (useHistory && history.state?.overlay === 'callModal') return history.back(); show('#callModal', false); show('#restoreCall'); syncBodyState(); }
+  function restoreCall() { if (currentCall) { openOverlay('callModal'); show('#restoreCall', false); } }
+  function closeCall() { show('#callModal', false); show('#restoreCall', false); audioCall?.stop(); currentCall = null; if (history.state?.marker === NAV_MARKER && history.state.overlay === 'callModal') history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title); syncBodyState(); syncCallRequestControls(); }
+  function toggleMute() { const muted = audioCall?.toggleMute(); $('#muteBtn small').textContent = muted ? 'Unmute' : 'Mute'; }
+  function sendCallChat(event) { event.preventDefault(); const message = $('#chatInput').value.trim(); if (!message || !currentCall) return; socket.emit('chat:send', { callId: currentCall.id, message }); $('#chatInput').value = ''; }
+  function addCallChat(message) { if (currentCall?.id !== message.callId) return; $('#chatMessages').insertAdjacentHTML('beforeend', `<div class="bubble ${message.senderId === me.id ? 'mine' : ''}"><b>${esc(message.senderName)}</b><br>${esc(message.message)}</div>`); }
+
+  async function loadHistory() {
     if (!me) return;
-    try {
-      const response = await P.api('/api/customer/support');
-      $('#supportList').innerHTML = response.tickets.length
-        ? response.tickets.map((ticket) => `
-          <article class="list-item"><div><strong>${P.esc(ticket.subject)}</strong><p>${P.esc(ticket.message)}</p>${ticket.admin_reply ? `<p><b>Admin reply:</b> ${P.esc(ticket.admin_reply)}</p>` : ''}</div><span class="badge ${ticket.status === 'open' ? 'ringing' : 'available'}">${P.esc(ticket.status)}</span></article>`).join('')
-        : emptyState('No support messages', 'Messages you send to the admin will appear here.');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
+    try { const response = await P.api('/api/customer/history'); $('#callHistory').innerHTML = response.calls?.length ? response.calls.map((call) => `<article class="list-item"><div><strong>${esc(call.employee_name)}</strong><p>${P.date(call.created_at)} · ${P.duration(call.billed_seconds)}</p></div><button class="button button-quiet" data-listener-profile="${esc(call.employee_id)}">Profile</button></article>`).join('') : emptyState('No calls yet', 'Your private call history appears here.'); $('#walletHistory').innerHTML = response.wallet?.length ? response.wallet.map((entry) => `<article class="list-item"><div><strong>${entry.seconds_delta > 0 ? '+' : '−'}${P.duration(Math.abs(entry.seconds_delta))}</strong><p>${esc(entry.note || entry.type)}</p></div><small>${P.date(entry.created_at)}</small></article>`).join('') : emptyState('No wallet activity', 'Top-ups and call charges appear here.'); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function sendSupport(event) {
-    event.preventDefault();
-    try {
-      await P.api('/api/customer/support', {
-        method: 'POST',
-        body: JSON.stringify({ subject: $('#supportSubject').value, message: $('#supportMessage').value }),
-      });
-      event.target.reset();
-      P.toast('Your message was sent to the administrator.', 'success');
-      loadSupport();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
+  async function loadFollowing(render = true) {
+    if (!me) return;
+    try { const response = await P.api('/api/customer/following'); followingListeners = response.listeners || []; if (render) $('#followingList').innerHTML = followingListeners.length ? followingListeners.map((item) => `<article class="mini-listener"><span class="conversation-avatar"><img class="protected-media" src="${esc(listenerImage(item))}" alt="" draggable="false"><i class="${liveStatus(item) === 'available' ? 'online' : ''}"></i></span><div><strong>${esc(item.name)}</strong><small>${esc(item.language || 'Malayalam')} · ${esc(statusLabel(liveStatus(item)))}</small></div><button class="button button-soft" data-listener-profile="${esc(item.id)}">Profile</button></article>`).join('') : emptyState('Not following anyone yet', 'Tap Follow on any listener profile.'); }
+    catch (error) { P.toast(error.message, 'error'); }
   }
+  async function loadNotifications() { if (!me) return; try { const response = await P.api('/api/customer/notifications'); $('#notificationsList').innerHTML = response.notifications?.length ? response.notifications.map((n) => `<article class="list-item"><div><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p></div><small>${P.date(n.created_at)}</small></article>`).join('') : emptyState('No notifications', 'Account and payment updates appear here.'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function markNotificationsRead() { try { await P.api('/api/customer/notifications/read', { method: 'POST', body: '{}' }); loadNotifications(); } catch (error) { P.toast(error.message, 'error'); } }
+  async function loadSupport() { if (!me) return; try { const r = await P.api('/api/customer/support'); $('#supportList').innerHTML = r.tickets?.length ? r.tickets.map((t) => `<article class="list-item"><div><strong>${esc(t.subject)}</strong><p>${esc(t.message)}</p>${t.admin_reply ? `<p><b>Reply:</b> ${esc(t.admin_reply)}</p>` : ''}</div><span>${esc(t.status)}</span></article>`).join('') : emptyState('No support messages', 'Messages to the team appear here.'); } catch {} }
+  async function sendSupport(event) { event.preventDefault(); try { await P.api('/api/customer/support', { method: 'POST', body: JSON.stringify({ subject: $('#supportSubject').value, message: $('#supportMessage').value }) }); event.target.reset(); loadSupport(); P.toast('Message sent.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
 
-  async function changeLogin(event) {
-    event.preventDefault();
+  async function chooseCustomerPhoto(event) {
+    const file = event.target.files?.[0]; if (!file) return;
+    const button = $('#customerPhotoButton');
+    button.disabled = true;
+    button.classList.add('uploading');
     try {
-      await P.api('/api/auth/change-login', {
-        method: 'POST',
-        body: JSON.stringify({ newEmail: $('#newEmail').value, currentPassword: $('#emailChangePassword').value }),
-      });
-      P.toast('Email updated. Please sign in again.', 'success');
-      setTimeout(() => logout(), 900);
+      customerPhotoDraft = await compressPhoto(file);
+      $('#customerPhotoPreview').src = customerPhotoDraft;
+      const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: me.name, username: me.username || '', profileImage: customerPhotoDraft }) });
+      me.profileImage = response.user.profileImage;
+      customerPhotoDraft = undefined;
+      await loadCustomerPhoto();
+      P.toast('Profile photo updated.', 'success');
     } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function changePhone(event) {
-    event.preventDefault();
-    const submit = event.submitter;
-    submit?.setAttribute('disabled', '');
-    try {
-      const response = await P.api('/api/auth/change-phone', {
-        method: 'POST',
-        body: JSON.stringify({
-          phone: $('#profilePhone').value,
-          currentPassword: $('#phoneChangePassword').value,
-        }),
-      });
-      me.phone = response.phone;
-      $('#profilePhone').value = response.phone;
-      $('#profilePhoneText').textContent = response.phone;
-      $('#phoneChangePassword').value = '';
-      P.toast('Contact phone updated.', 'success');
-    } catch (error) {
+      customerPhotoDraft = undefined;
+      await loadCustomerPhoto();
       P.toast(error.message, 'error');
     } finally {
-      submit?.removeAttribute('disabled');
+      button.disabled = false;
+      button.classList.remove('uploading');
+      event.target.value = '';
     }
   }
-
-  async function changePassword(event) {
-    event.preventDefault();
+  async function compressPhoto(file) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error('Choose a JPG, PNG or WebP photo smaller than 5 MB.');
+    const url = URL.createObjectURL(file);
+    try { const image = new Image(); await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; }); const size = 560; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const ctx = canvas.getContext('2d'); const crop = Math.min(image.naturalWidth, image.naturalHeight); ctx.drawImage(image, (image.naturalWidth - crop) / 2, (image.naturalHeight - crop) / 2, crop, crop, 0, 0, size, size); const result = canvas.toDataURL('image/jpeg', 0.84); if (result.length > 610000) throw new Error('Choose a simpler or smaller photo.'); return result; }
+    finally { URL.revokeObjectURL(url); }
+  }
+  async function saveCustomerProfile(event) { event.preventDefault(); try { const response = await P.api('/api/customer/profile', { method: 'PATCH', body: JSON.stringify({ name: $('#customerProfileName').value, username: $('#customerProfileUsername').value }) }); me.name = response.user.name; me.username = response.user.username; me.profileImage = response.user.profileImage; $('#profileName').textContent = me.name; $('#profileUsernameText').textContent = me.username ? `@${me.username}` : 'Add a username'; $('#customerProfileForm').classList.add('hidden'); P.toast('Profile updated.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function loadCustomerPhoto() {
+    if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
+    customerPhotoObjectUrl = '';
+    $('#customerPhotoPreview').src = 'assets/profile-placeholder.svg';
+    if (!me?.profileImage?.startsWith('photo:')) return;
     try {
-      await P.api('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }),
-      });
-      event.target.reset();
-      P.toast('Password updated. All sessions were signed out.', 'success');
-      setTimeout(() => logout(), 900);
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
+      const blob = await P.apiBlob('/api/customer/profile/image');
+      customerPhotoObjectUrl = URL.createObjectURL(blob);
+      $('#customerPhotoPreview').src = customerPhotoObjectUrl;
+    } catch {}
   }
-
-  async function reportCall(id, high = false) {
-    const reason = prompt(high ? 'Explain why you want this listener restricted:' : 'Describe the issue you want to report:');
-    if (!reason) return;
-    try {
-      await P.api('/api/customer/reports', {
-        method: 'POST',
-        body: JSON.stringify({ callId: id, reason, details: reason, priority: high ? 'high' : 'normal' }),
-      });
-      P.toast('Your report was sent to the administrator.', 'success');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  function reportCurrent() {
-    if (currentCall) reportCall(currentCall.id, false);
-  }
-
-  async function loadLegal(type) {
-    try {
-      const response = await P.api(`/api/public/legal/${type}`);
-      $('#legalTitle').textContent = ({ terms: 'Terms and Conditions', privacy: 'Privacy Policy', refund: 'Refund Policy', safety: 'Safety Policy' })[type] || 'Policy';
-      $('#legalBody').textContent = response.body;
-      openManagedOverlay('#legalModal', 'legalModal');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
+  async function changePassword(event) { event.preventDefault(); try { await P.api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: $('#currentPassword').value, newPassword: $('#newPassword').value }) }); P.toast('Password updated. Please sign in again.', 'success'); setTimeout(() => logout(), 700); } catch (error) { P.toast(error.message, 'error'); } }
+  async function reportCall(id) { const reason = prompt('Describe the issue for the safety team:'); if (!reason) return; try { await P.api('/api/customer/reports', { method: 'POST', body: JSON.stringify({ callId: id, reason, details: reason }) }); P.toast('Report sent.', 'success'); } catch (error) { P.toast(error.message, 'error'); } }
+  async function loadLegal(type) { try { const response = await P.api(`/api/public/legal/${type}`); $('#legalTitle').textContent = ({ terms: 'Terms and Conditions', privacy: 'Privacy Policy', refund: 'Refund Policy', safety: 'Safety Centre' })[type] || 'Policy'; $('#legalBody').textContent = response.body; openOverlay('legalModal'); } catch (error) { P.toast(error.message, 'error'); } }
 
   init();
 })();

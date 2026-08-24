@@ -6,7 +6,6 @@
   const tokenKey = config.TOKEN_KEY || 'we_met_customer_token';
   const expectedRole = config.EXPECTED_ROLE || 'customer';
   let sessionInvalidated = false;
-  const pendingMutations = new Map();
 
   function tokenRole(token) {
     try {
@@ -43,7 +42,7 @@
     clear() { localStorage.removeItem(tokenKey); },
   };
 
-  async function request(path, options = {}) {
+  async function api(path, options = {}) {
     const headers = { Accept: 'application/json', ...(options.headers || {}) };
     if (options.body !== undefined && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
     const sessionToken = Store.token;
@@ -52,7 +51,7 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
     try {
-      const response = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
+      const response = await fetch(`${base}${path}`, { cache: 'no-store', ...options, headers, signal: controller.signal });
       const isJson = (response.headers.get('content-type') || '').includes('json');
       const data = isJson ? await response.json() : await response.text();
       if (!response.ok) {
@@ -71,15 +70,22 @@
     }
   }
 
-  function api(path, options = {}) {
-    const method = String(options.method || 'GET').toUpperCase();
-    if (['GET', 'HEAD'].includes(method)) return request(path, options);
-
-    const key = `${method}:${path}:${typeof options.body === 'string' ? options.body : ''}`;
-    if (pendingMutations.has(key)) return pendingMutations.get(key);
-    const pending = request(path, options).finally(() => pendingMutations.delete(key));
-    pendingMutations.set(key, pending);
-    return pending;
+  async function apiBlob(path, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    const sessionToken = Store.token;
+    if (sessionToken) headers.Authorization = `Bearer ${sessionToken}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
+    try {
+      const response = await fetch(`${base}${path}`, { cache: 'no-store', ...options, headers, signal: controller.signal });
+      if (!response.ok) {
+        let message = 'The image could not be loaded.';
+        try { const data = await response.json(); message = data?.error || message; } catch {}
+        if (sessionToken && response.status === 401) invalidateSession(message);
+        throw Object.assign(new Error(message), { status: response.status });
+      }
+      return response.blob();
+    } finally { clearTimeout(timer); }
   }
 
   function escapeHtml(value = '') {
@@ -135,8 +141,8 @@
         if (registration) {
           await registration.showNotification(title, {
             body,
-            icon: 'assets/icon-192.png',
-            badge: 'assets/favicon.png',
+            icon: '/shared/icon-192.png',
+            badge: '/shared/favicon.png',
             tag: options.tag || 'we-met-update',
             renotify: options.renotify === true,
             requireInteraction: options.requireInteraction === true,
@@ -153,6 +159,7 @@
     base,
     Store,
     api,
+    apiBlob,
     esc: escapeHtml,
     duration,
     date,
