@@ -8,8 +8,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.8.0">
-  <link rel="stylesheet" href="style.css?v=8.8.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.0">
+  <link rel="stylesheet" href="style.css?v=8.9.0">
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -103,11 +103,11 @@
         </section>
         <div class="stats talk-stats"><article><small>Today</small><strong id="todayTime">0:00</strong></article><article><small>This week</small><strong id="weekTime">0:00</strong></article><article><small>Calls</small><strong id="totalCalls">0</strong></article><article><small>All time</small><strong id="totalTime">0:00</strong></article></div>
         <section class="availability-card compact-status-card clean-status"><div class="desk-mark"><img src="/shared/logo.svg" alt=""></div><div><span id="deskLanguage" class="language-chip">Listener calls</span><h2 id="deskTitle">You are offline</h2><p id="deskText">Go online when you are ready.</p></div></section>
-        <details class="panel activity-panel compact-details"><summary><span><b>Availability activity</b><small>Work and break sessions</small></span><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button></summary><div id="activityList" class="activity-list"></div></details>
+        <details class="panel activity-panel compact-details"><summary><span><b>Availability activity</b></span><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button></summary><div id="activityList" class="activity-list"></div></details>
       </section>
 
       <section id="tab-posts" class="tab">
-        <div class="compact-page-title"><h1>Create post</h1><small>Visible to your active Exclusive members.</small></div>
+        <div class="compact-page-title"><h1>Create post</h1></div>
         <form id="postForm" class="post-composer">
           <button id="choosePostPhoto" class="post-plus" type="button" aria-label="Choose photo"><span>＋</span><small>Select photo</small></button>
           <div id="postUploadPreview" class="post-upload-preview compact-upload"><span>＋</span><b>Choose one photo</b><small>JPG, PNG or WebP · max 4 MB</small></div>
@@ -118,7 +118,7 @@
       </section>
 
       <section id="tab-inbox" class="tab">
-        <div class="compact-page-title"><h1>Messages</h1><small>Your current and previous Exclusive members.</small></div>
+        <div class="compact-page-title"><h1>Messages</h1></div>
         <div class="listener-inbox-layout">
           <aside id="listenerInbox" class="listener-inbox-list"></aside>
           <section class="listener-direct-chat">
@@ -131,8 +131,8 @@
 
       <section id="tab-wallet" class="tab">
         <section class="wallet-hero">
-          <div><span class="eyebrow">EARNINGS</span><h2>Available balance</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus">Call and paid-membership earnings appear here.</p></div>
-          <div class="wallet-rate-card"><small>Your private rate</small><strong id="walletRate">₹0.00/min</strong><span>Only you and the admin see this rate.</span></div>
+          <div><span class="eyebrow">EARNINGS</span><h2>Available balance</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus" class="hidden"></p></div>
+          <div class="wallet-rate-card"><small>Your rate</small><strong id="walletRate">₹0.00/min</strong></div>
         </section>
         <div class="wallet-metrics"><article><small>Today</small><strong id="walletToday">₹0.00</strong></article><article><small>Week</small><strong id="walletWeek">₹0.00</strong></article><article><small>Lifetime</small><strong id="walletLifetime">₹0.00</strong></article><article><small>Paid</small><strong id="walletPaid">₹0.00</strong></article></div>
         <div class="wallet-grid">
@@ -140,7 +140,7 @@
             <span class="eyebrow">WITHDRAW</span><h2>UPI payout</h2>
             <form id="payoutDetailsForm" class="stack compact-form"><label>UPI ID<input id="listenerUpiId" autocomplete="off" placeholder="name@bank" maxlength="120" required></label><label>UPI-linked phone <small>Optional</small><input id="listenerUpiPhone" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+919876543210"></label><button class="button button-soft" type="submit">Save payout details</button></form>
             <form id="withdrawalForm" class="stack compact-form"><label>Amount (₹)<input id="withdrawalAmount" type="number" min="100" step="1" inputmode="decimal" placeholder="Minimum ₹100" required></label><button class="button button-primary" type="submit">Request withdrawal</button></form>
-            <p class="withdrawal-note">Admin reviews requests within 24 hours. UTR appears here after payment.</p>
+            
             <div id="withdrawalHistory" class="withdrawal-history"></div>
           </section>
           <section class="panel wallet-history-panel"><div class="section-head compact"><div><span class="eyebrow">LEDGER</span><h2>Wallet history</h2></div><button id="refreshWallet" class="button button-quiet" type="button">Refresh</button></div><div id="walletHistory" class="wallet-history"></div></section>
@@ -169,27 +169,27 @@
         </form>
 
         <section class="profile-menu">
-          <button data-tab="followers" type="button"><span><b>Followers</b><small>People following your profile</small></span><i>›</i></button>
-          <button data-tab="history" type="button"><span><b>Call history</b><small>Completed and missed calls</small></span><i>›</i></button>
-          <button data-tab="settings" type="button"><span><b>Settings</b><small>Password and admin updates</small></span><i>›</i></button>
-          <button id="logoutBtn" class="profile-menu-logout" type="button"><span><b>Log out</b><small>Sign out of this listener account</small></span><i>›</i></button>
+          <button data-tab="followers" type="button"><span><b>Followers</b></span><i>›</i></button>
+          <button data-tab="history" type="button"><span><b>Call history</b></span><i>›</i></button>
+          <button data-tab="settings" type="button"><span><b>Settings</b></span><i>›</i></button>
+          <button id="logoutBtn" class="profile-menu-logout" type="button"><span><b>Log out</b></span><i>›</i></button>
         </section>
         <div class="profile-post-heading"><h2>Your posts</h2><button class="button button-soft button-small" data-tab="posts" type="button">＋ Add</button></div>
         <div id="listenerPosts" class="listener-post-grid profile-post-grid"></div>
       </section>
 
-      <section id="tab-followers" class="tab"><div class="compact-page-title with-count"><div><h1>Followers</h1><small>Private to you</small></div><strong id="followerCount" class="follower-count">0 followers</strong></div><div id="followerGrid" class="follower-grid"></div></section>
+      <section id="tab-followers" class="tab"><div class="compact-page-title with-count"><div><h1>Followers</h1></div><strong id="followerCount" class="follower-count">0 followers</strong></div><div id="followerGrid" class="follower-grid"></div></section>
 
-      <section id="tab-history" class="tab"><div class="compact-page-title row"><div><h1>Calls</h1><small>Your call activity.</small></div><button id="refreshHistory" class="button button-quiet" type="button">Refresh</button></div><div id="historyList" class="list"></div></section>
+      <section id="tab-history" class="tab"><div class="compact-page-title row"><div><h1>Calls</h1></div><button id="refreshHistory" class="button button-quiet" type="button">Refresh</button></div><div id="historyList" class="list"></div></section>
 
       <section id="tab-settings" class="tab">
         <div class="compact-page-title"><h1>Settings</h1></div>
         <div class="listener-settings-list">
           <details class="listener-settings-item">
-            <summary><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/></svg></span><span><b>Account security</b><small>Change your password</small></span><svg class="settings-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <summary><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/></svg></span><span><b>Account security</b></span><svg class="settings-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
             <form id="passwordForm" class="stack listener-settings-body"><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form>
           </details>
-          <section class="listener-settings-item updates-item"><div class="settings-static-head"><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Updates</b><small>Account and payment notices</small></span></div><div id="notificationList" class="settings-notification-list"></div></section>
+          <section class="listener-settings-item updates-item"><div class="settings-static-head"><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Updates</b></span></div><div id="notificationList" class="settings-notification-list"></div></section>
         </div>
       </section>
       <section id="tab-notifications" class="tab"><div id="notificationListLegacy" class="list"></div></section>
@@ -233,6 +233,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.8.0"></script><script src="/shared/socket-loader.js?v=8.8.0"></script><script src="api.js?v=8.8.0"></script><script src="/shared/webrtc.js?v=8.8.0"></script><script src="app.js?v=8.8.0"></script>
+  <script src="config.js?v=8.9.0"></script><script src="/shared/socket-loader.js?v=8.9.0"></script><script src="api.js?v=8.9.0"></script><script src="/shared/webrtc.js?v=8.9.0"></script><script src="app.js?v=8.9.0"></script>
 </body>
 </html>

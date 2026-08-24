@@ -378,3 +378,62 @@ input:focus,input:focus-visible,textarea:focus,textarea:focus-visible,select:foc
 .call-view .person>*{position:relative;z-index:1}.call-view .chat{background:rgba(18,18,22,.76)!important;border-color:rgba(255,255,255,.09)!important}
 .call-view .chat form button svg,.call-view .call-control svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.call-view .call-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
 @media(max-width:700px){.app .topbar{height:62px}.call-view .person-avatar{width:96px;height:96px}}
+
+/* v8.9 — mobile-first usability pass */
+html{width:100%;min-height:100%;background:#111217;overflow-x:clip}
+body{width:100%;min-width:0;min-height:100dvh;background:radial-gradient(circle at 78% -5%,rgba(255,47,141,.10),transparent 31%),#111217;background-repeat:no-repeat;background-size:100% max(100%,100dvh);overflow-x:clip}
+.app{width:100%;min-height:100dvh;background:transparent;overflow-x:clip}
+.app .topbar{width:100%;min-width:0;padding-top:env(safe-area-inset-top);height:calc(64px + env(safe-area-inset-top));}
+.app-back{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;padding:0!important;border:0!important;border-radius:12px!important;background:transparent!important;color:#fff!important;box-shadow:none!important}
+.app-back:hover,.app-back:active{background:rgba(255,255,255,.06)!important;transform:none!important;box-shadow:none!important}
+.app-back svg{width:22px;height:22px}
+.listener-main{width:min(100%,var(--shell));min-height:calc(100dvh - 64px);}
+.compact-page-title{margin-bottom:14px}.compact-page-title h1{margin-bottom:0}
+.profile-menu>button small,.listener-settings-item>summary small,.settings-static-head small{display:none}
+.profile-menu>button{min-height:56px}
+.listener-settings-item>summary,.settings-static-head{min-height:62px}
+
+/* Earnings is the one intentionally prominent card. Everything below it stays flat. */
+#tab-wallet{max-width:900px;margin-inline:auto}
+.wallet-hero{grid-template-columns:minmax(0,1fr) auto!important;align-items:center;gap:16px;padding:24px!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:24px!important;background:linear-gradient(145deg,#241820,#17191e)!important;box-shadow:none!important}
+.wallet-hero:after{width:230px;height:230px;right:-120px;top:-140px;opacity:.7}
+.wallet-hero h2{margin:4px 0 2px;font-size:18px}.wallet-hero>div>strong{margin:2px 0;font-size:clamp(39px,7vw,58px)}.wallet-hero p{display:none}
+.wallet-rate-card{min-width:150px;padding:0 0 0 18px!important;border-left:1px solid var(--line)!important;background:transparent!important;text-align:right}.wallet-rate-card small{display:block;color:var(--muted);font-size:9px}.wallet-rate-card strong{font-size:18px!important}.wallet-rate-card span{display:none}
+.wallet-metrics{margin:18px 0 8px;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.wallet-metrics article{padding:15px 12px!important;border:0!important;border-right:1px solid var(--line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.wallet-metrics article:last-child{border-right:0!important}.wallet-metrics strong{font-size:20px}.wallet-metrics small{font-size:9px}
+.wallet-grid{gap:24px!important}.wallet-grid>.panel{padding:18px 0 22px!important;border:0!important;border-bottom:1px solid var(--line)!important;background:transparent!important;box-shadow:none!important}.wallet-grid>.panel:last-child{border-bottom:0!important}
+.withdrawal-panel>span.eyebrow{display:none}.withdrawal-panel h2{margin:0 0 16px!important;font-size:20px}.withdrawal-note{display:none}
+.compact-form{gap:12px}.compact-form+.compact-form{margin-top:18px;padding-top:18px}
+.compact-form input{min-height:48px;background:#1e2025}.compact-form .button{min-height:47px}
+.wallet-history-panel .section-head{align-items:center;margin-bottom:8px}.wallet-history-panel .section-head .eyebrow{display:none}.wallet-history-panel .section-head h2{margin:0;font-size:20px}.wallet-history-panel .button-quiet{background:transparent;border-color:var(--line)}
+.wallet-history,.withdrawal-history{gap:0}.wallet-entry,.withdrawal-entry{margin:0;padding:13px 2px!important;border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.wallet-entry:last-child,.withdrawal-entry:last-child{border-bottom:0!important}
+
+@media(max-width:700px){
+  html{scrollbar-gutter:auto}.shell{width:100%!important;max-width:none!important;margin:0!important;padding-inline:max(14px,env(safe-area-inset-left)) max(14px,env(safe-area-inset-right))}
+  .app .topbar{height:calc(58px + env(safe-area-inset-top));padding-inline:max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right));gap:8px}
+  .topbar .brand{min-width:0;gap:8px}.topbar .brand img{width:35px;height:35px}.topbar .brand strong{font-size:15px}.topbar .brand small{display:none!important}.header-actions{margin-left:auto;min-width:0}.status{max-width:92px;padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px}
+  .listener-main{min-height:calc(100dvh - 58px);padding-top:5px!important;padding-bottom:calc(84px + env(safe-area-inset-bottom))!important}
+  .listener-bottom-nav{left:0!important;bottom:0!important;transform:none!important;width:100%!important;max-width:none!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:0!important;padding:5px max(5px,env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-left))!important;border-width:1px 0 0!important;border-radius:0!important;background:rgba(18,19,23,.96)!important;box-shadow:none!important;backdrop-filter:blur(20px)}
+  .listener-bottom-nav button{min-height:54px!important;padding:6px 2px!important;border-radius:12px!important;gap:3px!important}.listener-bottom-nav button svg{width:21px!important;height:21px!important}.listener-bottom-nav button span{font-size:8px}.listener-bottom-nav button.active{background:rgba(255,47,141,.12)!important;box-shadow:none!important}
+  .tab{width:100%;min-width:0}.compact-page-title{padding-inline:1px;margin:7px 0 13px}.compact-page-title h1{font-size:25px!important;line-height:1.12}
+  .compact-page-title>small,.compact-page-title>div>small{display:none!important}
+  .desk-status-panel{padding-top:4px!important}.desk-status-panel h1{font-size:28px;margin:5px 0 14px}.desk-status-panel .shift-card{padding-top:14px!important}.shift-card>span,.shift-since{display:none}.shift-card>strong{font-size:23px;margin:0 0 11px}.shift-buttons{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:7px}.shift-buttons .button{width:100%;min-width:0;padding:11px 6px;font-size:10px}
+  .talk-stats{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;margin:14px 0;border-block:1px solid var(--line)}.talk-stats article{padding:13px 6px!important;border:0!important;border-right:1px solid var(--line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;text-align:center}.talk-stats article:last-child{border-right:0!important}.talk-stats small{font-size:7px}.talk-stats strong{font-size:16px!important;margin-top:4px}
+  .compact-status-card{min-height:0!important;display:flex!important;flex-direction:row!important;justify-content:flex-start!important;gap:12px;padding:15px 0!important;text-align:left!important}.compact-status-card .desk-mark{width:46px;height:46px;min-width:46px;padding:8px;border-radius:14px}.compact-status-card .language-chip{display:none}.compact-status-card h2{margin:0 0 3px!important;font-size:17px!important}.compact-status-card p{margin:0;font-size:10px}
+  .compact-details summary small{display:none}.compact-details summary{min-height:52px}.compact-details summary b{font-size:12px}
+  .post-composer{padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}.post-plus{min-height:48dvh!important;border-radius:18px}.post-composer .compact-upload{min-height:48dvh!important;border-radius:18px}.post-composer textarea{min-height:92px}
+  .listener-inbox-layout{height:calc(100dvh - 145px)!important;min-height:0!important;border-radius:0!important;border:0!important;background:transparent!important}.listener-inbox-list{padding:0!important}.listener-inbox-row{border-radius:14px}.listener-chat-head small{display:none}
+  #tab-wallet{padding-top:3px}.wallet-hero{grid-template-columns:minmax(0,1fr) auto!important;gap:9px!important;padding:19px 16px!important;border-radius:19px!important}.wallet-hero .eyebrow{font-size:8px}.wallet-hero h2{font-size:15px}.wallet-hero>div>strong{font-size:36px!important}.wallet-rate-card{min-width:105px!important;padding-left:11px!important}.wallet-rate-card small{font-size:7px}.wallet-rate-card strong{font-size:14px!important}
+  .wallet-metrics{grid-template-columns:repeat(4,minmax(0,1fr))!important;margin:13px 0 7px}.wallet-metrics article{padding:12px 5px!important;text-align:center}.wallet-metrics small{font-size:7px}.wallet-metrics strong{font-size:14px!important;margin-top:4px}
+  .wallet-grid{gap:0!important}.wallet-grid>.panel{padding:17px 0 20px!important}.withdrawal-panel h2,.wallet-history-panel .section-head h2{font-size:18px}.compact-form input{font-size:16px}.wallet-entry{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important}.wallet-entry>b{align-self:auto!important;font-size:13px!important}.wallet-entry p{margin:3px 0;font-size:9px}.wallet-entry small{font-size:8px}.withdrawal-entry{padding-block:12px!important}
+  .app-profile .profile-banner-preview{height:148px!important;border-radius:16px!important}.app-profile>.profile-photo-preview{width:88px!important;height:88px!important;margin:-44px 0 0 13px!important;border-width:5px!important}.profile-public-copy{padding:9px 14px 0!important}.profile-public-copy h2{font-size:23px!important}.profile-primary-actions{padding:13px 14px 0!important}.profile-primary-actions .button{min-height:43px!important}.profile-menu{margin:13px 0!important}.profile-menu>button{min-height:52px!important;padding:10px 4px!important}.profile-menu>button b{font-size:12px}.profile-menu>button i{font-size:21px}
+  .listener-profile-editor{padding:15px 0!important;margin:10px 0 18px!important}.listener-profile-editor .editor-head h2{font-size:20px}.listener-profile-editor .editor-head .eyebrow{display:none}.listener-profile-editor .profile-save-button{min-height:49px}
+  .listener-settings-list{gap:0;border-top:1px solid var(--line)}.listener-settings-item{border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;background:transparent!important}.listener-settings-body{background:transparent!important;padding-inline:0!important}.listener-settings-item>summary,.settings-static-head{padding-inline:2px!important}.settings-notification{padding-inline:2px!important}
+  .call-view{padding:0!important}.call-view .customer-theme-call{width:100%!important;height:100dvh!important;max-height:none!important;border:0!important;border-radius:0!important;padding:calc(12px + env(safe-area-inset-top)) 13px calc(12px + env(safe-area-inset-bottom))!important}.call-view .profile-backdrop{min-height:190px;border-radius:18px}.call-view .person-avatar{width:88px!important;height:88px!important}.call-view .person p{display:none}.call-view .chat{border-radius:17px}.call-view .call-control{width:62px!important;height:62px!important;border-radius:20px!important}
+}
+@media(max-width:380px){
+  .shell{padding-inline:10px!important}.shift-buttons{grid-template-columns:1fr 1fr}.shift-buttons #onlineBtn{grid-column:1/-1}.talk-stats small{font-size:6px}.wallet-hero{grid-template-columns:1fr!important}.wallet-rate-card{padding:10px 0 0!important;border-left:0!important;border-top:1px solid var(--line)!important;text-align:left}.wallet-metrics small{font-size:6px}.listener-bottom-nav button span{font-size:7px}
+}
+
+/* v8.9 bottom-nav containment safeguard */
+@media(max-width:700px){.listener-bottom-nav{top:auto!important;right:auto!important}}

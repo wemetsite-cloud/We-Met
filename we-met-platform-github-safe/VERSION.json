@@ -1,13 +1,14 @@
 {
-  "version": "8.8.0",
-  "name": "We Met v8.8.0 Clean Layout and Direct Wallet Checkout",
+  "version": "8.9.0",
+  "name": "We Met v8.9.0 Mobile Usability Refresh",
   "changes": [
-    "Removes solid signed-in headers and moves logout out of customer/listener headers",
-    "Flattens profile, settings and listener home sections to reduce floating card and card-inside-card styling",
-    "Admin listener editing now uses upload-only profile photo and banner controls; avatar selection is removed",
-    "Admin can save listener banner images through the backend update endpoint",
-    "Customer call screen uses the listener banner/profile as the visual background; listener call styling matches the customer call theme",
-    "Wallet Pay click prevents default navigation and opens Razorpay Standard Checkout directly on the wallet with redirect disabled",
-    "Updates cache/service-worker asset version to v8.8.0"
+    "Reworks customer, listener and admin mobile sizing so signed-in views stay inside the device width and 100dvh height",
+    "Makes customer and listener bottom navigation edge-to-edge and non-floating on phones",
+    "Simplifies back navigation to a lightweight icon button",
+    "Redesigns listener Earnings with one clear balance card, compact four-metric strip, flat payout form and flat history rows",
+    "Removes nonessential listener page descriptions and profile-menu helper copy",
+    "Compacts customer discovery, wallet, profile and messaging for phone screens while retaining touch-friendly controls",
+    "Improves admin phone containment, header, forms, tables, listener editor and full-screen modals",
+    "Keeps Razorpay direct Wallet overlay behavior from v8.8.0 and bumps all service-worker/cache versions to v8.9.0"
   ]
 }
