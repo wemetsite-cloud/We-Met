@@ -250,6 +250,7 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   const bio = text(req.body.bio, 500) || null;
   const profileImage = normalizeProfileImage(req.body.profileImage);
+  const bannerImage = normalizeProfileImage(req.body.bannerImage);
   const language = text(req.body.language, 60) || 'Malayalam';
   const hasRate = Object.hasOwn(req.body, 'ratePaise');
   const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : null;
@@ -260,7 +261,8 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   if (!username || !/^[a-z0-9._-]{3,80}$/.test(username)) {
     return res.status(400).json({ error: 'Add a public username with 3–80 letters, numbers, dots, underscores or hyphens.' });
   }
-  if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
+  if (profileImage === false) return res.status(400).json({ error: 'Upload a valid JPG, PNG, or WebP profile photo.' });
+  if (bannerImage === false) return res.status(400).json({ error: 'Upload a valid JPG, PNG, or WebP banner photo.' });
   if (hasRate && ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
   try {
@@ -269,9 +271,10 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
       SET name=$2,username=$3,phone=$4,bio=$5,listener_language=$6,
           listener_rate_paise=CASE WHEN $7::boolean THEN $8 ELSE listener_rate_paise END,
           profile_image=CASE WHEN $9::boolean THEN $10 ELSE profile_image END,
+          banner_image=CASE WHEN $11::boolean THEN $12 ELSE banner_image END,
           updated_at=now()
       WHERE id=$1 AND role='employee'
-      RETURNING id,role,name,username,email,phone,bio,profile_image,employee_code,
+      RETURNING id,role,name,username,email,phone,bio,profile_image,banner_image,employee_code,
                 listener_availability,listener_language,listener_rate_paise,status,created_at
     `, [
       req.params.id,
@@ -284,11 +287,14 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
       ratePaise,
       profileImage !== undefined,
       profileImage === undefined ? null : profileImage,
+      bannerImage !== undefined,
+      bannerImage === undefined ? null : bannerImage,
     ]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
     await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(req.params.id);
     const employee = result.rows[0];
     if (String(employee.profile_image || '').startsWith('data:image/')) employee.profile_image = `photo:${employee.id}`;
+    if (String(employee.banner_image || '').startsWith('data:image/')) employee.banner_image = `photo:${employee.id}`;
     res.json({ employee });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That phone number or public username is already in use.' });

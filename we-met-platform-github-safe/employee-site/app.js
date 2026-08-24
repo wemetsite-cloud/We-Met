@@ -144,7 +144,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.7.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.8.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -972,7 +972,7 @@
 
   function toggleMute() {
     const muted = audioCall?.toggleMute();
-    $('#muteBtn').innerHTML = `<span>${muted ? '🔇' : '🎙'}</span><small>${muted ? 'Unmute' : 'Mute'}</small>`;
+    const label = $('#muteBtn small'); if (label) label.textContent = muted ? 'Unmute' : 'Mute';
   }
 
   function sendChat(event) {

@@ -14,8 +14,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.7.0">
-  <link rel="stylesheet" href="style.css?v=8.7.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.8.0">
+  <link rel="stylesheet" href="style.css?v=8.8.0">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -31,7 +31,7 @@
     <div class="top-actions">
       <button data-install-app class="button button-soft button-small hidden" type="button">Install We Met</button><button id="notificationPermission" class="button button-quiet button-small hidden" type="button">Enable alerts</button>
       <button id="openAuth" class="button button-primary button-small" type="button">Let’s start</button>
-      <button id="logoutBtn" class="button button-quiet button-small hidden" type="button">Log out</button>
+
     </div>
   </header>
 
@@ -171,17 +171,12 @@
           <section class="panel"><span class="eyebrow">CONTACT SUPPORT</span><h2>Send a message to the admin</h2><form id="supportForm" class="stack"><label>Subject<input id="supportSubject" maxlength="120" required placeholder="What do you need help with?"></label><label>Message<textarea id="supportMessage" maxlength="3000" required placeholder="Explain the issue clearly"></textarea></label><button class="button button-primary">Send message</button></form><small>Support email: wemetsite@gmail.com</small></section>
           <section class="panel safety-panel"><span class="eyebrow">STAY SAFE</span><h2>Keep personal information private</h2><p>Never share your phone number, OTP, bank details, passwords or private images during a conversation.</p><button class="button button-soft legal-btn" data-legal="safety" type="button">Read safety policy</button></section>
         </div>
-        <div class="about-grid">
-          <section class="panel"><h3>About We Met</h3><p>A private voice-conversation platform with Malayalam as the default and optional listeners in other languages, plus text chat and connected-second billing.</p></section>
-          <section class="panel"><h3>Frequently asked</h3><p><b>Do I need an app?</b> No, a supported browser is enough.</p><p><b>Can the listener see my number?</b> No.</p><p><b>When does billing start?</b> After live audio connects.</p></section>
-          <section class="panel"><h3>Account help</h3><p>Use Support for account help, or permanently delete your customer account from the Profile tab.</p></section>
-        </div>
         <div class="section-head compact"><div><h2>Your support messages</h2></div></div><div id="supportList" class="list"></div>
       </div>
 
       <div class="tab" id="tab-profile">
         <div class="profile-layout">
-          <section class="panel customer-profile-card"><div class="customer-profile-summary"><button id="customerPhotoButton" class="customer-photo" type="button" aria-label="Change profile photo"><img id="customerPhotoPreview" src="assets/profile-placeholder.svg" alt="Your profile photo" draggable="false"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4Z"/><path d="m13.5 6.5 4 4"/></svg></span></button><input id="customerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div class="customer-profile-identity"><h2 id="profileName">—</h2><p id="profileUsernameText">Add a username</p><small id="profilePhoneText">—</small></div></div><div class="profile-summary-actions"><button id="toggleCustomerProfileEdit" class="button button-primary" type="button">Edit profile</button><button class="button button-soft" type="button" data-jump="following">Following</button></div><form id="customerProfileForm" class="stack profile-editor-collapsed hidden"><label>Name<input id="customerProfileName" minlength="2" maxlength="80" required></label><label>Username <small>Optional</small><input id="customerProfileUsername" minlength="3" maxlength="50" pattern="[a-zA-Z0-9._-]{3,50}" placeholder="your.name"></label><button class="button button-primary" type="submit">Save profile</button></form></section>
+          <section class="customer-profile-card customer-profile-flat"><div class="customer-profile-summary"><button id="customerPhotoButton" class="customer-photo" type="button" aria-label="Change profile photo"><img id="customerPhotoPreview" src="assets/profile-placeholder.svg" alt="Your profile photo" draggable="false"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4Z"/><path d="m13.5 6.5 4 4"/></svg></span></button><input id="customerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden><div class="customer-profile-identity"><h2 id="profileName">—</h2><p id="profileUsernameText">Add a username</p><small id="profilePhoneText">—</small></div></div><div class="profile-summary-actions"><button id="toggleCustomerProfileEdit" class="button button-primary" type="button">Edit profile</button><button class="button button-soft" type="button" data-jump="following">Following</button></div><form id="customerProfileForm" class="stack profile-editor-collapsed hidden"><label>Name<input id="customerProfileName" minlength="2" maxlength="80" required></label><label>Username <small>Optional</small><input id="customerProfileUsername" minlength="3" maxlength="50" pattern="[a-zA-Z0-9._-]{3,50}" placeholder="your.name"></label><button class="button button-primary" type="submit">Save profile</button></form></section>
 
           <section class="profile-menu-group" aria-labelledby="activityMenuTitle">
             <h2 id="activityMenuTitle">Your activity</h2>
@@ -207,7 +202,7 @@
           </details>
 
           <div class="profile-danger-links"><a class="delete-link" href="delete-account.html">Delete account</a></div>
-          <button id="profileLogout" class="profile-logout" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg><span>Log out</span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button id="logoutBtn" class="profile-logout" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg><span>Log out</span><svg class="menu-arrow" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
         </div>
       </div>
     </section>
@@ -252,11 +247,11 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.7.0"></script>
-  <script src="/shared/socket-loader.js?v=8.7.0"></script>
-  <script src="api.js?v=8.7.0"></script>
-  <script src="/shared/webrtc.js?v=8.7.0"></script>
+  <script src="config.js?v=8.8.0"></script>
+  <script src="/shared/socket-loader.js?v=8.8.0"></script>
+  <script src="api.js?v=8.8.0"></script>
+  <script src="/shared/webrtc.js?v=8.8.0"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app.js?v=8.7.0"></script>
+  <script src="app.js?v=8.8.0"></script>
 </body>
 </html>

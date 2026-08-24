@@ -26,7 +26,6 @@
   let adminPayments = { subscriptions: [], payments: [], topups: [], summary: {} };
   let verificationAudioUrls = [];
   let adminPostUrls = [];
-  const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let activePage = 'overview';
   let liveRefreshTimer = null;
   const queueFilters = { verifications: 'new', withdrawals: 'new', reports: 'new', support: 'new' };
@@ -75,6 +74,32 @@
     return `<span class="customer-avatar listener-avatar listener-photo ${className}"><img src="${P.esc(profileImageSrc(user.profile_image, user.name, user.id))}" alt=""></span>`;
   }
 
+  function bannerImageSrc(value, userId = '') {
+    const image = String(value || '');
+    if ((image === 'photo' || image === `photo:${userId}`) && userId) return `${P.base}/api/public/listener-banner-image/${encodeURIComponent(userId)}?v=${Date.now()}`;
+    if (/^data:image\/(?:jpeg|png|webp);base64,/.test(image)) return image;
+    return '/shared/default-listener-banner.png';
+  }
+
+  async function compressBannerPhoto(file) {
+    if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP banner.');
+    if (file.size > 7 * 1024 * 1024) throw new Error('Choose a banner smaller than 7 MB.');
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; });
+      const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 430;
+      const ctx = canvas.getContext('2d'); const sourceRatio = image.naturalWidth / image.naturalHeight; const targetRatio = canvas.width / canvas.height;
+      let sx=0, sy=0, sw=image.naturalWidth, sh=image.naturalHeight;
+      if (sourceRatio > targetRatio) { sw = image.naturalHeight * targetRatio; sx = (image.naturalWidth - sw) / 2; }
+      else { sh = image.naturalWidth / targetRatio; sy = (image.naturalHeight - sh) / 2; }
+      ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      const result = canvas.toDataURL('image/jpeg', .8);
+      if (result.length > 610000) throw new Error('Choose a simpler or smaller banner image.');
+      return result;
+    } finally { URL.revokeObjectURL(url); }
+  }
+
   async function compressProfilePhoto(file) {
     if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP photo.');
     if (file.size > 5 * 1024 * 1024) throw new Error('Choose a profile photo smaller than 5 MB.');
@@ -111,7 +136,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.7.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.8.0', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -405,22 +430,27 @@
   function editListener(id) {
     const user = users.find(item => item.id === id && item.role === 'employee');
     if (!user) return;
-    let profileImageDraft = user.profile_image || '';
-    const avatarOptions = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-admin-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="${P.esc(profileImageSrc(avatar, user.name, user.id))}" alt=""></button>`).join('');
-    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><div class="admin-profile-photo-editor"><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(profileImageDraft,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Customer-facing profile photo</strong><p>Upload a photo or choose one of the built-in We Met avatars.</p><div class="profile-photo-actions"><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload photo</button><button id="adminAutoListenerAvatar" class="ghost" type="button">Automatic avatar</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div id="adminAvatarGrid" class="avatar-picker">${avatarOptions}</div></div><label>Private original name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Public username<input id="editListenerUsername" pattern="[a-zA-Z0-9._-]{3,80}" value="${P.esc(user.username || '')}" required></label><label>Verified private phone<input id="editListenerPhone" type="tel" value="${P.esc(user.phone || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
-    const renderAvatarState = () => {
-      $('#editListenerPhotoPreview').src = profileImageSrc(profileImageDraft, $('#editListenerName').value || user.name, user.id);
-      $$('#adminAvatarGrid [data-admin-avatar]').forEach(button => button.classList.toggle('selected', button.dataset.adminAvatar === profileImageDraft));
+    const currentProfileImage = user.profile_image || '';
+    const currentBannerImage = user.banner_image || '';
+    let profileImageDraft;
+    let bannerImageDraft;
+    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack admin-listener-edit-clean"><div class="admin-listener-media-editor"><div class="admin-banner-editor" id="editListenerBannerPreview" style="--admin-banner:url('${P.esc(bannerImageSrc(currentBannerImage,user.id))}')"><button id="adminUploadListenerBanner" class="ghost" type="button">Upload banner</button><input id="adminListenerBannerFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(currentProfileImage,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Profile photo</strong><p>Upload the customer-facing listener photo.</p><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload profile photo</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div class="admin-listener-fields"><label>Private original name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Public username<input id="editListenerUsername" pattern="[a-zA-Z0-9._-]{3,80}" value="${P.esc(user.username || '')}" required></label><label>Verified private phone<input id="editListenerPhone" type="tel" value="${P.esc(user.phone || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label class="wide">Public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label></div><button class="primary big">Save listener</button></form>`);
+    const renderMediaState = () => {
+      $('#editListenerPhotoPreview').src = profileImageSrc(profileImageDraft === undefined ? currentProfileImage : profileImageDraft, $('#editListenerName').value || user.name, user.id);
+      $('#editListenerBannerPreview').style.setProperty('--admin-banner', `url("${bannerImageSrc(bannerImageDraft === undefined ? currentBannerImage : bannerImageDraft,user.id)}")`);
     };
     $('#adminUploadListenerPhoto').onclick = () => $('#adminListenerPhotoFile').click();
-    $('#adminListenerPhotoFile').onchange = async event => { try { profileImageDraft = await compressProfilePhoto(event.target.files?.[0]); renderAvatarState(); } catch (error) { P.toast(error.message,'error'); } finally { event.target.value=''; } };
-    $('#adminAutoListenerAvatar').onclick = () => { profileImageDraft=''; renderAvatarState(); };
-    $('#adminAvatarGrid').onclick = event => { const button = event.target.closest('[data-admin-avatar]'); if (!button) return; profileImageDraft=button.dataset.adminAvatar; renderAvatarState(); };
-    $('#editListenerName').oninput = () => { if (!profileImageDraft) renderAvatarState(); };
+    $('#adminListenerPhotoFile').onchange = async event => { try { profileImageDraft = await compressProfilePhoto(event.target.files?.[0]); renderMediaState(); } catch (error) { P.toast(error.message,'error'); } finally { event.target.value=''; } };
+    $('#adminUploadListenerBanner').onclick = () => $('#adminListenerBannerFile').click();
+    $('#adminListenerBannerFile').onchange = async event => { try { bannerImageDraft = await compressBannerPhoto(event.target.files?.[0]); renderMediaState(); } catch (error) { P.toast(error.message,'error'); } finally { event.target.value=''; } };
+    $('#editListenerName').oninput = renderMediaState;
     $('#editListenerForm').onsubmit = async event => {
       event.preventDefault();
       try {
-        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value, profileImage: profileImageDraft }) });
+        const payload = { name: $('#editListenerName').value, username: $('#editListenerUsername').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value };
+        if (profileImageDraft !== undefined) payload.profileImage = profileImageDraft;
+        if (bannerImageDraft !== undefined) payload.bannerImage = bannerImageDraft;
+        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
         closeAdminModal(); P.toast('Listener updated.', 'success'); loadUsers(); loadListenerWallets(); loadLive(true);
       } catch (error) { P.toast(error.message, 'error'); }
     };

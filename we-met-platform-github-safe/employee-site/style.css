@@ -360,3 +360,21 @@ input:focus,input:focus-visible,textarea:focus,textarea:focus-visible,select:foc
   .listener-post-likes-sheet{inset:auto 10px 10px;width:auto;max-height:min(68dvh,600px);border-radius:22px}
   .listener-feed-post>footer p{font-size:12px}
 }
+
+
+/* v8.8 clean listener layout */
+.app .topbar{background:transparent!important;border-bottom:0!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important}
+.clean-section{padding:8px 0 4px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.clean-section .shift-card{background:transparent!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;box-shadow:none!important;padding:18px 0 0!important}
+.clean-status,.compact-details.panel{background:transparent!important;border-width:0 0 1px!important;border-radius:0!important;box-shadow:none!important;padding-inline:0!important}
+.app-profile{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important}
+.flat-editor{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:4px 0 18px!important}
+.profile-menu{background:transparent!important;border:0!important;box-shadow:none!important}.profile-menu>button{background:transparent!important;border-radius:0!important;border-width:0 0 1px!important}.profile-menu-logout b{color:#ff7cae}
+.wallet-hero{background:transparent!important;border-width:0 0 1px!important;border-radius:0!important;box-shadow:none!important;padding-inline:0!important}.wallet-rate-card{background:transparent!important;border:0!important;box-shadow:none!important}.wallet-grid>.panel{background:transparent!important;border-width:0 0 1px!important;border-radius:0!important;box-shadow:none!important;padding-inline:0!important}
+.call-view{background:rgba(5,5,8,.86)!important;backdrop-filter:blur(14px)}
+.call-view .customer-theme-call{background:linear-gradient(155deg,#21131a,#411528)!important;border:1px solid rgba(255,255,255,.08);box-shadow:0 34px 90px rgba(0,0,0,.46)}
+.call-view .profile-backdrop{position:relative;overflow:hidden;border-radius:24px;background:radial-gradient(circle at 50% 24%,rgba(230,45,125,.24),transparent 34%),linear-gradient(160deg,#351522,#19191e);border:1px solid rgba(255,255,255,.08)}
+.call-view .person-avatar{position:relative;z-index:1;width:118px;height:118px;border-radius:50%;display:grid;place-items:center;border:6px solid rgba(255,255,255,.12);background:linear-gradient(145deg,#e62d7d,#6a193e);font-size:30px;box-shadow:0 20px 45px rgba(0,0,0,.35)}
+.call-view .person>*{position:relative;z-index:1}.call-view .chat{background:rgba(18,18,22,.76)!important;border-color:rgba(255,255,255,.09)!important}
+.call-view .chat form button svg,.call-view .call-control svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.call-view .call-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+@media(max-width:700px){.app .topbar{height:62px}.call-view .person-avatar{width:96px;height:96px}}

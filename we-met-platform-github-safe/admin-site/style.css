@@ -226,3 +226,12 @@ select:focus-visible {
   box-shadow: none !important;
   filter: none !important;
 }
+
+
+/* v8.8 flatter admin layout */
+.content>header{background:transparent!important;border-bottom:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}.content>header .admin-chip{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:6px 9px}.page>.toolbar{padding:4px 0 12px;border-bottom:1px solid var(--line)}
+.page>.panel:not(.wallet-policy-panel):not(.verification-prompt-form),.grid-form>form.panel,.grid-form>section.panel{box-shadow:none}
+.admin-listener-edit-clean{gap:18px}.admin-banner-editor{position:relative;height:190px;border-radius:18px;background:linear-gradient(180deg,rgba(20,20,24,.05),rgba(20,20,24,.52)),var(--admin-banner) center/cover no-repeat;border:1px solid var(--line);overflow:hidden}.admin-banner-editor>button{position:absolute;right:12px;top:12px;background:rgba(22,23,27,.86);color:#fff;border-color:rgba(255,255,255,.15)}
+.admin-listener-media-editor .admin-profile-photo-head{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:end;gap:14px;margin:-48px 18px 0}.admin-listener-media-editor .admin-profile-photo-preview{width:100px;height:100px;border-radius:50%;border:6px solid #17181d;overflow:hidden;background:#26272d;box-shadow:0 16px 36px rgba(0,0,0,.28)}.admin-listener-media-editor .admin-profile-photo-preview img{width:100%;height:100%;object-fit:cover}.admin-profile-photo-head>div{padding:50px 0 2px}.admin-profile-photo-head p{margin:4px 0 9px;color:var(--muted);font-size:11px}.admin-listener-fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}.admin-listener-fields .wide{grid-column:1/-1}.admin-listener-edit-clean>button.primary{width:100%}
+.avatar-picker,#adminAvatarGrid,#adminAutoListenerAvatar{display:none!important}
+@media(max-width:760px){.admin-listener-fields{grid-template-columns:1fr}.admin-listener-fields .wide{grid-column:auto}.admin-banner-editor{height:155px}.admin-listener-media-editor .admin-profile-photo-preview{width:86px;height:86px}}

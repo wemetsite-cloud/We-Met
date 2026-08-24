@@ -337,7 +337,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.7.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.8.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -371,7 +371,6 @@
     $$('[data-close]').forEach((button) => { button.onclick = () => closeOverlay(button.dataset.close); });
     $('#appBackButton').onclick = () => history.back();
     $('#logoutBtn').onclick = () => logout();
-    $('#profileLogout').onclick = () => logout();
     $('#tabs').onclick = (event) => { const button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); };
     $$('[data-jump]').forEach((button) => { button.onclick = () => selectTab(button.dataset.jump); });
     $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
@@ -435,7 +434,7 @@
     if (d.listenerMessage) return isActiveMember(d.listenerMessage)
       ? openConversation(d.listenerMessage)
       : subscribeToListener(d.listenerMessage, target);
-    if (d.buyPlan) return openPayment(d.buyPlan, target);
+    if (d.buyPlan) { event.preventDefault(); event.stopPropagation(); return openPayment(d.buyPlan, target); }
     if (d.conversation) return openConversation(d.conversation);
     if (d.cancelSubscription) return cancelSubscription(d.cancelSubscription);
   }
@@ -995,6 +994,8 @@
     const employee = directory.find((item) => item.id === currentCall.employee?.id) || currentCall.employee;
     if (employee?.id) currentCall.employee = { ...employee, ...currentCall.employee, following: Boolean(employee.following) };
     $('#callAvatarImage').src = employee?.id ? listenerImage(employee) : '/shared/logo.svg';
+    const callShell = $('#callModal .call-shell');
+    if (callShell) callShell.style.setProperty('--call-profile-bg', `url("${employee?.id ? listenerImage(employee, 'banner') : '/shared/default-listener-banner.png'}")`);
     show('#callProfileButton', Boolean(employee?.id)); show('#callFollowButton', Boolean(employee?.id)); show('#callSubscribeButton', Boolean(employee?.id) && !isActiveMember(employee.id) && !employee.subscribed);
     if (employee?.id) $('#callFollowButton').textContent = employee.following ? 'Following' : 'Follow';
   }
