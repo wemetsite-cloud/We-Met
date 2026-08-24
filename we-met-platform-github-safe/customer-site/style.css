@@ -696,3 +696,32 @@ body.razorpay-open iframe.razorpay-checkout-frame,body.razorpay-open iframe[src*
   .wallet-plan-card{min-height:195px;padding:14px 11px}.wallet-plan-minutes b{font-size:28px}.wallet-plan-price{font-size:16px}
   .listener-profile-title{grid-template-columns:1fr}.listener-profile-title .profile-follow-button{width:100%}
 }
+
+/* v8.4 — targeted profile, phone-field and post interaction refinements */
+.customer-profile-card{padding:19px 20px}
+.customer-profile-summary{display:grid;grid-template-columns:86px minmax(0,1fr);align-items:center;gap:16px}
+.customer-profile-summary>.customer-profile-identity{min-width:0;padding:2px 0}
+.customer-profile-identity h2{margin:0 0 7px;font-size:24px;line-height:1.12;letter-spacing:-.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.customer-profile-identity p{margin:0 0 6px;color:#c6c3ca;font-size:14px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.customer-profile-identity small{display:block;margin:0;color:#85838b;font-size:13px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.phone-field.international{display:grid;grid-template-columns:minmax(98px,112px) minmax(0,1fr);align-items:stretch;gap:9px;margin-top:8px;border:0;border-radius:0;background:transparent;overflow:visible}
+.phone-field.international select,.phone-field.international input{width:100%;min-width:0;min-height:49px;margin:0!important;padding:0 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);color:#fff;outline:0}
+.phone-field.international select{font-size:11px;cursor:pointer}
+.phone-field.international input{padding-inline:14px}
+.phone-field.international select:focus,.phone-field.international input:focus{border-color:#ff4f9e;box-shadow:0 0 0 4px rgba(255,47,141,.1)}
+
+.exclusive-post-like{position:absolute;z-index:3;right:10px;top:10px;width:38px;height:38px;display:grid;place-items:center;padding:0;border:1px solid rgba(255,255,255,.18);border-radius:50%;background:rgba(15,16,20,.72);color:#fff;cursor:pointer;backdrop-filter:blur(10px)}
+.exclusive-post-like svg{width:19px;height:19px;fill:transparent;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;transition:.16s}
+.exclusive-post-like.liked{border-color:rgba(255,88,160,.42);background:rgba(220,27,112,.9);color:#fff}
+.exclusive-post-like.liked svg{fill:currentColor}
+.exclusive-post-like:disabled{opacity:.6}
+.listener-call-fab:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+
+@media(max-width:520px){
+  .customer-profile-card{padding:17px}
+  .customer-profile-summary{grid-template-columns:78px minmax(0,1fr);gap:13px}
+  .customer-profile-identity h2{font-size:21px}
+  .phone-field.international{grid-template-columns:100px minmax(0,1fr);gap:8px}
+  .phone-field.international select,.phone-field.international input{padding-inline:10px}
+}
