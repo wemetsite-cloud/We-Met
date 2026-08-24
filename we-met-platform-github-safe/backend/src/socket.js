@@ -166,29 +166,8 @@ function createSocketServer(io) {
 
     if (Number(customer.balance_seconds) < config.minimumStartSeconds) {
       emitToUser(customerId, 'call:error', {
-        message: `You need at least ${Math.ceil(config.minimumStartSeconds / 60)} minutes to start a call.`,
+        message: 'Your wallet has no talk-time. Add minutes to start a call.',
         needsTopup: true,
-      });
-      return;
-    }
-
-    const subscribed = await db.query(`
-      SELECT employee_id FROM listener_subscriptions
-      WHERE customer_id=$1 AND status='active' AND current_period_end>now()
-    `, [customerId]);
-    const allowedEmployeeIds = new Set(subscribed.rows.map((row) => row.employee_id));
-    if (preferredEmployeeId && !allowedEmployeeIds.has(preferredEmployeeId)) {
-      emitToUser(customerId, 'call:error', {
-        message: 'Subscribe to this listener before calling. Calls also require talk-time in your wallet.',
-        subscriptionRequired: true,
-        employeeId: preferredEmployeeId,
-      });
-      return;
-    }
-    if (!preferredEmployeeId && !allowedEmployeeIds.size) {
-      emitToUser(customerId, 'call:error', {
-        message: 'Subscribe to a listener before calling. Calls are charged separately from your talk-time wallet.',
-        subscriptionRequired: true,
       });
       return;
     }
@@ -201,7 +180,7 @@ function createSocketServer(io) {
       if (preferred?.language) primaryLanguage = preferred.language;
     }
 
-    const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages, allowedEmployeeIds);
+    const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
     if (!employeeId) {
       const otherLanguagesAvailable = [...employees.values()].some((item) => item.state === 'available' && !sameLanguage(item.language, primaryLanguage));
       emitToUser(customerId, 'call:unavailable', {
@@ -301,6 +280,8 @@ function createSocketServer(io) {
         name: employee.name,
         bio: employee.bio || '',
         language: employee.language || primaryLanguage,
+        avatar: employee.avatar || '',
+        banner: employee.banner || '',
       },
     });
 

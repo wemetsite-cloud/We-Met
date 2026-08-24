@@ -24,7 +24,8 @@ async function upsertInitialListener() {
 
   const passwordHash = await hashPassword(listener.password);
   const phone = normalizePhone(listener.phone);
-  await pool.query(`
+  try {
+    await pool.query(`
     INSERT INTO users(role,name,username,phone,employee_code,password_hash,bio,listener_language,listener_rate_paise,listener_verification_status,listener_verified_at)
     VALUES('employee',$1,$2,$3,$4,$5,$6,'Malayalam',100,'approved',now())
     ON CONFLICT(username) DO UPDATE SET
@@ -36,7 +37,7 @@ async function upsertInitialListener() {
       listener_verified_at=COALESCE(users.listener_verified_at,now()),
       password_hash=CASE WHEN $7 THEN EXCLUDED.password_hash ELSE users.password_hash END,
       updated_at=now()
-  `, [
+    `, [
     listener.name,
     listener.username.toLowerCase(),
     phone,
@@ -44,7 +45,12 @@ async function upsertInitialListener() {
     passwordHash,
     'A calm listener who gives every conversation time and attention.',
     config.resetSeededPasswords,
-  ]);
+    ]);
+  } catch (error) {
+    if (error.code !== '23505') throw error;
+    console.warn('Initial listener was not changed because its phone, username, or listener ID already belongs to another account.');
+    return false;
+  }
   return true;
 }
 

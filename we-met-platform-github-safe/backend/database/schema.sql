@@ -178,6 +178,16 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS login_support_tickets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone text NOT NULL,
+  issue text NOT NULL CHECK (char_length(issue) BETWEEN 5 AND 3000),
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','replied','closed')),
+  admin_reply text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -560,17 +570,9 @@ CREATE INDEX IF NOT EXISTS idx_listener_wallet_employee ON listener_wallet_trans
 CREATE INDEX IF NOT EXISTS idx_listener_wallet_type ON listener_wallet_transactions(type,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_withdrawal_employee ON listener_withdrawal_requests(employee_id,requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_listener_withdrawal_status ON listener_withdrawal_requests(status,requested_at DESC);
-
--- Listener-initiated withdrawals were retired in v6.9.0. Keep historical rows for
--- audit continuity, but close any request left pending by an older deployment.
-UPDATE listener_withdrawal_requests
-SET status='declined',
-    admin_note=COALESCE(admin_note,'Listener withdrawal requests are no longer used. Payments are recorded by an administrator.'),
-    reviewed_at=COALESCE(reviewed_at,now()),
-    updated_at=now()
-WHERE status='pending';
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_support_status ON login_support_tickets(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_log(target_type,target_id,created_at DESC);

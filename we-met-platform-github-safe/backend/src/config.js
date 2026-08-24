@@ -42,8 +42,13 @@ const razorpayKeySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
 const razorpaySubscriptionPlanId = String(process.env.RAZORPAY_SUBSCRIPTION_PLAN_ID || 'plan_TTIsGpwDtJmgi5').trim();
 const razorpayWebhookSecret = String(process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
 const smsEnabled = bool(process.env.SMS_ENABLED, false);
+const smsProvider = String(process.env.SMS_PROVIDER || 'fast2sms').trim().toLowerCase();
 const fast2smsApiKey = String(process.env.FAST2SMS_API_KEY || '').trim();
 const fast2smsOtpTemplateId = String(process.env.FAST2SMS_OTP_TEMPLATE_ID || '').trim();
+const twilioAccountSid = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
+const twilioAuthToken = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
+const twilioFromNumber = String(process.env.TWILIO_FROM_NUMBER || '').trim();
+const twilioMessagingServiceSid = String(process.env.TWILIO_MESSAGING_SERVICE_SID || '').trim();
 const publicUrl = (
   process.env.PUBLIC_URL
   || process.env.RENDER_EXTERNAL_URL
@@ -53,6 +58,9 @@ const publicUrl = (
 const explicitOrigins = String(process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((value) => value.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+const platformOrigins = [publicUrl, process.env.RENDER_EXTERNAL_URL]
+  .map((value) => String(value || '').trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 const config = {
@@ -75,10 +83,14 @@ const config = {
     listenerSubscriptionCreditPaise: number(process.env.LISTENER_SUBSCRIPTION_CREDIT_PAISE, 5000),
   },
   sms: {
-    provider: 'fast2sms',
+    provider: smsProvider,
     enabled: smsEnabled,
     apiKey: fast2smsApiKey,
     otpTemplateId: fast2smsOtpTemplateId,
+    twilioAccountSid,
+    twilioAuthToken,
+    twilioFromNumber,
+    twilioMessagingServiceSid,
     otpExpiryMinutes: number(process.env.SMS_OTP_EXPIRY_MINUTES, 10),
     testOtp: nodeEnv === 'production' ? '' : String(process.env.SMS_TEST_OTP || '123456').trim(),
   },
@@ -98,10 +110,10 @@ const config = {
   jwtSecret: process.env.JWT_SECRET || '',
   databaseUrl: process.env.DATABASE_URL || '',
   databaseSsl: bool(process.env.DATABASE_SSL, true),
-  allowedOrigins: explicitOrigins.length ? explicitOrigins : [publicUrl],
+  allowedOrigins: [...new Set(explicitOrigins.length ? [...explicitOrigins, ...platformOrigins] : platformOrigins)],
 
   ringSeconds: number(process.env.RING_SECONDS, 30),
-  minimumStartSeconds: number(process.env.MINIMUM_START_SECONDS, 120),
+  minimumStartSeconds: number(process.env.MINIMUM_START_SECONDS, 1),
   lowBalanceSeconds: number(process.env.LOW_BALANCE_SECONDS, 60),
   mediaReconnectSeconds: number(process.env.MEDIA_RECONNECT_SECONDS, 45),
   listenerDisconnectGraceSeconds: number(process.env.LISTENER_DISCONNECT_GRACE_SECONDS, 45),
@@ -146,8 +158,8 @@ function validateConfig() {
   if (config.initialListener.password && config.initialListener.password.length < 10) {
     problems.push('INITIAL_LISTENER_PASSWORD must contain at least 10 characters when an initial listener is configured.');
   }
-  if (config.initialListener.password && !/^\+?91[6-9]\d{9}$/.test(String(config.initialListener.phone).replace(/[\s()-]/g, ''))) {
-    problems.push('INITIAL_LISTENER_PHONE must be a valid Indian mobile number when an initial listener password is configured.');
+  if (config.initialListener.password && !/^\+[1-9]\d{7,14}$/.test(String(config.initialListener.phone).replace(/[\s()-]/g, ''))) {
+    problems.push('INITIAL_LISTENER_PHONE must be a valid E.164 number, including country code, when an initial listener password is configured.');
   }
   if (config.initialListener.password && !/^[a-z0-9._-]{3,50}$/i.test(config.initialListener.username)) {
     problems.push('INITIAL_LISTENER_USERNAME must contain 3–50 letters, numbers, dots, underscores or hyphens.');
@@ -175,8 +187,16 @@ function validateConfig() {
   if (!Number.isInteger(config.razorpay.listenerSubscriptionCreditPaise) || config.razorpay.listenerSubscriptionCreditPaise < 0) {
     problems.push('LISTENER_SUBSCRIPTION_CREDIT_PAISE must be a non-negative whole number.');
   }
-  if (config.sms.enabled && (!config.sms.apiKey || !config.sms.otpTemplateId)) {
-    problems.push('FAST2SMS_API_KEY and FAST2SMS_OTP_TEMPLATE_ID are required when SMS_ENABLED=true.');
+  if (!['fast2sms', 'twilio'].includes(config.sms.provider)) {
+    problems.push('SMS_PROVIDER must be fast2sms or twilio.');
+  }
+  if (config.sms.enabled && config.sms.provider === 'fast2sms' && (!config.sms.apiKey || !config.sms.otpTemplateId)) {
+    problems.push('FAST2SMS_API_KEY and FAST2SMS_OTP_TEMPLATE_ID are required when SMS_PROVIDER=fast2sms and SMS_ENABLED=true.');
+  }
+  if (config.sms.enabled && config.sms.provider === 'twilio'
+      && (!config.sms.twilioAccountSid || !config.sms.twilioAuthToken
+        || (!config.sms.twilioFromNumber && !config.sms.twilioMessagingServiceSid))) {
+    problems.push('Twilio account credentials and either TWILIO_FROM_NUMBER or TWILIO_MESSAGING_SERVICE_SID are required when SMS_PROVIDER=twilio.');
   }
   if (!Number.isInteger(config.sms.otpExpiryMinutes) || config.sms.otpExpiryMinutes < 1 || config.sms.otpExpiryMinutes > 30) {
     problems.push('SMS_OTP_EXPIRY_MINUTES must be between 1 and 30.');

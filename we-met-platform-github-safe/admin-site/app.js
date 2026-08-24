@@ -20,6 +20,7 @@
   let reports = [];
   let tickets = [];
   let resets = [];
+  let withdrawals = [];
   let listenerWallets = [];
   let auditEntries = [];
   let verificationSubmissions = [];
@@ -29,6 +30,7 @@
   const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let activePage = 'overview';
   let liveRefreshTimer = null;
+  const queueFilters = { verifications: 'new', withdrawals: 'new', reports: 'new', support: 'new', resets: 'new' };
 
   const pageMeta = {
     overview: ['Overview', 'Live service health and operational summary'],
@@ -38,6 +40,7 @@
     payments: ['Payments', 'Top-ups, listener memberships and subscription credits'],
     content: ['Listener posts', 'Review and moderate exclusive listener photos'],
     wallets: ['Listener wallets', 'Adjust earnings balances and record manual payments'],
+    withdrawals: ['Withdrawals', 'Review UPI requests and record successful bank UTR references'],
     plans: ['Plans', 'Talk-time pricing available after customer sign-in'],
     coupons: ['Coupons', 'Create and control wallet redeem codes'],
     calls: ['Calls', 'Every call, participant and connected duration'],
@@ -107,7 +110,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.1.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.2.0', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -171,6 +174,7 @@
     $('#reloadCustomers').onclick = () => loadUsers();
     $('#reloadEmployees').onclick = () => loadUsers();
     $('#reloadWallets').onclick = loadListenerWallets;
+    $('#reloadWithdrawals').onclick = loadWithdrawals;
     $('#reloadCoupons').onclick = loadCoupons;
     $('#reloadCalls').onclick = loadCalls;
     $('#reloadReports').onclick = loadReports;
@@ -201,6 +205,9 @@
     const target = event.target.closest('button, [data-user-profile]');
     if (!target) return;
     const d = target.dataset;
+    if (d.queueFilter) return setQueueFilter(target.closest('[data-queue-group]')?.dataset.queueGroup, d.queueFilter);
+    if (d.withdrawalPaid) return reviewWithdrawal(d.withdrawalPaid, 'paid');
+    if (d.withdrawalDecline) return reviewWithdrawal(d.withdrawalDecline, 'declined');
     if (d.editListener) return editListener(d.editListener);
     if (d.walletRate) return listenerRateModal(d.walletRate);
     if (d.walletAdjust) return adjustListenerWallet(d.walletAdjust);
@@ -217,6 +224,7 @@
     if (d.reportClose) return updateReport(d.reportClose, 'closed');
     if (d.target) return suspendModal(d.target);
     if (d.reply) return replySupport(d.reply);
+    if (d.loginSupportReply) return replySupport(d.loginSupportReply, 'login');
     if (d.resetApprove) return reviewReset(d.resetApprove, 'approved');
     if (d.resetDecline) return reviewReset(d.resetDecline, 'declined');
     if (d.verificationApprove) return reviewVerification(d.verificationApprove, 'approve');
@@ -305,6 +313,7 @@
       payments: loadPayments,
       content: loadAdminPosts,
       wallets: loadListenerWallets,
+      withdrawals: loadWithdrawals,
       plans: loadPlans,
       coupons: loadCoupons,
       calls: loadCalls,
@@ -322,7 +331,7 @@
       const count = role => data.users.find(item => item.role === role)?.count || 0;
       $('#mCustomers').textContent = count('customer');
       $('#mTalk').textContent = P.duration(data.totalTalkSeconds);
-      $('#mAttention').textContent = Number(data.openReports || 0) + Number(data.openTickets || 0);
+      $('#mAttention').textContent = Number(data.openReports || 0) + Number(data.openTickets || 0) + Number(data.pendingWithdrawals || 0) + Number(data.openLoginSupport || 0);
       $('#callSummary').innerHTML = (data.calls || []).map(item => `<div><small>${P.esc(item.status)}</small><strong>${item.count}</strong><span>${P.duration(item.seconds)}</span></div>`).join('') || '<p class="empty-copy">No calls yet.</p>';
     } catch (error) { P.toast(error.message, 'error'); }
   }
@@ -638,11 +647,31 @@
     $('#callsTable').innerHTML = list.map(call => `<tr><td>${profileLink(call.customer_id, call.customer_name, call.customer_email || '')}</td><td>${profileLink(call.employee_id, call.employee_name, call.employee_email || '')}</td><td><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span></td><td>${P.duration(call.billed_seconds)}</td><td>${P.moneyExact(call.listener_rate_paise)}</td><td>${P.moneyExact(call.listener_earnings_paise)}</td><td>${P.date(call.started_at || call.created_at)}</td><td>${P.esc(call.end_reason || '—')}</td></tr>`).join('') || '<tr><td colspan="8">No calls match this search.</td></tr>';
   }
 
+  function setQueueFilter(group, filter) {
+    if (!queueFilters[group] || !['new', 'history'].includes(filter)) return;
+    queueFilters[group] = filter;
+    $$(`[data-queue-group="${group}"] [data-queue-filter]`).forEach(button => button.classList.toggle('active', button.dataset.queueFilter === filter));
+    if (group === 'reports') renderReports();
+    if (group === 'support') renderSupport();
+    if (group === 'resets') renderResets();
+    if (group === 'withdrawals') renderWithdrawals();
+    if (group === 'verifications') loadVerifications();
+  }
+
+  function visibleQueue(list, group, isNew) {
+    return list.filter(item => queueFilters[group] === 'new' ? isNew(item) : !isNew(item));
+  }
+
   async function loadReports() {
     try {
       reports = (await P.api('/api/admin/reports')).reports || [];
-      $('#reportsList').innerHTML = reports.map(report => `<article class="ticket"><div><div><span class="pill ${P.esc(report.status)}">${P.esc(report.status)}</span> ${report.priority === 'high' ? '<span class="pill open">HIGH</span>' : ''}</div><strong>${profileLink(report.reporter_id, report.reporter_name)} <span class="connection-arrow">→</span> ${profileLink(report.target_id, report.target_name || 'Unknown')}</strong><p><b>${P.esc(report.reason)}</b></p><p>${P.esc(report.details || '')}</p><small>${P.date(report.created_at)}</small>${report.admin_note ? `<p>Admin note: ${P.esc(report.admin_note)}</p>` : ''}</div><div class="actions"><button class="warning" data-report-review="${report.id}">Review</button><button class="ghost" data-report-close="${report.id}">Close</button>${report.target_id ? `<button class="danger" data-target="${report.target_id}">Suspend target</button>` : ''}</div></article>`).join('') || '<p>No reports.</p>';
+      renderReports();
     } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function renderReports() {
+    const list = visibleQueue(reports, 'reports', item => item.status !== 'closed');
+    $('#reportsList').innerHTML = list.map(report => `<article class="ticket"><div><div><span class="pill ${P.esc(report.status)}">${P.esc(report.status)}</span> ${report.priority === 'high' ? '<span class="pill open">HIGH</span>' : ''}</div><strong>${profileLink(report.reporter_id, report.reporter_name)} <span class="connection-arrow">→</span> ${profileLink(report.target_id, report.target_name || 'Unknown')}</strong><p><b>${P.esc(report.reason)}</b></p><p>${P.esc(report.details || '')}</p><small>${P.date(report.created_at)}</small>${report.admin_note ? `<p>Admin note: ${P.esc(report.admin_note)}</p>` : ''}</div>${report.status !== 'closed' ? `<div class="actions"><button class="warning" data-report-review="${report.id}">Review</button><button class="ghost" data-report-close="${report.id}">Close</button>${report.target_id ? `<button class="danger" data-target="${report.target_id}">Suspend target</button>` : ''}</div>` : ''}</article>`).join('') || `<p class="empty-copy">No ${queueFilters.reports === 'new' ? 'new' : 'historical'} reports.</p>`;
   }
 
   async function loadVerifications() {
@@ -654,12 +683,13 @@
       $('#verificationPendingCount').textContent = verificationSubmissions.filter(item => item.status === 'pending').length;
       $('#verificationApprovedCount').textContent = verificationSubmissions.filter(item => item.status === 'approved').length;
       $('#verificationRejectedCount').textContent = verificationSubmissions.filter(item => item.status === 'rejected').length;
-      const cards = await Promise.all(verificationSubmissions.map(async item => {
+      const visible = visibleQueue(verificationSubmissions, 'verifications', item => item.status === 'pending');
+      const cards = await Promise.all(visible.map(async item => {
         let audioUrl = '';
         try { const blob = await P.apiBlob(item.audioUrl); audioUrl = URL.createObjectURL(blob); verificationAudioUrls.push(audioUrl); } catch {}
         return `<article class="verification-admin-card ${P.esc(item.status)}"><header><img src="${P.esc(profileImageSrc(item.profileImage,item.publicName,item.employeeId))}" alt=""><div><span>${P.esc(item.status.toUpperCase())}</span><h3>${P.esc(item.publicName)}</h3><p>Private: ${P.esc(item.privateName)} · ${P.esc(item.phone || 'No phone')}</p></div></header><blockquote lang="ml">${P.esc(item.promptText)}</blockquote>${audioUrl ? `<audio controls preload="metadata" src="${P.esc(audioUrl)}"></audio>` : '<p class="audio-error">Recording could not be loaded.</p>'}<div class="verification-admin-meta"><small>${(Number(item.audioSize || 0) / 1024).toFixed(0)} KB</small><small>${P.date(item.createdAt)}</small></div>${item.adminNote ? `<p class="admin-note"><b>Review note:</b> ${P.esc(item.adminNote)}</p>` : ''}${item.status === 'pending' ? `<div class="verification-admin-actions"><button class="primary" data-verification-approve="${P.esc(item.id)}" type="button">Approve listener</button><button class="danger" data-verification-reject="${P.esc(item.id)}" type="button">Request new recording</button></div>` : ''}</article>`;
       }));
-      $('#verificationCards').innerHTML = cards.join('') || '<p class="empty-copy">No voice recordings yet.</p>';
+      $('#verificationCards').innerHTML = cards.join('') || `<p class="empty-copy">No ${queueFilters.verifications === 'new' ? 'new recordings' : 'verification history'}.</p>`;
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
@@ -726,18 +756,36 @@
 
   async function loadSupport() {
     try {
-      tickets = (await P.api('/api/admin/support')).tickets || [];
-      $('#supportList').innerHTML = tickets.map(ticket => `<article class="ticket"><div><span class="pill ${P.esc(ticket.status)}">${P.esc(ticket.status)}</span><strong>${P.esc(ticket.subject)} — ${profileLink(ticket.customer_id, ticket.customer_name, ticket.customer_email)}</strong><p>${P.esc(ticket.message)}</p>${ticket.admin_reply ? `<p><b>Reply:</b> ${P.esc(ticket.admin_reply)}</p>` : ''}<small>${P.date(ticket.created_at)}</small></div><button class="primary" data-reply="${ticket.id}">Reply</button></article>`).join('') || '<p>No support messages.</p>';
+      const [accountData, loginData] = await Promise.all([P.api('/api/admin/support'), P.api('/api/admin/login-support')]);
+      tickets = [
+        ...(accountData.tickets || []).map(item => ({ ...item, kind: 'account' })),
+        ...(loginData.tickets || []).map(item => ({ ...item, kind: 'login', subject: 'Login support', message: item.issue })),
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      renderSupport();
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
-  function replySupport(id) {
-    const ticket = tickets.find(item => item.id === id);
+  function renderSupport() {
+    const list = visibleQueue(tickets, 'support', item => item.status === 'open');
+    $('#supportList').innerHTML = list.map(ticket => {
+      const identity = ticket.kind === 'login'
+        ? `<span class="verified-support-phone">OTP verified · ${P.esc(ticket.phone)}</span>`
+        : profileLink(ticket.customer_id, ticket.customer_name, ticket.customer_email);
+      const action = ticket.status === 'open'
+        ? `<button class="primary" ${ticket.kind === 'login' ? 'data-login-support-reply' : 'data-reply'}="${ticket.id}">Reply</button>`
+        : '';
+      return `<article class="ticket"><div><span class="pill ${P.esc(ticket.status)}">${P.esc(ticket.status)}</span><strong>${P.esc(ticket.subject || 'Support')} — ${identity}</strong><p>${P.esc(ticket.message || ticket.issue || '')}</p>${ticket.admin_reply ? `<p><b>Reply:</b> ${P.esc(ticket.admin_reply)}</p>` : ''}<small>${P.date(ticket.created_at)}</small></div>${action}</article>`;
+    }).join('') || `<p class="empty-copy">No ${queueFilters.support === 'new' ? 'new support issues' : 'support history'}.</p>`;
+  }
+
+  function replySupport(id, kind = 'account') {
+    const ticket = tickets.find(item => item.id === id && item.kind === kind);
     if (!ticket) return;
     modal(`Reply — ${ticket.subject}`, `<form id="replyForm" class="stack"><label>Reply<textarea id="replyText" required>${P.esc(ticket.admin_reply || '')}</textarea></label><label>Status<select id="replyStatus"><option value="replied">Replied</option><option value="closed">Closed</option></select></label><button class="primary">Send reply</button></form>`);
     $('#replyForm').onsubmit = async event => {
       event.preventDefault();
-      try { await P.api(`/api/admin/support/${id}`, { method: 'PATCH', body: JSON.stringify({ adminReply: $('#replyText').value, status: $('#replyStatus').value }) }); closeAdminModal(); P.toast('Reply sent.', 'success'); loadSupport(); }
+      const endpoint = kind === 'login' ? `/api/admin/login-support/${id}` : `/api/admin/support/${id}`;
+      try { await P.api(endpoint, { method: 'PATCH', body: JSON.stringify({ adminReply: $('#replyText').value, status: $('#replyStatus').value }) }); closeAdminModal(); P.toast('Reply saved.', 'success'); loadSupport(); }
       catch (error) { P.toast(error.message, 'error'); }
     };
   }
@@ -745,14 +793,44 @@
   async function loadResets() {
     try {
       resets = (await P.api('/api/admin/password-resets')).requests || [];
-      $('#resetList').innerHTML = resets.map(request => `<article class="ticket"><div><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span><strong>${profileLink(request.user_id, request.name, request.email || request.username)}</strong><p>${P.esc(request.role)} • requested ${P.date(request.created_at)} • expires ${P.date(request.expires_at)}</p>${request.admin_message ? `<p><b>Admin message:</b> ${P.esc(request.admin_message)}</p>` : ''}</div>${request.status === 'open' ? `<div class="actions"><button class="primary" data-reset-approve="${request.id}">Approve</button><button class="danger" data-reset-decline="${request.id}">Decline</button></div>` : ''}</article>`).join('') || '<p>No reset requests.</p>';
+      renderResets();
     } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function renderResets() {
+    const list = visibleQueue(resets, 'resets', item => item.status === 'open');
+    $('#resetList').innerHTML = list.map(request => `<article class="ticket"><div><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span><strong>${profileLink(request.user_id, request.name, request.email || request.username)}</strong><p>${P.esc(request.role)} • requested ${P.date(request.created_at)} • expires ${P.date(request.expires_at)}</p>${request.admin_message ? `<p><b>Admin message:</b> ${P.esc(request.admin_message)}</p>` : ''}</div>${request.status === 'open' ? `<div class="actions"><button class="primary" data-reset-approve="${request.id}">Approve</button><button class="danger" data-reset-decline="${request.id}">Decline</button></div>` : ''}</article>`).join('') || `<p class="empty-copy">No ${queueFilters.resets === 'new' ? 'new password reset requests' : 'password reset history'}.</p>`;
   }
 
   async function reviewReset(id, action) {
     const message = prompt(`Optional message for the user (${action}):`) || '';
     try { await P.api(`/api/admin/password-resets/${id}`, { method: 'PATCH', body: JSON.stringify({ action, adminMessage: message }) }); P.toast(`Recovery request ${action}.`, 'success'); loadResets(); }
     catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function loadWithdrawals() {
+    try { withdrawals = (await P.api('/api/admin/withdrawals')).withdrawals || []; renderWithdrawals(); }
+    catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function renderWithdrawals() {
+    const list = visibleQueue(withdrawals, 'withdrawals', item => item.status === 'pending');
+    $('#withdrawalList').innerHTML = list.map(item => `<article class="ticket withdrawal-admin-card"><div><div><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><span class="payout-amount">${P.moneyExact(item.amount_paise)}</span></div><strong>${profileLink(item.employee_id, item.listener_username ? `@${item.listener_username}` : item.listener_name, item.employee_code || item.phone || '')}</strong><div class="payout-destination"><small>UPI destination</small><b>${P.esc(item.payout_upi_id)}</b>${item.payout_upi_phone ? `<span>${P.esc(item.payout_upi_phone)}</span>` : ''}</div><small>Requested ${P.date(item.requested_at)}</small>${item.payment_reference ? `<p><b>UTR:</b> ${P.esc(item.payment_reference)}</p>` : ''}${item.admin_note ? `<p><b>Admin note:</b> ${P.esc(item.admin_note)}</p>` : ''}</div>${item.status === 'pending' ? `<div class="actions"><button class="primary" data-withdrawal-paid="${item.id}">Mark paid</button><button class="danger" data-withdrawal-decline="${item.id}">Decline</button></div>` : ''}</article>`).join('') || `<p class="empty-copy">No ${queueFilters.withdrawals === 'new' ? 'new withdrawal requests' : 'withdrawal history'}.</p>`;
+  }
+
+  function reviewWithdrawal(id, action) {
+    const request = withdrawals.find(item => item.id === id);
+    if (!request || request.status !== 'pending') return;
+    const paid = action === 'paid';
+    modal(paid ? 'Record paid withdrawal' : 'Decline withdrawal', `<form id="withdrawalReviewForm" class="stack"><div class="payout-confirm"><small>Listener</small><b>${P.esc(request.listener_username ? `@${request.listener_username}` : request.listener_name)}</b><small>Amount</small><strong>${P.moneyExact(request.amount_paise)}</strong><small>UPI</small><b>${P.esc(request.payout_upi_id)}</b></div>${paid ? '<label>Bank UTR / payment reference<input id="withdrawalUtr" minlength="3" maxlength="160" required autocomplete="off"></label>' : ''}<label>Admin note ${paid ? '<small>Optional</small>' : ''}<textarea id="withdrawalAdminNote" maxlength="500" ${paid ? '' : 'required'}></textarea></label><button class="${paid ? 'primary' : 'danger'}">${paid ? 'Confirm payment' : 'Decline request'}</button></form>`);
+    $('#withdrawalReviewForm').onsubmit = async event => {
+      event.preventDefault(); const button = event.submitter; button.disabled = true;
+      try {
+        await P.api(`/api/admin/withdrawals/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ action, utr: $('#withdrawalUtr')?.value || '', adminNote: $('#withdrawalAdminNote').value }) });
+        closeAdminModal(); P.toast(paid ? 'Withdrawal marked paid with UTR.' : 'Withdrawal declined.', 'success');
+        await Promise.all([loadWithdrawals(), loadListenerWallets(), loadDashboard()]);
+      } catch (error) { P.toast(error.message, 'error'); button.disabled = false; }
+    };
   }
 
   async function loadAudit() {

@@ -6,7 +6,7 @@ const config = require('../config');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { authenticate, asyncHandler, unavailable, activateExpiredSuspension } = require('../middleware');
 const { profileImageReference } = require('../profile-image');
-const { normalizePhone, indianMobile, maskPhone } = require('../phone');
+const { normalizePhone, internationalPhone, maskPhone } = require('../phone');
 const { sendOtp } = require('../sms');
 const createRateLimit = require('../request-limit');
 
@@ -46,6 +46,12 @@ const otpVerifyLimit = createRateLimit({
   max: 20,
   message: 'Too many OTP checks. Please wait before trying again.',
   key: (req) => `${req.ip}:${String(req.body?.challengeId || '')}`,
+});
+const loginSupportLimit = createRateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 6,
+  message: 'Too many login-support requests. Please wait before trying again.',
+  key: (req) => `${req.ip}:${String(req.body?.phone || '').replace(/\D/g, '')}`,
 });
 
 const cleanupTimer = setInterval(() => {
@@ -164,9 +170,9 @@ async function consumeRegistration(client, registrationToken, role) {
 }
 
 router.post('/phone/start', otpStartLimit, asyncHandler(async (req, res) => {
-  const phone = normalizePhone(req.body.phone);
+  const phone = internationalPhone(req.body.phone);
   const role = validRole(String(req.body.role || ''));
-  if (!phone || !indianMobile(phone)) return res.status(400).json({ error: 'Enter a valid 10-digit Indian mobile number.' });
+  if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
   if (!role) return res.status(400).json({ error: 'Choose a valid account type.' });
 
   const existing = await db.query(
@@ -196,6 +202,35 @@ router.post('/phone/start', otpStartLimit, asyncHandler(async (req, res) => {
 
   return res.status(201).json({
     mode: 'otp',
+    challengeId,
+    phone: maskPhone(phone),
+    expiresInSeconds: config.sms.otpExpiryMinutes * 60,
+    developmentOtp: !config.sms.enabled && config.sms.testOtp ? config.sms.testOtp : undefined,
+  });
+}));
+
+router.post('/support/phone/start', loginSupportLimit, asyncHandler(async (req, res) => {
+  const phone = internationalPhone(req.body.phone);
+  if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
+
+  const challengeId = crypto.randomUUID();
+  const code = !config.sms.enabled && config.sms.testOtp
+    ? config.sms.testOtp
+    : String(crypto.randomInt(100000, 1000000));
+  const expiresAt = new Date(Date.now() + config.sms.otpExpiryMinutes * 60_000);
+  await db.query(`
+    INSERT INTO otp_challenges(id,phone,role,code_hash,expires_at)
+    VALUES($1,$2,'customer',$3,$4)
+  `, [challengeId, phone, otpCodeHash(challengeId, phone, 'customer', code), expiresAt]);
+
+  try {
+    await sendOtp(phone, code, `support-${challengeId}`);
+  } catch (error) {
+    await db.query('DELETE FROM otp_challenges WHERE id=$1 AND verified_at IS NULL', [challengeId]).catch(() => null);
+    throw error;
+  }
+
+  res.status(201).json({
     challengeId,
     phone: maskPhone(phone),
     expiresInSeconds: config.sms.otpExpiryMinutes * 60,
@@ -298,6 +333,27 @@ router.post('/phone/register/listener', registrationLimit, asyncHandler(async (r
     if (error.code === '23505') return res.status(409).json({ error: 'That phone number or public username is already registered.' });
     throw error;
   }
+}));
+
+router.post('/support/submit', loginSupportLimit, asyncHandler(async (req, res) => {
+  const issue = String(req.body.issue || '').trim().slice(0, 3000);
+  if (issue.length < 5) return res.status(400).json({ error: 'Briefly describe the login issue.' });
+
+  const ticket = await db.transaction(async (client) => {
+    const challenge = await consumeRegistration(client, req.body.registrationToken, 'customer');
+    const created = await client.query(`
+      INSERT INTO login_support_tickets(phone,issue)
+      VALUES($1,$2)
+      RETURNING id,status,created_at
+    `, [challenge.phone, issue]);
+    await client.query('UPDATE otp_challenges SET consumed_at=now() WHERE id=$1', [challenge.id]);
+    return created.rows[0];
+  });
+
+  res.status(201).json({
+    ticket,
+    message: 'Your login issue was sent securely. The support team can now verify the number and review it.',
+  });
 }));
 
 router.post('/register', registrationLimit, asyncHandler(async (req, res) => {
@@ -438,8 +494,8 @@ router.delete('/account', authenticate, asyncHandler(async (req, res) => {
 }));
 
 router.post('/forgot-password', recoveryLimit, asyncHandler(async (req, res) => {
-  const identifier = normalizePhone(req.body.identifier);
-  if (!identifier || !indianMobile(identifier)) return res.status(400).json({ error: 'Enter your registered 10-digit Indian mobile number.' });
+  const identifier = internationalPhone(req.body.identifier);
+  if (!identifier) return res.status(400).json({ error: 'Enter your registered mobile number with country code.' });
   if (!canRequestReset(req, identifier)) {
     return res.status(429).json({ error: 'Too many recovery requests. Try again later.' });
   }

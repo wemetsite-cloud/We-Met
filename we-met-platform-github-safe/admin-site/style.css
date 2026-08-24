@@ -193,7 +193,7 @@ aside{background:linear-gradient(180deg,#3a0922,#210d17);box-shadow:16px 0 45px 
 .admin-post-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.admin-post-card{overflow:hidden;border:1px solid var(--line);border-radius:22px;background:linear-gradient(150deg,#25272d,#17191e);box-shadow:0 18px 42px rgba(0,0,0,.2)}.admin-post-card>img,.admin-post-missing{width:100%;aspect-ratio:1/1;display:block;object-fit:cover;background:#121318}.admin-post-missing{display:grid;place-items:center;color:var(--muted)}.admin-post-card>div{padding:16px}.admin-post-card h3{margin:7px 0;color:#fff;font-size:15px}.admin-post-card p,.admin-post-card small{display:block;color:var(--muted);font-size:10px}.admin-post-card .danger{width:100%;margin-top:13px}
 @media(max-width:920px){.admin-post-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.admin-post-gallery{grid-template-columns:1fr}}
 
-/* v8.1 — restrained operations theme and clear verification control */
+/* v8.2 — restrained operations theme and clear verification control */
 aside{background:linear-gradient(180deg,#25151d,#171217)}
 aside nav button.active,aside nav button:hover{background:rgba(230,45,125,.13);box-shadow:inset 3px 0 #e62d7d}
 .content>header{background:rgba(22,23,27,.96)}
@@ -201,3 +201,16 @@ aside nav button.active,aside nav button:hover{background:rgba(230,45,125,.13);b
 .listener-management>form.panel{box-shadow:0 15px 42px rgba(0,0,0,.18)}
 .toolbar p,.panel-head p{max-width:700px;line-height:1.45}
 @media(max-width:760px){.content>main{padding-inline:13px}.toolbar h2{font-size:20px}.page-heading p{display:none}.listener-admin-card{padding:14px}.customer-card-actions{gap:7px}}
+
+/* v8.2 — operational queues and application polish */
+.content>header{background:linear-gradient(180deg,rgba(22,23,27,.95),rgba(22,23,27,.82));backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 8px 28px rgba(0,0,0,.14)}
+.queue-tabs{width:max-content;display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:0 0 15px;padding:5px;border:1px solid var(--line);border-radius:14px;background:#18191e}.queue-tabs button{min-width:96px;min-height:38px;padding:8px 14px;border:0;border-radius:10px;background:transparent;color:#8f8d95;font-weight:850;cursor:pointer}.queue-tabs button.active{background:linear-gradient(135deg,rgba(255,47,141,.24),rgba(255,104,172,.1));color:#fff;box-shadow:inset 0 0 0 1px rgba(255,128,184,.09)}
+.verified-support-phone{display:inline-flex;margin:4px 0;padding:5px 8px;border-radius:999px;background:rgba(55,216,145,.1);color:#69e5a8;font-size:9px;font-weight:850}
+.withdrawal-admin-card .payout-amount{display:inline-block;margin-left:7px;color:#fff;font-size:18px;font-weight:900}.payout-destination{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;margin:12px 0;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:#1d1e23}.payout-destination small{color:var(--muted);font-size:8px;text-transform:uppercase}.payout-destination b{overflow-wrap:anywhere;color:#ff96c4}.payout-destination span{color:var(--muted);font-size:9px}.payout-confirm{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;padding:14px;border:1px solid var(--line);border-radius:15px;background:#1d1e23}.payout-confirm small{color:var(--muted);font-size:8px;text-transform:uppercase}.payout-confirm b,.payout-confirm strong{overflow-wrap:anywhere;text-align:right}.payout-confirm strong{color:#ff95c3;font-size:18px}
+.ticket{border-radius:17px}.ticket>div{min-width:0}.ticket strong{overflow-wrap:anywhere}.ticket .actions{display:flex;flex-wrap:wrap;gap:7px}
+.login-screen{height:100dvh;min-height:560px;overflow:hidden;padding:14px}.login-card{max-height:calc(100dvh - 28px);overflow:auto}
+@media(max-width:760px){
+  .queue-tabs{width:100%}.queue-tabs button{min-width:0}.ticket .actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.ticket .actions button{width:100%}
+  .payout-destination{grid-template-columns:1fr}.payout-destination b,.payout-destination span{display:block}.content>header{backdrop-filter:blur(18px)}
+}
+@media(max-width:470px){.login-screen{padding:0}.login-card{width:100%;height:100dvh;max-height:none;border:0;border-radius:0;padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;justify-content:center}.ticket .actions{grid-template-columns:1fr}.payout-confirm{grid-template-columns:1fr}.payout-confirm b,.payout-confirm strong{text-align:left}}

@@ -167,11 +167,18 @@ router.delete('/posts/:id', asyncHandler(async (req, res) => {
 
 router.get('/followers', asyncHandler(async (req, res) => {
   const result = await db.query(`
-    SELECT f.customer_id,f.created_at,u.name,u.profile_image,
+    SELECT f.customer_id,f.created_at,u.name,u.username,u.profile_image,
            EXISTS(
              SELECT 1 FROM listener_subscriptions s
              WHERE s.customer_id=f.customer_id AND s.employee_id=f.employee_id
                AND s.status='active' AND s.current_period_end>now()
+               AND (
+                 s.paid_count>0
+                 OR EXISTS(
+                   SELECT 1 FROM listener_subscription_payments payment
+                   WHERE payment.subscription_id=s.id AND payment.status='captured'
+                 )
+               )
            ) AS subscribed
     FROM listener_follows f
     JOIN users u ON u.id=f.customer_id AND u.role='customer'
@@ -182,7 +189,7 @@ router.get('/followers', asyncHandler(async (req, res) => {
     count: result.rows.length,
     followers: result.rows.map((row) => ({
       customerId: row.customer_id,
-      name: row.name,
+      name: row.username || row.name,
       profileImage: profileImageReference(row.profile_image, row.customer_id),
       followedAt: row.created_at,
       subscribed: Boolean(row.subscribed),
@@ -208,7 +215,7 @@ router.get('/followers/:customerId/image', asyncHandler(async (req, res) => {
 router.get('/inbox', asyncHandler(async (req, res) => {
   const result = await db.query(`
     SELECT DISTINCT ON (s.customer_id)
-           s.customer_id,s.status,s.current_period_end,u.name,u.profile_image,
+           s.customer_id,s.status,s.current_period_end,u.name,u.username,u.profile_image,
            last_message.message,last_message.created_at AS last_message_at,last_message.sender_id,
            COALESCE(unread.count,0)::int AS unread_count
     FROM listener_subscriptions s
@@ -224,11 +231,18 @@ router.get('/inbox', asyncHandler(async (req, res) => {
         AND m.sender_id=s.customer_id AND m.read_at IS NULL
     ) unread ON true
     WHERE s.employee_id=$1
+      AND (
+        s.paid_count>0
+        OR EXISTS(
+          SELECT 1 FROM listener_subscription_payments payment
+          WHERE payment.subscription_id=s.id AND payment.status='captured'
+        )
+      )
     ORDER BY s.customer_id,s.updated_at DESC
   `, [req.user.id]);
   res.json({ conversations: result.rows.map((row) => ({
     customerId: row.customer_id,
-    customerName: row.name,
+    customerName: row.username || row.name,
     customerImage: profileImageReference(row.profile_image, row.customer_id),
     active: row.status === 'active' && row.current_period_end && new Date(row.current_period_end) > new Date(),
     currentPeriodEnd: row.current_period_end,
@@ -240,8 +254,16 @@ router.get('/inbox', asyncHandler(async (req, res) => {
 
 router.get('/inbox/:customerId/messages', asyncHandler(async (req, res) => {
   const relation = await db.query(`
-    SELECT 1 FROM listener_subscriptions
-    WHERE customer_id=$1 AND employee_id=$2 LIMIT 1
+    SELECT 1 FROM listener_subscriptions subscription
+    WHERE customer_id=$1 AND employee_id=$2
+      AND (
+        paid_count>0
+        OR EXISTS(
+          SELECT 1 FROM listener_subscription_payments payment
+          WHERE payment.subscription_id=subscription.id AND payment.status='captured'
+        )
+      )
+    LIMIT 1
   `, [req.params.customerId, req.user.id]);
   if (!relation.rows[0]) return res.status(404).json({ error: 'Conversation not found.' });
   const result = await db.query(`
@@ -264,6 +286,29 @@ router.get('/inbox/:customerId/messages', asyncHandler(async (req, res) => {
     active: latest?.status === 'active' && latest.current_period_end && new Date(latest.current_period_end) > new Date(),
     messages: result.rows,
   });
+}));
+
+router.get('/inbox/:customerId/image', asyncHandler(async (req, res) => {
+  const result = await db.query(`
+    SELECT u.profile_image
+    FROM listener_subscriptions subscription
+    JOIN users u ON u.id=subscription.customer_id AND u.role='customer'
+    WHERE subscription.employee_id=$1 AND subscription.customer_id=$2
+      AND (
+        subscription.paid_count>0
+        OR EXISTS(
+          SELECT 1 FROM listener_subscription_payments payment
+          WHERE payment.subscription_id=subscription.id AND payment.status='captured'
+        )
+      )
+    LIMIT 1
+  `, [req.user.id, req.params.customerId]);
+  const image = decodeProfileImage(result.rows[0]?.profile_image);
+  if (!image) return res.status(404).end();
+  res.setHeader('Content-Type', image.mime);
+  res.setHeader('Content-Length', String(image.buffer.length));
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.end(image.buffer);
 }));
 
 router.post('/inbox/:customerId/messages', asyncHandler(async (req, res) => {

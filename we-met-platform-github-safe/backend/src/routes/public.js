@@ -25,7 +25,9 @@ router.get('/config', (_req, res) => res.json({
 
 router.get('/listener-profile-image/:id', asyncHandler(async (req, res) => {
   const result = await db.query(
-    `SELECT profile_image FROM users WHERE id=$1 AND role='employee'`,
+    `SELECT profile_image FROM users
+     WHERE id=$1 AND role='employee' AND status='active'
+       AND listener_verification_status='approved'`,
     [req.params.id],
   );
   const image = decodeProfileImage(result.rows[0]?.profile_image);
@@ -38,7 +40,9 @@ router.get('/listener-profile-image/:id', asyncHandler(async (req, res) => {
 
 router.get('/listener-banner-image/:id', asyncHandler(async (req, res) => {
   const result = await db.query(
-    `SELECT banner_image FROM users WHERE id=$1 AND role='employee' AND listener_verification_status='approved'`,
+    `SELECT banner_image FROM users
+     WHERE id=$1 AND role='employee' AND status='active'
+       AND listener_verification_status='approved'`,
     [req.params.id],
   );
   const image = decodeProfileImage(result.rows[0]?.banner_image);

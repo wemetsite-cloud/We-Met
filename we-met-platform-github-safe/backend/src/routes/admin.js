@@ -4,7 +4,7 @@ const db = require('../db');
 const { hashPassword } = require('../auth');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
 const { normalizeProfileImage } = require('../profile-image');
-const { normalizePhone, indianMobile } = require('../phone');
+const { normalizePhone, internationalPhone } = require('../phone');
 
 const router = express.Router();
 router.use(authenticate, requireRole('admin'));
@@ -49,7 +49,7 @@ function integer(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_I
 }
 
 router.get('/dashboard', asyncHandler(async (_req, res) => {
-  const [users, calls, reports, tickets, coupons, minutes] = await Promise.all([
+  const [users, calls, reports, tickets, coupons, minutes, withdrawals, loginSupport] = await Promise.all([
     db.query(`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role`),
     db.query(`
       SELECT status, COUNT(*)::int AS count,
@@ -61,6 +61,8 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     db.query(`SELECT COUNT(*)::int AS count FROM support_tickets WHERE status = 'open'`),
     db.query(`SELECT COUNT(*)::int AS count FROM coupons WHERE active = true`),
     db.query(`SELECT COALESCE(SUM(billed_seconds), 0)::bigint AS seconds FROM calls`),
+    db.query(`SELECT COUNT(*)::int AS count FROM listener_withdrawal_requests WHERE status='pending'`),
+    db.query(`SELECT COUNT(*)::int AS count FROM login_support_tickets WHERE status='open'`),
   ]);
 
   res.json({
@@ -70,6 +72,8 @@ router.get('/dashboard', asyncHandler(async (_req, res) => {
     openTickets: tickets.rows[0].count,
     activeCoupons: coupons.rows[0].count,
     totalTalkSeconds: Number(minutes.rows[0].seconds),
+    pendingWithdrawals: withdrawals.rows[0].count,
+    openLoginSupport: loginSupport.rows[0].count,
   });
 }));
 
@@ -151,9 +155,9 @@ router.post('/employees', asyncHandler(async (req, res) => {
     .toUpperCase()
     .replace(/[^A-Z0-9-]/g, '');
 
-  if (name.length < 2 || !phone || !indianMobile(phone) || password.length < 8) {
+  if (name.length < 2 || !phone || !internationalPhone(phone) || password.length < 8) {
     return res.status(400).json({
-      error: 'Enter a valid original name, Indian mobile number, and a password with at least 8 characters.',
+      error: 'Enter a valid original name, mobile number with country code, and a password with at least 8 characters.',
     });
   }
   if (!username || !/^[a-z0-9._-]{3,80}$/.test(username)) {
@@ -250,8 +254,8 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   const hasRate = Object.hasOwn(req.body, 'ratePaise');
   const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : null;
 
-  if (name.length < 2 || !phone || !indianMobile(phone)) {
-    return res.status(400).json({ error: 'Enter a valid original name and Indian mobile number.' });
+  if (name.length < 2 || !phone || !internationalPhone(phone)) {
+    return res.status(400).json({ error: 'Enter a valid original name and mobile number with country code.' });
   }
   if (!username || !/^[a-z0-9._-]{3,80}$/.test(username)) {
     return res.status(400).json({ error: 'Add a public username with 3–80 letters, numbers, dots, underscores or hyphens.' });
@@ -738,6 +742,91 @@ router.post('/listener-wallets/:id/adjust', asyncHandler(async (req, res) => {
   });
 }));
 
+router.get('/withdrawals', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT request.*,listener.name AS listener_name,listener.username AS listener_username,
+           listener.employee_code,listener.phone
+    FROM listener_withdrawal_requests request
+    JOIN users listener ON listener.id=request.employee_id
+    ORDER BY CASE request.status WHEN 'pending' THEN 0 ELSE 1 END,request.requested_at DESC
+    LIMIT 500
+  `);
+  res.json({ withdrawals: result.rows.map((row) => ({ ...row, amount_paise: Number(row.amount_paise || 0) })) });
+}));
+
+router.patch('/withdrawals/:id', asyncHandler(async (req, res) => {
+  const action = String(req.body.action || '').trim().toLowerCase();
+  const utr = text(req.body.utr, 160) || null;
+  const adminNote = text(req.body.adminNote, 500) || null;
+  if (!['paid', 'declined'].includes(action)) return res.status(400).json({ error: 'Choose paid or declined.' });
+  if (action === 'paid' && (!utr || utr.length < 3)) return res.status(400).json({ error: 'Enter the UTR or payment reference.' });
+
+  const output = await db.transaction(async (client) => {
+    const result = await client.query(`
+      SELECT request.*,listener.name AS listener_name
+      FROM listener_withdrawal_requests request
+      JOIN users listener ON listener.id=request.employee_id
+      WHERE request.id=$1 FOR UPDATE OF request
+    `, [req.params.id]);
+    const request = result.rows[0];
+    if (!request) throw Object.assign(new Error('Withdrawal request not found.'), { status: 404 });
+    if (request.status !== 'pending') throw Object.assign(new Error('This withdrawal request was already reviewed.'), { status: 409 });
+
+    if (action === 'paid') {
+      const balanceResult = await client.query(`
+        SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise
+        FROM listener_wallet_transactions WHERE employee_id=$1
+      `, [request.employee_id]);
+      const balancePaise = Number(balanceResult.rows[0].balance_paise || 0);
+      if (Number(request.amount_paise) > balancePaise) {
+        throw Object.assign(new Error('The listener wallet no longer has enough unpaid balance for this request.'), { status: 409 });
+      }
+      const duplicateReference = await client.query(`
+        SELECT id FROM listener_wallet_transactions
+        WHERE type='payout' AND lower(payment_reference)=lower($1) LIMIT 1
+      `, [utr]);
+      if (duplicateReference.rows[0]) throw Object.assign(new Error('This UTR or payment reference was already recorded.'), { status: 409 });
+      await client.query(`
+        INSERT INTO listener_wallet_transactions(
+          employee_id,type,amount_paise,reference_id,payout_upi_id,payout_upi_phone,
+          payment_reference,note,created_by
+        ) VALUES($1,'payout',$2,$3,$4,$5,$6,$7,$8)
+      `, [
+        request.employee_id,
+        -Number(request.amount_paise),
+        request.id,
+        request.payout_upi_id,
+        request.payout_upi_phone,
+        utr,
+        adminNote || 'Listener withdrawal paid',
+        req.user.id,
+      ]);
+    }
+
+    const updated = await client.query(`
+      UPDATE listener_withdrawal_requests
+      SET status=$2,payment_reference=$3,admin_note=$4,reviewed_by=$5,
+          reviewed_at=now(),paid_at=CASE WHEN $2='paid' THEN now() ELSE NULL END,updated_at=now()
+      WHERE id=$1 RETURNING *
+    `, [request.id, action, utr, adminNote, req.user.id]);
+    const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(request.amount_paise) / 100);
+    const title = action === 'paid' ? 'Withdrawal paid' : 'Withdrawal update';
+    const body = action === 'paid'
+      ? `${amount} was marked paid.${utr ? ` UTR: ${utr}.` : ''}`
+      : `Your ${amount} withdrawal request was declined.${adminNote ? ` ${adminNote}` : ''}`;
+    await client.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.employee_id, title, body]);
+    return { request: updated.rows[0], userId: request.employee_id, title, body };
+  });
+
+  await req.app.locals.notifyUser?.(output.userId, {
+    title: output.title,
+    body: output.body,
+    url: './',
+    tag: `we-met-withdrawal-${output.request.id}`,
+  });
+  res.json({ withdrawal: { ...output.request, amount_paise: Number(output.request.amount_paise || 0) } });
+}));
+
 router.get('/audit-log', asyncHandler(async (_req, res) => {
   const result = await db.query(`
     SELECT log.*,admin.name AS admin_name
@@ -921,6 +1010,28 @@ router.get('/support', asyncHandler(async (_req, res) => {
              ticket.created_at DESC
   `);
   res.json({ tickets: result.rows });
+}));
+
+router.get('/login-support', asyncHandler(async (_req, res) => {
+  const result = await db.query(`
+    SELECT * FROM login_support_tickets
+    ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END,created_at DESC
+    LIMIT 500
+  `);
+  res.json({ tickets: result.rows });
+}));
+
+router.patch('/login-support/:id', asyncHandler(async (req, res) => {
+  const reply = text(req.body.adminReply, 3000);
+  const status = String(req.body.status || 'replied');
+  if (!VALID_SUPPORT_STATUSES.has(status)) return res.status(400).json({ error: 'Invalid support-ticket status.' });
+  const result = await db.query(`
+    UPDATE login_support_tickets
+    SET admin_reply=$2,status=$3,updated_at=now()
+    WHERE id=$1 RETURNING *
+  `, [req.params.id, reply || null, status]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Login-support ticket not found.' });
+  res.json({ ticket: result.rows[0] });
 }));
 
 router.patch('/support/:id', asyncHandler(async (req, res) => {

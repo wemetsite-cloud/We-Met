@@ -20,6 +20,9 @@ test('v8 phone-first OTP flow covers customers and listeners without email regis
   assert.match(auth, /router\.post\('\/phone\/register\/listener'/);
   assert.match(auth, /listener_verification_status/);
   assert.match(sms, /FAST2SMS|fast2sms/i);
+  assert.match(sms, /TWILIO|twilio/i);
+  assert.match(auth, /router\.post\('\/support\/phone\/start'/);
+  assert.match(auth, /router\.post\('\/support\/submit'/);
   assert.match(customer, /Let’s start/);
   assert.match(customer, /id="authProgressFill"/);
   assert.match(listener, /Your number stays private/);
@@ -28,7 +31,7 @@ test('v8 phone-first OTP flow covers customers and listeners without email regis
   assert.doesNotMatch(listener, /type="email"/);
 });
 
-test('each listener membership is recurring ₹399 and keeps paid calls separate', () => {
+test('each listener membership is recurring ₹399 while every call remains wallet-only', () => {
   const config = read('backend', 'src', 'config.js');
   const subscriptions = read('backend', 'src', 'routes', 'subscriptions.js');
   const access = read('backend', 'src', 'subscription-access.js');
@@ -43,10 +46,14 @@ test('each listener membership is recurring ₹399 and keeps paid calls separate
   assert.match(subscriptions, /razorpay\.subscriptions\.cancel/);
   assert.match(subscriptions, /listener_credited_at/);
   assert.match(access, /status='active'/);
-  assert.match(socket, /FROM listener_subscriptions/);
-  assert.match(socket, /subscriptionRequired: true/);
+  assert.match(access, /listener_subscription_payments/);
+  assert.match(access, /payment\.status='captured'/);
+  assert.doesNotMatch(socket, /FROM listener_subscriptions/);
+  assert.doesNotMatch(socket, /subscriptionRequired: true/);
+  assert.match(socket, /ringCustomer\(user\.id, employeeId \|\| null/);
   assert.match(socket, /balance_seconds/);
-  assert.match(customer, /Membership does not include free calls/);
+  assert.match(customer, /Calls need only wallet talk-time/);
+  assert.doesNotMatch(customer.slice(customer.indexOf('function requestCall'), customer.indexOf('function requestRandomCall')), /isSubscribed/);
   assert.match(customer, /selectTab\('wallet'\)/);
 });
 
@@ -99,7 +106,7 @@ test('customer talk-time balance is presented only in the wallet page', () => {
   assert.match(html.slice(walletStart, walletEnd), /Choose your minutes/);
 });
 
-test('v8.1 repairs legacy duplicate phone records before Render creates the unique index', () => {
+test('v8.2 repairs legacy duplicate phone records before Render creates the unique index', () => {
   const schema = read('backend', 'database', 'schema.sql');
   const repair = schema.indexOf('WITH ranked_phone_accounts AS');
   const uniqueIndex = schema.indexOf('CREATE UNIQUE INDEX IF NOT EXISTS uq_users_role_phone');
@@ -110,7 +117,7 @@ test('v8.1 repairs legacy duplicate phone records before Render creates the uniq
   assert.doesNotMatch(schema.slice(repair, uniqueIndex), /DELETE FROM users/);
 });
 
-test('v8.1 customer home contains only connection, language choice and verified discovery', () => {
+test('v8.2 customer home contains only connection, language choice and verified discovery', () => {
   const html = read('customer-site', 'index.html');
   const app = read('customer-site', 'app.js');
   const css = read('customer-site', 'style.css');
@@ -124,11 +131,11 @@ test('v8.1 customer home contains only connection, language choice and verified 
   assert.match(app, /employeeId: null, allowOtherLanguages:/);
   assert.match(app, /walletCheckoutModal/);
   assert.match(app, /theme: \{ color: '#e62d7d', backdrop_color: '#0c0d10' \}/);
-  assert.match(css, /\.plans-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+  assert.match(css, /\.plans-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/);
   assert.match(css, /\.wallet-plan-card/);
 });
 
-test('v8.1 admin-created listeners are approved by default with an optional voice check', () => {
+test('v8.2 admin-created listeners are approved by default with an optional voice check', () => {
   const route = read('backend', 'src', 'routes', 'admin.js');
   const adminHtml = read('admin-site', 'index.html');
   const adminApp = read('admin-site', 'app.js');
@@ -141,7 +148,7 @@ test('v8.1 admin-created listeners are approved by default with an optional voic
   assert.match(adminApp, /requireVerification/);
 });
 
-test('listener availability panel is scoped to the Desk tab with no repeated greeting', () => {
+test('listener portal uses app-style bottom navigation with no repeated greeting', () => {
   const html = read('employee-site', 'index.html');
   const app = read('employee-site', 'app.js');
   const deskStart = html.indexOf('id="tab-desk"');
@@ -149,6 +156,31 @@ test('listener availability panel is scoped to the Desk tab with no repeated gre
   assert.ok(deskStart > 0 && postsStart > deskStart);
   assert.match(html.slice(deskStart, postsStart), /id="shiftStatus"/);
   assert.doesNotMatch(html.slice(0, deskStart), /id="shiftStatus"/);
+  assert.match(html, /class="tabs listener-bottom-nav"/);
+  assert.match(html, /data-tab="desk"[\s\S]*<span>Home<\/span>/);
+  assert.match(html, /data-tab="inbox"[\s\S]*<span>Inbox<\/span>/);
+  assert.match(html, /data-tab="posts"[\s\S]*<span>Create<\/span>/);
   assert.doesNotMatch(html, /YOUR LISTENER DESK|id="hello"/);
   assert.doesNotMatch(app, /\$\('#hello'\)/);
+});
+
+test('v8.2 listener withdrawals and administrator new/history queues are wired end to end', () => {
+  const schema = read('backend', 'database', 'schema.sql');
+  const listenerRoute = read('backend', 'src', 'routes', 'employee.js');
+  const adminRoute = read('backend', 'src', 'routes', 'admin.js');
+  const listenerHtml = read('employee-site', 'index.html');
+  const adminHtml = read('admin-site', 'index.html');
+  const adminApp = read('admin-site', 'app.js');
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS listener_withdrawal_requests/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS login_support_tickets/);
+  assert.match(listenerRoute, /router\.post\('\/withdrawals'/);
+  assert.match(listenerRoute, /Save your UPI ID/);
+  assert.match(adminRoute, /router\.get\('\/withdrawals'/);
+  assert.match(adminRoute, /router\.patch\('\/withdrawals\/:id'/);
+  assert.match(adminRoute, /router\.get\('\/login-support'/);
+  assert.match(listenerHtml, /id="withdrawalForm"/);
+  assert.match(adminHtml, /id="page-withdrawals"/);
+  assert.match(adminHtml, /data-queue-group="withdrawals"/);
+  assert.match(adminApp, /const queueFilters = \{ verifications: 'new', withdrawals: 'new'/);
 });

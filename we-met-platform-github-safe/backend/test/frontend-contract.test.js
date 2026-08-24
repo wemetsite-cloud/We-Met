@@ -83,7 +83,7 @@ test('the customer portal ships the v8 membership layout and phone-first authent
   assert.match(app, /data-buy-plan/);
   assert.match(app, /type="button">Buy<\/button>/);
   assert.match(app, /data-subscribe/);
-  assert.match(app, /Membership does not include free calls/);
+  assert.match(app, /Calls need only wallet talk-time/);
   assert.doesNotMatch(app, /data-video|Start video call/);
-  assert.match(serviceWorker, /const VERSION = '8\.1\.0'/);
+  assert.match(serviceWorker, /const VERSION = '8\.2\.0'/);
 });

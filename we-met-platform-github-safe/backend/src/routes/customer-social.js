@@ -23,12 +23,19 @@ async function listenerDirectory(customerId, employeeId = null) {
   if (employeeId) params.push(employeeId);
   const result = await db.query(`
     SELECT u.id,u.name,u.username,u.bio,u.profile_image,u.banner_image,
-           u.listener_language,u.listener_availability,u.listener_rate_paise,u.last_seen_at,
+           u.listener_language,u.listener_availability,u.last_seen_at,
            EXISTS(SELECT 1 FROM listener_follows f WHERE f.customer_id=$1 AND f.employee_id=u.id) AS following,
            EXISTS(
              SELECT 1 FROM listener_subscriptions s
              WHERE s.customer_id=$1 AND s.employee_id=u.id AND s.status='active'
                AND s.current_period_end>now()
+               AND (
+                 s.paid_count>0
+                 OR EXISTS(
+                   SELECT 1 FROM listener_subscription_payments payment
+                   WHERE payment.subscription_id=s.id AND payment.status='captured'
+                 )
+               )
            ) AS subscribed,
            (SELECT COUNT(*)::int FROM listener_posts p WHERE p.employee_id=u.id) AS post_count
     FROM users u
@@ -47,7 +54,6 @@ async function listenerDirectory(customerId, employeeId = null) {
     bannerImage: listenerBannerReference(row),
     language: row.listener_language || 'Malayalam',
     availability: row.listener_availability || 'offline',
-    ratePaise: Number(row.listener_rate_paise || 100),
     following: Boolean(row.following),
     subscribed: Boolean(row.subscribed),
     postCount: Number(row.post_count || 0),
@@ -57,6 +63,11 @@ async function listenerDirectory(customerId, employeeId = null) {
 
 router.get('/listeners', asyncHandler(async (req, res) => {
   res.json({ listeners: await listenerDirectory(req.user.id) });
+}));
+
+router.get('/following', asyncHandler(async (req, res) => {
+  const listeners = await listenerDirectory(req.user.id);
+  res.json({ listeners: listeners.filter((listener) => listener.following) });
 }));
 
 router.get('/listeners/:id/profile', asyncHandler(async (req, res) => {
@@ -123,6 +134,13 @@ router.get('/subscriptions', asyncHandler(async (req, res) => {
     FROM listener_subscriptions s
     JOIN users u ON u.id=s.employee_id
     WHERE s.customer_id=$1
+      AND (
+        s.paid_count>0
+        OR EXISTS(
+          SELECT 1 FROM listener_subscription_payments payment
+          WHERE payment.subscription_id=s.id AND payment.status='captured'
+        )
+      )
     ORDER BY (s.status='active' AND s.current_period_end>now()) DESC,s.updated_at DESC
   `, [req.user.id]);
   res.json({ subscriptions: result.rows.map((row) => ({
@@ -146,7 +164,7 @@ router.get('/subscriptions', asyncHandler(async (req, res) => {
 router.get('/conversations', asyncHandler(async (req, res) => {
   const result = await db.query(`
     SELECT s.id AS subscription_id,s.employee_id,s.status,s.current_period_end,
-           u.name,u.username,u.profile_image,u.listener_availability,
+           u.name,u.username,u.profile_image,u.listener_availability,u.listener_language,
            last_message.message,last_message.created_at AS last_message_at,last_message.sender_id,
            COALESCE(unread.count,0)::int AS unread_count
     FROM listener_subscriptions s
@@ -160,6 +178,13 @@ router.get('/conversations', asyncHandler(async (req, res) => {
       WHERE m.subscription_id=s.id AND m.sender_id=s.employee_id AND m.read_at IS NULL
     ) unread ON true
     WHERE s.customer_id=$1
+      AND (
+        s.paid_count>0
+        OR EXISTS(
+          SELECT 1 FROM listener_subscription_payments payment
+          WHERE payment.subscription_id=s.id AND payment.status='captured'
+        )
+      )
     ORDER BY COALESCE(last_message.created_at,s.updated_at) DESC
   `, [req.user.id]);
   res.json({ conversations: result.rows.map((row) => ({
@@ -168,6 +193,7 @@ router.get('/conversations', asyncHandler(async (req, res) => {
     listenerName: listenerPublicName(row),
     listenerImage: profileImageReference(row.profile_image, row.employee_id),
     availability: row.listener_availability,
+    language: row.listener_language || 'Malayalam',
     active: row.status === 'active' && row.current_period_end && new Date(row.current_period_end) > new Date(),
     currentPeriodEnd: row.current_period_end,
     lastMessage: row.message,
@@ -211,18 +237,25 @@ router.post('/conversations/:employeeId/messages', asyncHandler(async (req, res)
 
 router.patch('/profile', asyncHandler(async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 80);
+  const username = String(req.body.username || '').trim().toLowerCase().slice(0, 50) || null;
   const profileImage = normalizeProfileImage(req.body.profileImage);
   if (name.length < 2) return res.status(400).json({ error: 'Enter your name.' });
+  if (username && !/^[a-z0-9._-]{3,50}$/.test(username)) return res.status(400).json({ error: 'Use 3–50 letters, numbers, dots, underscores or hyphens for the username.' });
   if (profileImage === false) return res.status(400).json({ error: 'Choose a valid JPG, PNG or WebP profile photo.' });
-  const result = await db.query(`
-    UPDATE users SET name=$2,
-      profile_image=CASE WHEN $3::boolean THEN $4 ELSE profile_image END,
-      updated_at=now()
-    WHERE id=$1 AND role='customer'
-    RETURNING id,name,profile_image
-  `, [req.user.id, name, profileImage !== undefined, profileImage === undefined ? null : profileImage]);
-  const user = result.rows[0];
-  res.json({ user: { id: user.id, name: user.name, profileImage: profileImageReference(user.profile_image, user.id) } });
+  try {
+    const result = await db.query(`
+      UPDATE users SET name=$2,username=$3,
+        profile_image=CASE WHEN $4::boolean THEN $5 ELSE profile_image END,
+        updated_at=now()
+      WHERE id=$1 AND role='customer'
+      RETURNING id,name,username,profile_image
+    `, [req.user.id, name, username, profileImage !== undefined, profileImage === undefined ? null : profileImage]);
+    const user = result.rows[0];
+    res.json({ user: { id: user.id, name: user.name, username: user.username, profileImage: profileImageReference(user.profile_image, user.id) } });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'That username is already in use.' });
+    throw error;
+  }
 }));
 
 router.get('/profile/image', asyncHandler(async (req, res) => {

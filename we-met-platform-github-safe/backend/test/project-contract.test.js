@@ -54,7 +54,7 @@ test('keeps listener work-session analytics private to admin while listener sees
   assert.match(read('backend', 'src', 'socket.js'), /currentRuntime\s*\?\s*\(currentRuntime\.status === 'ringing' \? 'ringing' : 'busy'\)/);
 });
 
-test('ships listener earnings with admin-managed payments and no listener withdrawal flow', () => {
+test('ships listener earnings with audited listener withdrawal requests', () => {
   const schema = read('backend', 'database', 'schema.sql');
   const adminRoutes = read('backend', 'src', 'routes', 'admin.js');
   const employeeRoutes = read('backend', 'src', 'routes', 'employee.js');
@@ -64,7 +64,6 @@ test('ships listener earnings with admin-managed payments and no listener withdr
   assert.match(schema, /listener_withdrawal_requests/);
   assert.match(schema, /uq_listener_wallet_call_credit/);
   assert.match(schema, /uq_listener_wallet_payout/);
-  assert.match(schema, /Listener-initiated withdrawals were retired in v6\.9\.0/);
   assert.match(schema, /WHERE status='pending'/);
   assert.match(schema, /listener_rate_paise/);
   assert.match(schema, /IF NOT earnings_column_exists THEN/);
@@ -72,18 +71,20 @@ test('ships listener earnings with admin-managed payments and no listener withdr
   assert.match(adminRoutes, /router\.get\('\/listener-wallets'/);
   assert.match(adminRoutes, /router\.post\('\/listener-wallets\/:id\/mark-paid'/);
   assert.match(adminRoutes, /router\.post\('\/listener-wallets\/:id\/adjust'/);
-  assert.doesNotMatch(adminRoutes, /router\.(?:get|patch|post)\('\/withdrawals/);
+  assert.match(adminRoutes, /router\.get\('\/withdrawals'/);
+  assert.match(adminRoutes, /router\.patch\('\/withdrawals\/:id'/);
   assert.match(adminRoutes, /FOR UPDATE/);
   assert.match(employeeRoutes, /router\.get\(['"]\/wallet/);
-  assert.doesNotMatch(employeeRoutes, /MIN_WITHDRAWAL_PAISE|\/wallet\/withdrawals|\/wallet\/payout-details/);
+  assert.match(employeeRoutes, /router\.patch\('\/payout-details'/);
+  assert.match(employeeRoutes, /router\.post\('\/withdrawals'/);
   assert.match(listenerHtml, /id="tab-wallet"/);
   assert.match(listenerHtml, /id="walletBalance"/);
-  assert.match(listenerHtml, /ADMIN-MANAGED/);
-  assert.doesNotMatch(listenerHtml, /withdrawalForm|walletUpiId|walletUpiPhone/);
+  assert.match(listenerHtml, /id="withdrawalForm"/);
+  assert.match(listenerHtml, /id="listenerUpiId"/);
   assert.match(adminHtml, /id="page-wallets"/);
   assert.match(adminHtml, /id="listenerWalletBalance"/);
   assert.match(adminHtml, /Record paid/);
-  assert.doesNotMatch(adminHtml, /withdrawalRequests|empUpi|empUpiPhone/);
+  assert.match(adminHtml, /id="page-withdrawals"/);
   assert.match(adminHtml, /id="page-payments"/);
   assert.match(adminHtml, /Listener credits/);
 });
@@ -107,7 +108,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '8\.1\.0'/);
+    assert.match(serviceWorker, /const VERSION = '8\.2\.0'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }
