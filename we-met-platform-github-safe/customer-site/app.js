@@ -124,10 +124,28 @@
     activeProfilePosts = [];
   }
 
+  function initAutoHideHeader() {
+    let lastY = Math.max(0, window.scrollY); let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (ticking) return; ticking = true;
+      requestAnimationFrame(() => {
+        const y = Math.max(0, window.scrollY);
+        const topbar = document.querySelector('.topbar');
+        if (topbar) {
+          const hide = y > 76 && y > lastY + 4 && !currentOverlay();
+          topbar.classList.toggle('topbar-hidden', hide);
+          if (y < 18 || y < lastY - 4 || currentOverlay()) topbar.classList.remove('topbar-hidden');
+        }
+        lastY = y; ticking = false;
+      });
+    }, { passive: true });
+  }
+
   function initNavigation() {
     const requestedTab = new URLSearchParams(location.search).get('tab');
     activeTab = VALID_TABS.has(requestedTab) ? requestedTab : 'home';
-    history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title);
+    history.replaceState({ marker: NAV_MARKER, tab: activeTab, root: true }, document.title);
+    history.pushState({ marker: NAV_MARKER, tab: activeTab, guard: true }, document.title);
     window.addEventListener('popstate', (event) => {
       const state = event.state?.marker === NAV_MARKER
         ? event.state
@@ -140,6 +158,9 @@
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
       if (!['listenerProfileModal', 'customerPostFeed'].includes(state.overlay)) { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
       syncBodyState();
+      if (event.state?.marker === NAV_MARKER && event.state.root && !currentOverlay() && (!me || activeTab === 'home')) {
+        history.pushState({ marker: NAV_MARKER, tab: activeTab || 'home', guard: true }, document.title);
+      }
     });
   }
 
@@ -484,7 +505,7 @@
   }
 
   async function init() {
-    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); loadPublicShowcase();
+    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); initAutoHideHeader(); loadPublicShowcase();
     try { publicConfig = await P.api('/api/public/config'); } catch (error) { P.toast(error.message, 'error'); }
     if (P.Store.token) await loadMe();
   }

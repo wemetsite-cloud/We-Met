@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b0b0f">
+  <meta name="theme-color" content="#fff8fb">
   <meta name="description" content="The private We Met listener app for calls, exclusive posts, messages and earnings.">
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.4">
-  <link rel="stylesheet" href="style.css?v=8.9.4">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.5">
+  <link rel="stylesheet" href="style.css?v=8.9.5">
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -102,8 +102,8 @@
           <div id="listenerHomeShowcase" class="listener-home-showcase"><div class="listener-home-placeholder"><img src="/shared/logo.svg" alt=""></div></div>
         </section>
         <section class="listener-availability-console"><div><span id="deskLanguage" class="language-chip">Listener calls</span><h2 id="deskTitle">You are offline</h2><p id="deskText">Go online when you are ready.</p></div><div class="shift-buttons"><button id="onlineBtn" class="button button-primary" type="button">Go online</button><button id="breakBtn" class="button button-soft" type="button" disabled>Take break</button><button id="offlineBtn" class="button button-quiet" type="button" disabled>Go offline</button></div></section>
-        <div class="stats talk-stats listener-home-stats"><article><small>Today</small><strong id="todayTime">0:00</strong></article><article><small>This week</small><strong id="weekTime">0:00</strong></article><article><small>Calls</small><strong id="totalCalls">0</strong></article><article><small>All time</small><strong id="totalTime">0:00</strong></article></div>
-        <details class="activity-drawer"><summary>Availability activity <span>›</span></summary><div class="activity-drawer-body"><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button><div id="activityList" class="activity-list"></div></div></details>
+        <div class="stats talk-stats listener-home-stats hidden"><article><small>Today</small><strong id="todayTime">0:00</strong></article><article><small>This week</small><strong id="weekTime">0:00</strong></article><article><small>Calls</small><strong id="totalCalls">0</strong></article><article><small>All time</small><strong id="totalTime">0:00</strong></article></div>
+        <details class="activity-drawer hidden"><summary>Availability activity <span>›</span></summary><div class="activity-drawer-body"><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button><div id="activityList" class="activity-list"></div></div></details>
       </section>
 
       <section id="tab-posts" class="tab">
@@ -135,7 +135,7 @@
         <section class="wallet-payout-card">
           <div class="wallet-payout-head"><div><span class="eyebrow">UPI PAYOUT</span><h2>Request withdrawal</h2></div><button id="changePayoutDetails" class="wallet-change" type="button">Change</button></div>
           <div class="wallet-destination"><div><small>UPI ID</small><strong id="payoutUpiDisplay">Not added</strong></div><div><small>Linked phone</small><strong id="payoutPhoneDisplay">Not added</strong></div></div>
-          <form id="payoutDetailsForm" class="wallet-payout-edit stack hidden"><label>UPI ID<input id="listenerUpiId" autocomplete="off" placeholder="name@bank" maxlength="120" required></label><label>UPI-linked phone<input id="listenerUpiPhone" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+919876543210" required></label><div class="wallet-edit-actions"><button id="cancelPayoutDetails" class="button button-quiet" type="button">Cancel</button><button class="button button-soft" type="submit">Save payout details</button></div></form>
+          
           <form id="withdrawalForm" class="wallet-withdraw-form"><label>Amount<input id="withdrawalAmount" type="number" min="100" step="1" inputmode="decimal" placeholder="₹100 minimum" required></label><button class="button button-primary" type="submit">Request withdrawal</button></form>
         </section>
         <div id="walletToday" class="hidden">₹0.00</div><div id="walletWeek" class="hidden">₹0.00</div><div id="walletLifetime" class="hidden">₹0.00</div><div id="walletPaid" class="hidden">₹0.00</div><button id="refreshWallet" class="hidden" type="button">Refresh</button><div id="walletHistory" class="hidden"></div><div id="withdrawalHistory" class="hidden"></div>
@@ -191,6 +191,16 @@
     </main>
   </div>
 
+
+  <div id="payoutDetailsModal" class="modal payout-details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="payoutDetailsTitle">
+    <div class="modal-card payout-details-card">
+      <button id="payoutDetailsBack" class="modal-back" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button id="cancelPayoutDetails" class="close" type="button" aria-label="Close">×</button>
+      <span class="eyebrow">PAYOUT DETAILS</span><h2 id="payoutDetailsTitle">Where should we send it?</h2><p>Your UPI ID and linked phone stay private and are used only for payout requests.</p>
+      <form id="payoutDetailsForm" class="stack"><label>UPI ID<input id="listenerUpiId" autocomplete="off" placeholder="name@bank" maxlength="120" required></label><label>UPI-linked phone<input id="listenerUpiPhone" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+919876543210" required></label><button class="button button-primary button-large" type="submit">Save payout details</button></form>
+    </div>
+  </div>
+
   <div id="listenerSupportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerSupportTitle">
     <div class="modal-card support-auth-card"><button id="closeListenerSupport" class="close" type="button" aria-label="Close">×</button><span class="eyebrow">LOGIN SUPPORT</span><h2 id="listenerSupportTitle">Verify your number</h2>
       <form id="listenerSupportPhoneForm" class="stack"><label>Mobile number<div class="listener-phone-field international"><select id="listenerSupportCountry" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option></select><input id="listenerSupportPhone" inputmode="tel" maxlength="14" required></div></label><button class="button button-primary">Send OTP</button></form>
@@ -228,6 +238,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.4"></script><script src="/shared/socket-loader.js?v=8.9.3"></script><script src="api.js?v=8.9.4"></script><script src="/shared/webrtc.js?v=8.9.3"></script><script src="app.js?v=8.9.4"></script>
+  <script src="config.js?v=8.9.5"></script><script src="/shared/socket-loader.js?v=8.9.5"></script><script src="api.js?v=8.9.5"></script><script src="/shared/webrtc.js?v=8.9.5"></script><script src="app.js?v=8.9.5"></script>
 </body>
 </html>

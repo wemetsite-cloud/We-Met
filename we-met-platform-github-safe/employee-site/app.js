@@ -57,6 +57,7 @@
   }
 
   function currentOverlay() {
+    if (!$('#payoutDetailsModal')?.classList.contains('hidden')) return 'payoutDetailsModal';
     if (!$('#listenerPostEditModal')?.classList.contains('hidden')) return 'listenerPostEditModal';
     if (!$('#listenerPostDetailModal')?.classList.contains('hidden')) return 'listenerPostDetailModal';
     if (!$('#listenerSupportModal')?.classList.contains('hidden')) return 'listenerSupportModal';
@@ -118,7 +119,8 @@
   }
 
   function initNavigation() {
-    history.replaceState(navigationState('desk', null), document.title);
+    history.replaceState({ ...navigationState('desk', null), root: true }, document.title);
+    history.pushState({ ...navigationState('desk', null), guard: true }, document.title);
     window.addEventListener('popstate', (event) => {
       const previousOverlay = currentOverlay();
       const state = event.state?.marker === NAVIGATION_MARKER
@@ -131,6 +133,7 @@
       if (previousOverlay === 'callView' && currentCall) minimizeListenerCall('none');
       else show('#callView', false);
       show('#incomingModal', false);
+      show('#payoutDetailsModal', false);
       show('#recoveryModal', false);
       show('#listenerSupportModal', false);
       show('#listenerPostDetailModal', false);
@@ -139,6 +142,9 @@
       releasePostEditPreview();
       if (me) selectTab(state.tab, { historyMode: 'none' });
       syncBackButton();
+      if (event.state?.marker === NAVIGATION_MARKER && event.state.root && !currentOverlay() && (!me || activeTab === 'desk')) {
+        history.pushState({ ...navigationState('desk', null), guard: true }, document.title);
+      }
     });
   }
 
@@ -352,6 +358,7 @@
     $('#payoutDetailsForm').addEventListener('submit', savePayoutDetails);
     $('#changePayoutDetails').addEventListener('click', () => showPayoutEditor(true));
     $('#cancelPayoutDetails').addEventListener('click', () => showPayoutEditor(false));
+    $('#payoutDetailsBack').addEventListener('click', () => showPayoutEditor(false));
     $('#settingsPayoutChange').addEventListener('click', () => { selectTab('wallet'); showPayoutEditor(true); setTimeout(() => $('#listenerUpiId').focus(), 80); });
     $('#withdrawalForm').addEventListener('submit', requestWithdrawal);
     $('#refreshActivity').addEventListener('click', () => { loadStats(); loadActivity(); });
@@ -410,14 +417,14 @@
   }
 
   function showPayoutEditor(open) {
-    const form = $('#payoutDetailsForm');
-    if (!form) return;
-    show('#payoutDetailsForm', open);
     if (open) {
       $('#listenerUpiId').value = currentPayoutDetails.upiId || '';
       $('#listenerUpiPhone').value = currentPayoutDetails.upiPhone || '';
+      openManagedOverlay('#payoutDetailsModal', 'payoutDetailsModal');
       setTimeout(() => $('#listenerUpiId').focus(), 60);
+      return;
     }
+    closeManagedOverlay('payoutDetailsModal');
   }
 
   async function init() {

@@ -339,7 +339,7 @@ button{touch-action:manipulation}
   --rose:#ff80b8;--ink:#f8f7fa;--muted:#a7a5ae;--line:rgba(255,255,255,.09);--white:#1b1d22;
   --green:#38d68b;--amber:#f2aa4b;--red:#ff6684;--shadow:0 24px 70px rgba(0,0,0,.28);
   --surface:#1a1c21;--surface-2:#23252b;--surface-3:#2b2e35;--violet:#8f4fff;--deep-purple:#280052;
-  color-scheme:dark;
+  color-scheme:light;
 }
 html{scroll-padding-top:90px;background:#111217}
 body{background:radial-gradient(circle at 80% 5%,rgba(103,35,164,.15),transparent 30%),#111217;color:var(--ink)}
@@ -664,7 +664,7 @@ body.signed-in{scroll-padding-bottom:calc(118px + env(safe-area-inset-bottom))}
 body.razorpay-open:before{display:none!important}
 body.razorpay-open{background:#0c0d10!important}
 body.razorpay-open .wallet-checkout-overlay:not(.hidden){display:grid!important;background:radial-gradient(circle at 50% 22%,rgba(230,45,125,.2),transparent 36%),rgba(7,8,10,.94)}
-body.razorpay-open iframe.razorpay-checkout-frame,body.razorpay-open iframe[src*="razorpay"]{background:#0c0d10!important;color-scheme:dark}
+body.razorpay-open iframe.razorpay-checkout-frame,body.razorpay-open iframe[src*="razorpay"]{background:#0c0d10!important;color-scheme:light}
 .wallet-checkout-card[aria-busy="true"],.wallet-checkout-overlay[aria-busy="true"] .wallet-checkout-card{box-shadow:0 36px 110px rgba(230,45,125,.12),0 36px 100px rgba(0,0,0,.64)}
 
 @media(max-width:760px){
@@ -845,20 +845,83 @@ body.razorpay-open:before{display:none!important}body.razorpay-open{background:#
 @media(max-width:760px){body.signed-in .tabs{background:rgba(255,255,255,.98)!important;border-top:1px solid var(--line)!important}.tabs button.active{background:#fff0f6!important}.dashboard{background:transparent!important}}
 
 
-/* v8.9.4 — dark application theme; Razorpay Standard Checkout behavior intentionally untouched */
-:root{--pink:#ff4f9a;--pink-deep:#ff2f8d;--pink-soft:#26111e;--pink-faint:#0d0b0f;--ink:#f7f2f5;--muted:#aaa0a8;--line:#2b252c;--white:#111014;--surface:#111014;--surface-2:#171419;--surface-3:#201a20;color-scheme:dark!important}
-html,body{background:#0b0b0f!important;color:#f7f2f5!important}body{background:radial-gradient(circle at 15% 0,rgba(255,47,141,.08),transparent 34%),linear-gradient(180deg,#0b0b0f,#111014 52%,#0b0b0f)!important}.page-glow-one{background:radial-gradient(circle,rgba(255,47,141,.12),transparent 68%)!important}.page-glow-two{background:radial-gradient(circle,rgba(114,71,255,.08),transparent 70%)!important}
-.topbar,body.signed-in .topbar{background:rgba(11,11,15,.88)!important;border-bottom:1px solid #242027!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important}.brand strong,.hero h1,.trust-copy h2,.section-head h2,.call-hero h2,.welcome-card h1{color:#fff!important}.brand small,.hero-lead,.section-head p,.call-hero p{color:#aaa0a8!important}.topbar .button-quiet,.topbar .button-soft,.app-back,.modal-back{background:#171419!important;color:#fff!important;border:1px solid #2d2730!important}
-.trust-row span,.feature-grid article,.steps article,.phone-preview,.floating-note,.trust-showcase,.trust-points span,.install-banner,.welcome-card,.call-hero,.previous-box,.language-fallback-toggle,.listener-card,.listener-card-v8,.panel,.wallet-plan-card,.coupon-panel,.membership-card,.list-item,.profile-menu-group,.profile-menu-row,.customer-profile-flat,.direct-message-layout,.direct-chat,.settings-card,.security-panel{background:#121116!important;color:#f7f2f5!important;border-color:#2b252c!important;box-shadow:none!important}.phone-preview,.trust-showcase,.call-hero,.welcome-card{background:linear-gradient(145deg,#171419,#0f0e12)!important}.preview-person p,.preview-note,.trust-row span,.feature-grid article p,.steps article p,.trust-copy>p,.public-footer>div>p,.public-footer>small{color:#aaa0a8!important}.preview-note span,.feature-grid h2,.steps h3,.trust-row b{color:#fff!important}.preview-person .language-chip,.public-footer nav a{background:#22121b!important;color:#ff79b5!important}
-.trust-visuals{background:transparent!important}.trust-visuals img{object-fit:cover!important;background:#171419!important;border-color:#2c2530!important;box-shadow:0 14px 34px rgba(0,0,0,.32)!important}
-.tabs,body.signed-in .tabs{background:rgba(15,14,18,.97)!important;border-color:#2b252c!important;box-shadow:none!important}.tabs button{color:#8f858d!important}.tabs button.active{background:rgba(255,47,141,.12)!important;color:#ff66aa!important}
-.listener-card,.listener-card-v8{background:#121116!important}.listener-media,.listener-card-avatar{background:#1e1b21!important}.listener-status{background:rgba(15,14,18,.9)!important;color:#fff!important;border-color:#312a33!important}.listener-card h3,.listener-card-v8 h3,.listener-card-copy h3{color:#fff!important}.listener-card p,.listener-card-v8 p,.listener-card-copy p{color:#aaa0a8!important}.listener-tags span{background:#1d151b!important;color:#e9a2c0!important;border-color:#34232c!important}
-.minutes-balance{background:#151318!important;border:1px solid #2b252c!important;color:#fff!important}.minutes-balance small{color:#9c939a!important}.minutes-balance strong{color:#ff64aa!important}
-.plans-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:14px!important}.wallet-plan-card{min-height:250px!important;aspect-ratio:.72!important;padding:18px 15px!important;border-radius:22px!important;background:linear-gradient(155deg,#1b161c,#101014)!important;border:1px solid #302731!important;box-shadow:0 16px 34px rgba(0,0,0,.2)!important}.wallet-plan-minutes b{font-size:38px!important;color:#fff!important}.wallet-plan-price{font-size:20px!important;color:#fff!important}.wallet-plan-name{color:#9f959d!important}.wallet-plan-card>.button{border-radius:13px!important}.popular-label{background:#ff2f8d!important;color:#fff!important}
-.modal:not(.call-modal):not(.customer-post-feed){background:rgba(0,0,0,.68)!important}.modal-card,.auth-card,.wallet-checkout-card{background:#131116!important;color:#f7f2f5!important;border:1px solid #2f2830!important;box-shadow:0 28px 80px rgba(0,0,0,.5)!important}.modal-card .close,.auth-card .close{background:#1b181d!important;color:#fff!important;border:1px solid #322a33!important}.modal-card h1,.modal-card h2,.auth-card h1,.auth-card h2{color:#fff!important}
-.stack input,.stack textarea,.stack select,input,textarea,select,.phone-field.international select,.phone-field.international input{background:#151318!important;color:#fff!important;border-color:#302a31!important}.stack input:focus,.stack textarea:focus,.stack select:focus,input:focus,textarea:focus,select:focus{border-color:#ff4f9a!important;box-shadow:0 0 0 4px rgba(255,79,154,.09)!important}.button-soft{background:#24151e!important;color:#ff80b8!important;border-color:#3b2631!important}.button-quiet{background:#161419!important;color:#ddd4da!important;border-color:#2c2730!important}
-.customer-profile-identity h2,.profile-public-copy h2,.profile-menu-row b,.direct-chat-head h3{color:#fff!important}.customer-profile-identity p,.customer-profile-identity small,.profile-menu-row small,.direct-chat-head small{color:#9f959d!important}.profile-menu-row:hover{background:#18151a!important}.direct-message-layout,.direct-chat-head,.direct-message-list,.direct-message-form{background:#111014!important;border-color:#29242b!important}.direct-bubble{background:#211d23!important;color:#f7f2f5!important}.direct-bubble.mine{background:#d82c79!important;color:#fff!important}
-.call-modal{background:rgba(0,0,0,.72)!important}.call-shell{background:linear-gradient(155deg,#151318,#0d0c0f)!important;color:#fff!important;border-color:#2d2730!important;box-shadow:0 28px 80px rgba(0,0,0,.55)!important}.call-person h2,.call-person p,.call-status,.call-timer{color:#fff!important}.chat-box,.round-action{background:#171419!important;color:#fff!important;border-color:#302a31!important}.customer-post-feed,.customer-feed-post,.customer-feed-media{background:#0f0e12!important;color:#fff!important}.customer-post-feed>header,.customer-feed-post footer{background:#111014!important;color:#fff!important;border-color:#29242b!important}
-/* Do not style Razorpay iframe or force Razorpay page state. The working popup remains provider-controlled. */
-body.razorpay-open:before{display:none!important}body.razorpay-open .wallet-checkout-overlay:not(.hidden){display:none!important}
-@media(max-width:1180px){.plans-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}@media(max-width:900px){.plans-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(max-width:760px){body.signed-in .tabs{background:rgba(15,14,18,.98)!important;border-top:1px solid #29242b!important}.plans-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}.wallet-plan-card{min-height:224px!important;aspect-ratio:.72!important;padding:15px 12px!important}.wallet-plan-minutes b{font-size:33px!important}.dashboard{background:transparent!important}}
+/* v8.9.5 — luminous paper / gallery light theme. No dark application surfaces. */
+:root{
+  --pink:#df4d8e;--pink-deep:#b92f70;--pink-soft:#fff1f6;--pink-faint:#fff9fc;
+  --ink:#392b35;--muted:#82727c;--line:#eadfe6;--surface:#fffdfd;--surface-2:#fff7fa;
+  --lavender:#f3efff;--peach:#fff0e8;--mint:#eefaf5;--blue-soft:#eef6ff;
+  --shadow:0 18px 50px rgba(111,72,93,.09);color-scheme:light!important;
+}
+html{background:#fffafc!important;scroll-behavior:auto!important;scrollbar-width:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important}
+body{color:var(--ink)!important;background:
+  radial-gradient(circle at 9% 5%,rgba(255,213,230,.78),transparent 23%),
+  radial-gradient(circle at 92% 20%,rgba(224,216,255,.72),transparent 25%),
+  radial-gradient(circle at 22% 82%,rgba(220,246,238,.58),transparent 23%),
+  linear-gradient(180deg,#fffdfd 0%,#fff8fb 48%,#fffdfd 100%)!important}
+body:after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;opacity:.42;background-image:radial-gradient(circle at center,rgba(206,155,182,.26) 1px,transparent 1.2px);background-size:24px 24px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.42),transparent 76%)}
+.page-glow{opacity:.62!important;filter:blur(8px)!important}.page-glow-one{background:radial-gradient(circle,rgba(255,187,216,.62),transparent 68%)!important}.page-glow-two{background:radial-gradient(circle,rgba(211,201,255,.62),transparent 70%)!important}
+
+/* Header is intentionally backgroundless. */
+.topbar,body.signed-in .topbar{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;transition:transform .22s ease,opacity .22s ease!important;will-change:transform}
+.topbar.topbar-hidden{transform:translateY(calc(-100% - 12px))!important;opacity:.2!important;pointer-events:none}
+.topbar .brand{filter:drop-shadow(0 5px 14px rgba(131,73,104,.1))}.topbar .brand img{border-radius:14px;box-shadow:0 7px 20px rgba(178,79,125,.12)}
+body.signed-in .topbar .brand span{display:none!important}
+body.signed-in .top-actions{display:none!important}
+.app-back,.modal-back,.customer-post-feed>header button,.call-back{background:rgba(255,255,255,.94)!important;color:#9f2d65!important;border:1px solid rgba(218,197,208,.95)!important;box-shadow:0 8px 22px rgba(113,73,94,.13)!important;backdrop-filter:blur(10px)!important}
+.app-back svg,.modal-back svg,.call-back svg{stroke:currentColor!important}
+
+/* Paper-art surfaces: bright, soft and varied instead of plain white. */
+.phone-preview,.trust-showcase,.install-banner,.feature-grid article,.steps article,.random-connect-card,.listener-card-v8,.panel,.membership-card,.list-item,.customer-profile-flat,.profile-menu-group,.direct-message-layout,.settings-card,.security-panel{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(255,248,251,.94))!important;border:1px solid rgba(231,217,225,.95)!important;box-shadow:var(--shadow)!important}
+.phone-preview:after,.trust-showcase:after,.random-connect-card:after,.panel:after,.membership-card:after{content:"";position:absolute;width:135px;height:135px;border-radius:50%;right:-68px;top:-72px;background:radial-gradient(circle,rgba(235,188,213,.23),transparent 67%);pointer-events:none}
+.feature-grid article:nth-child(2n){background:linear-gradient(145deg,#fff,#f8f5ff)!important}.feature-grid article:nth-child(3n){background:linear-gradient(145deg,#fff,#f1fbf7)!important}.steps article:nth-child(2n){background:linear-gradient(145deg,#fff,#fff5ef)!important}
+
+/* Profile art and rings. */
+.listener-card-avatar,.listener-profile-avatar,.customer-photo,.conversation-avatar,.membership-listener img,.call-avatar{border-radius:50%!important;background:#fff7fa!important;border:5px solid #fff!important;box-shadow:0 0 0 2px #edc9da,0 12px 30px rgba(119,73,95,.13)!important}
+.listener-card-avatar{width:74px!important;height:74px!important}.listener-card-avatar img,.listener-profile-avatar img,.customer-photo img,.conversation-avatar img{border-radius:50%!important;object-fit:cover!important}
+.listener-card-v8{border-radius:22px!important}.listener-tags span,.language-chip,.exclusive-tag,.listener-live{background:#fff3f8!important;color:#a9326b!important;border-color:#f0d8e4!important}
+.listener-live.available{background:#effaf5!important;color:#237a5b!important;border-color:#d7eee4!important}
+
+/* Navigation feels like floating porcelain, never a solid header. */
+.tabs,body.signed-in .tabs{background:rgba(255,255,255,.88)!important;border:1px solid rgba(231,216,224,.9)!important;box-shadow:0 14px 40px rgba(111,72,93,.08)!important;backdrop-filter:blur(18px)!important}
+.tabs button{color:#8a7781!important}.tabs button.active{background:linear-gradient(145deg,#fff0f6,#f7f0ff)!important;color:#ac2e68!important;box-shadow:none!important}
+
+/* Inputs / locks / exclusive are fully light. */
+.stack input,.stack textarea,.stack select,input,textarea,select,.phone-field.international select,.phone-field.international input{background:rgba(255,255,255,.95)!important;color:var(--ink)!important;border:1px solid #e8dce3!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important}
+.stack input::placeholder,.stack textarea::placeholder,input::placeholder,textarea::placeholder{color:#ad9da6!important}
+.locked-posts{background:linear-gradient(145deg,#fff9fc,#f5f0ff)!important;color:var(--ink)!important;border:1px dashed #dfbdd0!important;box-shadow:0 12px 30px rgba(116,76,98,.07)!important}.locked-posts .lock-art{background:#fff!important;color:#c43777!important;border:1px solid #efd9e5!important}.locked-posts small{color:var(--muted)!important}.exclusive-posts{background:transparent!important}.exclusive-posts-head span{color:#a62f68!important}.member-confirmed{background:#eefaf5!important;color:#24765a!important;border-color:#d8eee5!important}
+
+/* Customer wallet: balance is unmistakable; plan cards are vertical bank-card proportions. */
+.wallet-heading{align-items:center!important}.minutes-balance{min-width:150px!important;padding:13px 17px!important;border-radius:19px!important;background:linear-gradient(145deg,#fff,#fff0f6)!important;border:1px solid #eccfdd!important;box-shadow:0 12px 28px rgba(140,70,105,.09)!important}.minutes-balance small{color:#8c7883!important}.minutes-balance strong{font-size:29px!important;line-height:1!important;color:#a72e68!important;letter-spacing:-.035em!important}
+.plans-grid{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:14px!important;overflow:visible!important;padding-bottom:2px!important}
+.wallet-plan-card{min-width:0!important;min-height:248px!important;aspect-ratio:.72!important;padding:18px 15px!important;border-radius:24px!important;background:linear-gradient(160deg,#fff 0%,#fff5f9 58%,#f6f1ff 100%)!important;border:1px solid #e8d9e2!important;box-shadow:0 16px 38px rgba(112,70,92,.09)!important}
+.wallet-plan-card:nth-child(3n+2){background:linear-gradient(160deg,#fff,#f4f8ff)!important}.wallet-plan-card:nth-child(3n){background:linear-gradient(160deg,#fff,#f1fbf7)!important}
+.wallet-plan-card:before{content:"";position:absolute;left:15px;right:15px;top:14px;height:3px;border-radius:999px;background:linear-gradient(90deg,#e34d90,#a885e7,#70bba9);opacity:.72}.wallet-plan-minutes b{font-size:39px!important;color:var(--ink)!important}.wallet-plan-price{font-size:21px!important;color:#9f2d65!important}.wallet-plan-name{color:#8d7883!important}.popular-label{background:#fff0f6!important;color:#a62f68!important;border:1px solid #eecfdd!important}.wallet-plan-card>.button{border-radius:14px!important}
+
+/* Call screen: full white luxury, with a pale artwork backdrop. */
+.call-modal{background:rgba(222,204,214,.42)!important;backdrop-filter:blur(14px)!important}.call-shell{background:linear-gradient(150deg,#fff,#fff8fb 58%,#f7f4ff)!important;color:var(--ink)!important;border:1px solid #e8dce4!important;box-shadow:0 30px 90px rgba(102,65,85,.18)!important}.call-shell:before{background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,250,252,.9)),var(--call-profile-bg) center/cover no-repeat!important;opacity:.34!important}.call-shell:after{background:linear-gradient(180deg,transparent 10%,rgba(255,252,253,.76) 44%,rgba(255,252,253,.98) 66%)!important}.call-top,.call-person h2,.call-person p,.call-person>strong,.call-status,.call-timer{color:var(--ink)!important}.call-top{color:#75636d!important}.chat-box{background:rgba(255,255,255,.78)!important;border-color:#eadfe5!important}.bubble{background:#f6eef3!important;color:var(--ink)!important}.bubble.mine{background:#e14d8f!important;color:#fff!important}.chat-form{border-color:#eadfe5!important}.chat-form input{background:#fff!important;color:var(--ink)!important}.chat-form input::placeholder{color:#a4959e!important}.round-action{background:#fff!important;color:#604c58!important;border:1px solid #e5d8df!important;box-shadow:0 9px 25px rgba(108,70,90,.08)!important}.round-action.end,.round-action.end-call{background:#df5874!important;color:#fff!important;border-color:transparent!important}
+.restore-call{background:rgba(255,255,255,.96)!important;color:#8f2a5e!important;border:1px solid #e7d4de!important;box-shadow:0 15px 40px rgba(109,67,89,.15)!important}.restore-call small{color:#8b7781!important}
+
+/* Modals / feeds. */
+.modal:not(.call-modal):not(.customer-post-feed){background:rgba(223,207,216,.48)!important}.modal-card,.auth-card,.wallet-checkout-card{background:linear-gradient(155deg,#fff,#fffafd)!important;color:var(--ink)!important;border:1px solid #e9dde4!important;box-shadow:0 28px 86px rgba(100,65,84,.17)!important}.modal-card h1,.modal-card h2,.auth-card h1,.auth-card h2{color:var(--ink)!important}.close{background:#fff!important;color:#8f2a5e!important;border:1px solid #e6d8e0!important}.customer-post-feed,.customer-feed-post,.customer-feed-media{background:#fffdfd!important;color:var(--ink)!important}.customer-post-feed>header,.customer-feed-post footer{background:rgba(255,253,253,.96)!important;color:var(--ink)!important;border-color:#eadfe5!important}
+
+/* No visible page scrollbar / no smooth scroll line animation. */
+*{scrollbar-width:none!important}*::-webkit-scrollbar{display:none!important}.tab{animation:none!important}.page,.payment-step{animation:none!important}
+
+body.razorpay-open:before{display:none!important}body.razorpay-open{background:#fff8fb!important}body.razorpay-open .wallet-checkout-overlay:not(.hidden){display:none!important}body.razorpay-open iframe.razorpay-checkout-frame,body.razorpay-open iframe[src*="razorpay"]{background:transparent!important;color-scheme:light!important}
+
+@media(max-width:1180px){.plans-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+@media(max-width:900px){.plans-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:760px){
+  body.signed-in .topbar{height:calc(56px + env(safe-area-inset-top))!important;padding-inline:max(11px,env(safe-area-inset-left)) max(11px,env(safe-area-inset-right))!important}.topbar .brand img{width:38px!important;height:38px!important}.topbar .brand strong{font-size:14px!important}
+  body.signed-in .tabs{background:rgba(255,255,255,.92)!important;border-top:1px solid #eadde4!important}
+  .plans-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}.wallet-plan-card{min-height:218px!important;aspect-ratio:.72!important;padding:15px 11px!important;border-radius:20px!important}.wallet-plan-minutes b{font-size:32px!important}.wallet-plan-price{font-size:17px!important}
+  .minutes-balance{min-width:116px!important;padding:11px 12px!important}.minutes-balance strong{font-size:23px!important}
+  .listener-card-avatar{width:64px!important;height:64px!important}.call-shell{border-radius:0!important;border:0!important}
+}
+
+/* v8.9.5 light completeness: legacy/cached surfaces that can still appear. */
+.toast{background:#fff!important;color:#5f4b57!important;border:1px solid #e6d9e0!important;box-shadow:0 14px 38px rgba(103,67,86,.13)!important}.toast.error{background:#fff0f3!important;color:#a13b55!important;border-color:#f0ced7!important}.toast.success{background:#eefaf5!important;color:#28765b!important;border-color:#d6ece3!important}
+.phone-auth-step h1,.phone-auth-step h2,.phone-auth-step label{color:var(--ink)!important}.phone-auth-step>p,.phone-auth-step small{color:var(--muted)!important}.phone-field,.auth-switch,.auth-flow .check{background:#fff8fb!important;border-color:#e8dce3!important}.phone-field>span{color:#a72f68!important;border-color:#e8dce3!important}.auth-switch button{color:#8b7782!important}.auth-switch button.active{background:#fff!important;color:#a42e67!important}.password-field button{background:#fff0f6!important;color:#a32e66!important}.auth-progress span,.auth-progress-line{background:#eadfe5!important}.auth-progress span.active,.auth-progress-line i{background:linear-gradient(90deg,#e24f91,#b392e6)!important}
+.wallet-checkout-brand b,.wallet-checkout-summary h2,.wallet-checkout-summary>strong,.wallet-checkout-minutes b{color:var(--ink)!important}.wallet-checkout-brand small,.wallet-checkout-provider,.wallet-checkout-summary>div>small,.wallet-checkout-summary p{color:var(--muted)!important}.wallet-checkout-summary,.wallet-checkout-minutes,.wallet-checkout-trust span{background:#fff8fb!important;color:var(--ink)!important;border-color:#e7dae1!important}.wallet-checkout-minutes small{color:#a42e67!important}.wallet-checkout-trust span{color:#7f6c77!important}
+.merchant-detail-card,.premium-qr-card,.proof-preview,.payment-summary div,.upi-actions-card,.payment-qr-card{background:#fff!important;color:var(--ink)!important;border-color:#e6dbe1!important}.merchant-detail-card strong,.premium-qr-card>strong,.payment-summary strong{color:var(--ink)!important}.merchant-copy,.payment-security-line>span,.premium-paid-button{background:#fff0f6!important;color:#a42e67!important;border:1px solid #ead0dd!important}.premium-qr-card .payment-kicker,.premium-qr-card>small{color:var(--muted)!important}.premium-qr-card .qr-save-link{background:#fff7fa!important;color:#a42e67!important;border-color:#e5d8df!important}.payment-summary .exact-amount,.payment-status-icon.approved{background:#eefaf5!important;color:#28765b!important;border-color:#d6ece3!important}.payment-summary .exact-amount small{color:#5e8677!important}

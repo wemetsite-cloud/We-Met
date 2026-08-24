@@ -1,12 +1,14 @@
 {
-  "version": "8.9.4",
-  "name": "dark-listener-wallet-showcase",
+  "version": "8.9.5",
+  "name": "premium-light-classic-razorpay",
   "changes": [
-    "Returns customer, listener and admin portals to a refined dark theme without changing the working Razorpay Standard Checkout popup flow",
-    "Redesigns the listener signed-in home with a visual hero, clearer availability controls, compact work stats and an auto-hiding header that returns at the top or on upward scroll",
-    "Simplifies the listener wallet to balance, per-minute rate, saved UPI destination and withdrawal amount/request controls; payout details edit only on demand and are reachable from Settings",
-    "Adds an admin Public images manager for up to 12 compressed portrait previews stored in platform settings and shuffled daily on customer/listener public screens",
-    "Reshapes customer talk-time plans into taller narrow cards with 2 columns on phones and up to 5 columns on desktop",
-    "Bumps PWA caches and asset versions to 8.9.4"
+    "Rebuilds customer, listener, admin, legal and calling surfaces in a premium artistic light theme with no active dark-theme presentation",
+    "Preserves the confirmed working Razorpay Standard Checkout popup flow from v8.9.3 without callback or redirect payment navigation",
+    "Uses transparent auto-hiding headers that return on upward scroll or at the top, with high-contrast back navigation",
+    "Simplifies the listener experience and wallet to balance, per-minute rate, saved UPI/phone, amount and withdrawal request, with payout details edited in an on-demand popup",
+    "Keeps the admin-managed daily shuffled public listener image pool for customer and listener preview areas",
+    "Refines the customer wallet with a more prominent balance and tall premium plan cards: two per row on phones and up to five on desktop",
+    "Hides visible page scrollbars and removes decorative scrolling/transition motion while preserving normal page scrolling",
+    "Bumps project, PWA cache and asset versions to 8.9.5"
   ]
 }
