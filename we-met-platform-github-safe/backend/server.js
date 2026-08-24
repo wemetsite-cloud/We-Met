@@ -7,6 +7,7 @@ const db = require('./src/db');
 const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
 const { settleCall } = require('./src/call-settlement');
+const subscriptionRoutes = require('./src/routes/subscriptions');
 
 const app = express();
 const server = http.createServer(app);
@@ -51,6 +52,7 @@ app.use((req, res, next) => {
   next();
 });
 
+app.post('/api/subscriptions/webhook', express.raw({ type: 'application/json', limit: '1mb' }), subscriptionRoutes.webhook);
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', async (_req, res) => {
@@ -66,9 +68,13 @@ app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
 app.use('/api', require('./src/routes/razorpay'));
+app.use('/api/subscriptions', subscriptionRoutes.router);
 app.use('/api/customer', require('./src/routes/customer'));
+app.use('/api/customer', require('./src/routes/customer-social'));
 app.use('/api/employee', require('./src/routes/employee'));
+app.use('/api/employee', require('./src/routes/employee-social'));
 app.use('/api/admin', require('./src/routes/admin'));
+app.use('/api/admin', require('./src/routes/admin-social'));
 
 const io = new Server(server, {
   cors: {
@@ -173,9 +179,19 @@ app.use((req, res) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  const status = error.status || 500;
+  const status = error.code === 'LIMIT_FILE_SIZE'
+    ? 413
+    : error.type === 'entity.too.large'
+      ? 413
+      : error.code === '22P02'
+        ? 400
+        : error.status || 500;
   res.status(status).json({
-    error: status >= 500 ? 'Server error. Please try again.' : error.message,
+    error: status === 413
+      ? 'That upload is larger than the allowed limit.'
+      : error.code === '22P02'
+        ? 'The requested item identifier is invalid.'
+      : status >= 500 ? 'Server error. Please try again.' : error.message,
   });
 });
 

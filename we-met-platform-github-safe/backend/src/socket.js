@@ -48,7 +48,7 @@ function createSocketServer(io) {
   function publicListeners() {
     const priority = { available: 0, ringing: 1, busy: 2, break: 3 };
     return [...employees.entries()]
-      .map(([id, employee]) => ({ id, name: employee.name, bio: employee.bio || '', avatar: employee.avatar || '', language: employee.language || 'Malayalam', status: employee.state }))
+      .map(([id, employee]) => ({ id, name: employee.name, bio: employee.bio || '', avatar: employee.avatar || '', banner: employee.banner || '', language: employee.language || 'Malayalam', status: employee.state }))
       .sort((a, b) => (priority[a.status] ?? 9) - (priority[b.status] ?? 9) || a.name.localeCompare(b.name));
   }
 
@@ -65,9 +65,10 @@ function createSocketServer(io) {
     employees.set(user.id, {
       state,
       availability,
-      name: user.name,
+      name: user.username || user.name,
       bio: user.bio || '',
       avatar: user.profile_image || '',
+      banner: user.banner_image || '',
       language: user.listener_language || 'Malayalam',
       lastAssigned: employees.get(user.id)?.lastAssigned || 0,
     });
@@ -94,7 +95,10 @@ function createSocketServer(io) {
     try {
       const payload = verifyToken(socket.handshake.auth?.token);
       const result = await db.query(`
-        SELECT id, role, name, email, bio, CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image, balance_seconds, status, listener_availability, listener_language,
+        SELECT id, role, name, username, email, bio,
+               CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
+               CASE WHEN banner_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE banner_image END AS banner_image,
+               balance_seconds,status,listener_availability,listener_language,listener_verification_status,
                suspended_until, suspension_reason, auth_version
         FROM users
         WHERE id = $1
@@ -119,9 +123,12 @@ function createSocketServer(io) {
     return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
   }
 
-  function findAvailableEmployee(excluded = [], preferredEmployeeId = null, primaryLanguage = 'Malayalam', allowOtherLanguages = false) {
+  function findAvailableEmployee(excluded = [], preferredEmployeeId = null, primaryLanguage = 'Malayalam', allowOtherLanguages = false, allowedEmployeeIds = null) {
     const available = [...employees.entries()]
-      .filter(([id, employee]) => employee.state === 'available' && hasLiveSocket(id) && !excluded.includes(id));
+      .filter(([id, employee]) => employee.state === 'available'
+        && hasLiveSocket(id)
+        && !excluded.includes(id)
+        && (!allowedEmployeeIds || allowedEmployeeIds.has(id)));
 
     if (preferredEmployeeId) {
       const preferred = available.find(([id]) => id === preferredEmployeeId);
@@ -165,6 +172,27 @@ function createSocketServer(io) {
       return;
     }
 
+    const subscribed = await db.query(`
+      SELECT employee_id FROM listener_subscriptions
+      WHERE customer_id=$1 AND status='active' AND current_period_end>now()
+    `, [customerId]);
+    const allowedEmployeeIds = new Set(subscribed.rows.map((row) => row.employee_id));
+    if (preferredEmployeeId && !allowedEmployeeIds.has(preferredEmployeeId)) {
+      emitToUser(customerId, 'call:error', {
+        message: 'Subscribe to this listener before calling. Calls also require talk-time in your wallet.',
+        subscriptionRequired: true,
+        employeeId: preferredEmployeeId,
+      });
+      return;
+    }
+    if (!preferredEmployeeId && !allowedEmployeeIds.size) {
+      emitToUser(customerId, 'call:error', {
+        message: 'Subscribe to a listener before calling. Calls are charged separately from your talk-time wallet.',
+        subscriptionRequired: true,
+      });
+      return;
+    }
+
     let primaryLanguage = String(options.primaryLanguage || 'Malayalam').trim() || 'Malayalam';
     const allowOtherLanguages = Boolean(options.allowOtherLanguages);
 
@@ -173,7 +201,7 @@ function createSocketServer(io) {
       if (preferred?.language) primaryLanguage = preferred.language;
     }
 
-    const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages);
+    const employeeId = findAvailableEmployee(triedEmployees, preferredEmployeeId, primaryLanguage, allowOtherLanguages, allowedEmployeeIds);
     if (!employeeId) {
       const otherLanguagesAvailable = [...employees.values()].some((item) => item.state === 'available' && !sameLanguage(item.language, primaryLanguage));
       emitToUser(customerId, 'call:unavailable', {
@@ -223,6 +251,7 @@ function createSocketServer(io) {
     const stillOnline = await db.query(`
       SELECT 1 FROM users
       WHERE id=$1 AND role='employee' AND status='active' AND listener_availability='online'
+        AND listener_verification_status='approved'
     `, [employeeId]);
     if (!stillOnline.rows[0] || !hasLiveSocket(employeeId) || employees.get(employeeId) !== employee || employee.state !== 'ringing') {
       await db.query(`
@@ -514,7 +543,9 @@ function createSocketServer(io) {
     if (user.role === 'employee') {
       cancelListenerDisconnect(user.id);
       listenerActivity.touchLastSeen(user.id).catch(console.error);
-      const availability = user.listener_availability || 'offline';
+      const availability = user.listener_verification_status === 'approved'
+        ? (user.listener_availability || 'offline')
+        : 'offline';
       const currentRuntime = calls.get(userCall.get(user.id));
       if (availability === 'online' || availability === 'break') {
         const presenceState = currentRuntime
@@ -546,6 +577,15 @@ function createSocketServer(io) {
       if (user.role !== 'employee') return availabilityReply(acknowledge, { ok: false, error: 'This is not a listener account.' });
       if (activeCallForUser(user.id)) return availabilityReply(acknowledge, { ok: false, error: 'Finish the current call before changing availability.' });
 
+      const verification = await db.query(`
+        SELECT listener_verification_status,username,name,bio,profile_image,banner_image,listener_language
+        FROM users WHERE id=$1 AND role='employee'
+      `, [user.id]);
+      if (verification.rows[0]?.listener_verification_status !== 'approved') {
+        return availabilityReply(acknowledge, { ok: false, error: 'Wait for administrator voice verification before going online.' });
+      }
+      Object.assign(user, verification.rows[0]);
+
       cancelListenerDisconnect(user.id);
       await db.query(`UPDATE users SET listener_availability='online',last_seen_at=now(),updated_at=now() WHERE id=$1 AND role='employee'`, [user.id]);
       await listenerActivity.transition(user.id, 'online', 'Went online');
@@ -559,6 +599,10 @@ function createSocketServer(io) {
     socket.on('employee:break', safeHandler(async ({ enabled } = {}, acknowledge) => {
       if (user.role !== 'employee') return availabilityReply(acknowledge, { ok: false, error: 'This is not a listener account.' });
       if (activeCallForUser(user.id)) return availabilityReply(acknowledge, { ok: false, error: 'Finish the current call before changing availability.' });
+      const verification = await db.query('SELECT listener_verification_status FROM users WHERE id=$1', [user.id]);
+      if (verification.rows[0]?.listener_verification_status !== 'approved') {
+        return availabilityReply(acknowledge, { ok: false, error: 'Wait for administrator voice verification before changing availability.' });
+      }
 
       const availability = enabled ? 'break' : 'online';
       await db.query(`UPDATE users SET listener_availability=$2,last_seen_at=now(),updated_at=now() WHERE id=$1 AND role='employee'`, [user.id, availability]);
@@ -761,17 +805,22 @@ function createSocketServer(io) {
   async function refreshEmployeeProfile(userId) {
     const current = employees.get(userId);
     if (!current) return;
-    const result = await db.query(`SELECT id,name,bio,CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,listener_language,listener_availability,status FROM users WHERE id=$1 AND role='employee'`, [userId]);
+    const result = await db.query(`SELECT id,name,username,bio,
+      CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
+      CASE WHEN banner_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE banner_image END AS banner_image,
+      listener_language,listener_availability,listener_verification_status,status
+      FROM users WHERE id=$1 AND role='employee'`, [userId]);
     const row = result.rows[0];
-    if (!row || row.status !== 'active' || !hasLiveSocket(userId) || !['online','break'].includes(row.listener_availability)) {
+    if (!row || row.status !== 'active' || row.listener_verification_status !== 'approved' || !hasLiveSocket(userId) || !['online','break'].includes(row.listener_availability)) {
       employees.delete(userId);
       if (!row || row.status !== 'active' || row.listener_availability === 'offline') {
         await listenerActivity.transition(userId, null, 'Profile or account status changed');
       }
     } else {
-      current.name = row.name;
+      current.name = row.username || row.name;
       current.bio = row.bio || '';
       current.avatar = row.profile_image || '';
+      current.banner = row.banner_image || '';
       current.language = row.listener_language || 'Malayalam';
       current.availability = row.listener_availability;
       if (current.state !== 'ringing' && current.state !== 'busy') current.state = row.listener_availability === 'break' ? 'break' : 'available';

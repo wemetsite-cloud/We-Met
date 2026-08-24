@@ -22,6 +22,10 @@
   let resets = [];
   let listenerWallets = [];
   let auditEntries = [];
+  let verificationSubmissions = [];
+  let adminPayments = { subscriptions: [], payments: [], topups: [], summary: {} };
+  let verificationAudioUrls = [];
+  let adminPostUrls = [];
   const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let activePage = 'overview';
   let liveRefreshTimer = null;
@@ -30,6 +34,9 @@
     overview: ['Overview', 'Live service health and operational summary'],
     customers: ['Customers', 'Accounts, contact records and wallet controls'],
     employees: ['Listeners', 'Presence, connected work time and call performance'],
+    verifications: ['Verifications', 'Review listener voice recordings and control the Malayalam prompt'],
+    payments: ['Payments', 'Top-ups, listener memberships and subscription credits'],
+    content: ['Listener posts', 'Review and moderate exclusive listener photos'],
     wallets: ['Listener wallets', 'Adjust earnings balances and record manual payments'],
     plans: ['Plans', 'Talk-time pricing available after customer sign-in'],
     coupons: ['Coupons', 'Create and control wallet redeem codes'],
@@ -100,7 +107,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=7.0.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.0.0', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -158,6 +165,7 @@
     $('#broadcastForm').onsubmit = sendBroadcast;
     $('#adminPasswordForm').onsubmit = changePassword;
     $('#adminUsernameForm').onsubmit = changeAdminUsername;
+    $('#verificationPromptForm').onsubmit = saveVerificationPrompt;
 
     $('#refreshLive').onclick = () => loadLive();
     $('#reloadCustomers').onclick = () => loadUsers();
@@ -169,6 +177,9 @@
     $('#reloadSupport').onclick = loadSupport;
     $('#reloadResets').onclick = loadResets;
     $('#reloadAudit').onclick = loadAudit;
+    $('#reloadVerifications').onclick = loadVerifications;
+    $('#reloadPayments').onclick = loadPayments;
+    $('#reloadAdminPosts').onclick = loadAdminPosts;
 
     $('#customerSearch').oninput = renderCustomers;
     $('#listenerSearch').oninput = renderEmployees;
@@ -208,6 +219,9 @@
     if (d.reply) return replySupport(d.reply);
     if (d.resetApprove) return reviewReset(d.resetApprove, 'approved');
     if (d.resetDecline) return reviewReset(d.resetDecline, 'declined');
+    if (d.verificationApprove) return reviewVerification(d.verificationApprove, 'approve');
+    if (d.verificationReject) return reviewVerification(d.verificationReject, 'reject');
+    if (d.adminPostDelete) return deleteAdminPost(d.adminPostDelete);
     if (d.userProfile) return showDetails(d.userProfile);
   }
 
@@ -229,7 +243,7 @@
     button?.setAttribute('disabled', '');
     button?.setAttribute('aria-busy', 'true');
     try {
-      const data = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: $('#username').value, password: $('#password').value }) });
+      const data = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: $('#username').value, password: $('#password').value, role: 'admin' }) });
       if (data.user.role !== 'admin') throw new Error('This account does not have administrator access.');
       P.Store.token = data.token;
       me = data.user;
@@ -286,6 +300,9 @@
       overview: () => { loadDashboard(); loadLive(); },
       customers: loadUsers,
       employees: loadUsers,
+      verifications: loadVerifications,
+      payments: loadPayments,
+      content: loadAdminPosts,
       wallets: loadListenerWallets,
       plans: loadPlans,
       coupons: loadCoupons,
@@ -328,35 +345,35 @@
       users = (await P.api('/api/admin/users')).users || [];
       renderCustomers();
       renderEmployees();
-      $('#broadcastUser').innerHTML = '<option value="">All customers and listeners</option>' + users.filter(user => user.role !== 'admin').map(user => `<option value="${user.id}">${P.esc(user.name)} — ${P.esc(user.email || user.username || '')}</option>`).join('');
+      $('#broadcastUser').innerHTML = '<option value="">All customers and listeners</option>' + users.filter(user => user.role !== 'admin').map(user => `<option value="${user.id}">${P.esc(user.name)} — ${P.esc(user.phone || user.username || '')}</option>`).join('');
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
   function renderCustomers() {
     const all = users.filter(user => user.role === 'customer');
     const query = ($('#customerSearch')?.value || '').trim().toLowerCase();
-    const list = all.filter(user => `${user.name} ${user.email || ''} ${user.phone || ''}`.toLowerCase().includes(query));
+    const list = all.filter(user => `${user.name} ${user.phone || ''}`.toLowerCase().includes(query));
     $('#customerCount').textContent = all.length;
     $('#customerActiveCount').textContent = all.filter(user => user.status === 'active').length;
     $('#customerPhoneCount').textContent = all.filter(user => user.phone).length;
     $('#customerWalletTotal').textContent = P.duration(all.reduce((total, user) => total + Number(user.balance_seconds || 0), 0));
-    $('#customersTable').innerHTML = list.length ? list.map(user => `<article class="customer-card clickable-card" role="listitem" tabindex="0" data-user-profile="${user.id}"><header><span class="customer-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, user.email || 'Email not provided')}</div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></header><div class="customer-contact-grid"><div><small>Phone</small>${user.phone ? `<a class="phone-link" href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : '<span class="contact-missing">Not provided</span>'}</div><div><small>Wallet balance</small><strong>${P.duration(user.balance_seconds)}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div></div><div class="customer-card-actions"><button class="ghost" data-user-profile="${user.id}">Full profile</button><button class="primary" data-minutes="${user.id}">Minutes</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div></article>`).join('') : `<div class="customer-empty"><b>${query ? 'No matching customers' : 'No customers yet'}</b><p>${query ? 'Try a different name, email or phone number.' : 'New customer accounts will appear here automatically.'}</p></div>`;
+    $('#customersTable').innerHTML = list.length ? list.map(user => `<article class="customer-card clickable-card" role="listitem" tabindex="0" data-user-profile="${user.id}"><header><span class="customer-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, user.phone || 'Phone not available')}</div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></header><div class="customer-contact-grid"><div><small>Phone</small>${user.phone ? `<a class="phone-link" href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : '<span class="contact-missing">Not provided</span>'}</div><div><small>Wallet balance</small><strong>${P.duration(user.balance_seconds)}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div></div><div class="customer-card-actions"><button class="ghost" data-user-profile="${user.id}">Full profile</button><button class="primary" data-minutes="${user.id}">Minutes</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div></article>`).join('') : `<div class="customer-empty"><b>${query ? 'No matching customers' : 'No customers yet'}</b><p>${query ? 'Try a different name or phone number.' : 'New customer accounts will appear here automatically.'}</p></div>`;
   }
 
   function renderEmployees() {
     const all = users.filter(user => user.role === 'employee');
     const query = ($('#listenerSearch')?.value || '').trim().toLowerCase();
     const status = $('#listenerStatusFilter')?.value || '';
-    const list = all.filter(user => `${user.name} ${user.email || ''} ${user.employee_code || ''} ${user.listener_language || ''}`.toLowerCase().includes(query) && (!status || user.listener_availability === status));
+    const list = all.filter(user => `${user.name} ${user.username || ''} ${user.phone || ''} ${user.employee_code || ''} ${user.listener_language || ''}`.toLowerCase().includes(query) && (!status || user.listener_availability === status));
     $('#listenerCount').textContent = all.length;
     $('#listenerOnlineCount').textContent = all.filter(user => user.listener_availability === 'online').length;
     $('#listenerTodayWork').textContent = P.duration(all.reduce((total, user) => total + Number(user.today_work_seconds || 0), 0));
     $('#listenerTodayTalk').textContent = P.duration(all.reduce((total, user) => total + Number(user.today_talk_seconds || 0), 0));
     $('#employeeCards').innerHTML = list.length ? list.map(user => `
       <article class="listener-admin-card clickable-card" tabindex="0" data-user-profile="${user.id}">
-        <header>${listenerAvatarMarkup(user)}<div>${profileLink(user.id, user.name, `${user.employee_code || 'No ID'} • ${user.listener_language || 'Malayalam'}`)}</div><div class="listener-statuses"><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span><span class="pill ${user.listener_availability === 'online' ? 'available' : P.esc(user.listener_availability || 'offline')}">${P.esc(user.listener_availability || 'offline')}</span></div></header>
+        <header>${listenerAvatarMarkup(user)}<div>${profileLink(user.id, user.username ? `@${user.username}` : user.name, `${user.employee_code || 'No ID'} • ${user.listener_language || 'Malayalam'}`)}</div><div class="listener-statuses"><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span><span class="pill ${user.listener_availability === 'online' ? 'available' : P.esc(user.listener_availability || 'offline')}">${P.esc(user.listener_availability || 'offline')}</span><span class="pill verification-${P.esc(user.listener_verification_status || 'approved')}">${P.esc(user.listener_verification_status || 'approved')}</span></div></header>
         <div class="listener-performance"><div><small>Work today</small><strong>${P.duration(user.today_work_seconds)}</strong></div><div><small>Talk today</small><strong>${P.duration(user.today_talk_seconds)}</strong></div><div><small>Break today</small><strong>${P.duration(user.today_break_seconds)}</strong></div><div><small>Calls today</small><strong>${Number(user.today_calls || 0)}</strong></div><div><small>Rate / min</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div><div><small>Unpaid wallet</small><strong>${P.moneyExact(user.listener_wallet_balance_paise)}</strong></div></div>
-        <p class="listener-contact">${P.esc(user.email || '')}${user.phone ? ` • ${P.esc(user.phone)}` : ''} • Last seen ${user.last_seen_at ? P.date(user.last_seen_at) : 'not recorded'}</p>
+        <p class="listener-contact">${P.esc(user.phone || 'Private phone not available')} • Last seen ${user.last_seen_at ? P.date(user.last_seen_at) : 'not recorded'}</p>
         <div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="ghost" data-wallet-rate="${user.id}">Set rate</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div>
       </article>`).join('') : '<p class="empty-copy">No listeners match this filter.</p>';
   }
@@ -365,6 +382,7 @@
     try {
       const data = await P.api(`/api/admin/users/${id}/details`);
       const user = data.user;
+      user.email = user.username ? `@${user.username}` : user.phone || 'Phone-first account';
       const callStats = data.callAnalytics || {};
       const workStats = data.workAnalytics || {};
       const listenerWalletSummary = data.listenerWalletSummary || {};
@@ -383,7 +401,7 @@
     if (!user) return;
     let profileImageDraft = user.profile_image || '';
     const avatarOptions = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-admin-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="assets/${avatar}" alt=""></button>`).join('');
-    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><div class="admin-profile-photo-editor"><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(profileImageDraft,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Customer-facing profile photo</strong><p>Upload a photo or choose one of the built-in We Met avatars.</p><div class="profile-photo-actions"><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload photo</button><button id="adminAutoListenerAvatar" class="ghost" type="button">Automatic avatar</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div id="adminAvatarGrid" class="avatar-picker">${avatarOptions}</div></div><label>Name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Username<input id="editListenerUsername" value="${P.esc(user.username || '')}"></label><label>Email<input id="editListenerEmail" type="email" value="${P.esc(user.email || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Phone<input id="editListenerPhone" value="${P.esc(user.phone || '')}"></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
+    modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><div class="admin-profile-photo-editor"><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(profileImageDraft,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Customer-facing profile photo</strong><p>Upload a photo or choose one of the built-in We Met avatars.</p><div class="profile-photo-actions"><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload photo</button><button id="adminAutoListenerAvatar" class="ghost" type="button">Automatic avatar</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div id="adminAvatarGrid" class="avatar-picker">${avatarOptions}</div></div><label>Private original name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Public username<input id="editListenerUsername" pattern="[a-zA-Z0-9._-]{3,80}" value="${P.esc(user.username || '')}" required></label><label>Verified private phone<input id="editListenerPhone" type="tel" value="${P.esc(user.phone || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
     const renderAvatarState = () => {
       $('#editListenerPhotoPreview').src = profileImageSrc(profileImageDraft, $('#editListenerName').value || user.name, user.id);
       $$('#adminAvatarGrid [data-admin-avatar]').forEach(button => button.classList.toggle('selected', button.dataset.adminAvatar === profileImageDraft));
@@ -396,7 +414,7 @@
     $('#editListenerForm').onsubmit = async event => {
       event.preventDefault();
       try {
-        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, email: $('#editListenerEmail').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value, profileImage: profileImageDraft }) });
+        await P.api(`/api/admin/employees/${id}`, { method: 'PATCH', body: JSON.stringify({ name: $('#editListenerName').value, username: $('#editListenerUsername').value, language: $('#editListenerLanguage').value, phone: $('#editListenerPhone').value, ratePaise: Math.round(Number($('#editListenerRate').value) * 100), bio: $('#editListenerBio').value, profileImage: profileImageDraft }) });
         closeAdminModal(); P.toast('Listener updated.', 'success'); loadUsers(); loadListenerWallets(); loadLive(true);
       } catch (error) { P.toast(error.message, 'error'); }
     };
@@ -414,7 +432,7 @@
 
   function renderListenerWallets() {
     const query = ($('#walletSearch')?.value || '').trim().toLowerCase();
-    const list = listenerWallets.filter(item => `${item.name} ${item.email || ''} ${item.employee_code || ''} ${item.listener_language || ''}`.toLowerCase().includes(query));
+    const list = listenerWallets.filter(item => `${item.name} ${item.phone || ''} ${item.employee_code || ''} ${item.listener_language || ''}`.toLowerCase().includes(query));
     const total = field => listenerWallets.reduce((sum, item) => sum + Number(item[field] || 0), 0);
     $('#listenerWalletCount').textContent = listenerWallets.length;
     $('#listenerWalletBalance').textContent = P.moneyExact(total('balance_paise'));
@@ -422,7 +440,7 @@
     $('#listenerWalletPaid').textContent = P.moneyExact(total('lifetime_paid_paise'));
     $('#listenerWalletCards').innerHTML = list.length ? list.map(item => {
       const balance = Number(item.balance_paise || 0);
-      return `<article class="listener-wallet-card"><header>${listenerAvatarMarkup(item)}<div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(item.email || 'No email recorded')}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span></div></header><div class="wallet-due"><small>Current unpaid balance</small><strong>${P.moneyExact(balance)}</strong><span>${balance > 0 ? 'Record a payment only after the listener has been paid separately' : 'No unpaid listener earnings'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Recorded paid</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last payment</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions"><button class="primary" data-wallet-paid="${item.id}" ${balance > 0 ? '' : 'disabled'}>Record paid</button><button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
+      return `<article class="listener-wallet-card"><header>${listenerAvatarMarkup(item)}<div>${profileLink(item.id, item.name, `${item.employee_code || 'No ID'} • ${item.listener_language || 'Malayalam'}`)}<p>${P.esc(item.phone || 'Private phone not available')}</p></div><div class="listener-statuses"><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><span class="pill ${item.listener_availability === 'online' ? 'available' : P.esc(item.listener_availability || 'offline')}">${P.esc(item.listener_availability || 'offline')}</span></div></header><div class="wallet-due"><small>Current unpaid balance</small><strong>${P.moneyExact(balance)}</strong><span>${balance > 0 ? 'Record a payment only after the listener has been paid separately' : 'No unpaid listener earnings'}</span></div><div class="wallet-admin-metrics"><div><small>Rate / minute</small><strong>${Number(item.listener_rate_paise || 0) > 0 ? P.moneyExact(item.listener_rate_paise) : 'Not set'}</strong></div><div><small>Earned today</small><strong>${P.moneyExact(item.today_earnings_paise)}</strong></div><div><small>This week</small><strong>${P.moneyExact(item.week_earnings_paise)}</strong></div><div><small>Lifetime earned</small><strong>${P.moneyExact(item.lifetime_earnings_paise)}</strong></div><div><small>Recorded paid</small><strong>${P.moneyExact(item.lifetime_paid_paise)}</strong></div><div><small>Last payment</small><strong>${item.last_paid_at ? P.date(item.last_paid_at) : 'Never'}</strong></div></div><div class="customer-card-actions"><button class="primary" data-wallet-paid="${item.id}" ${balance > 0 ? '' : 'disabled'}>Record paid</button><button class="ghost" data-wallet-rate="${item.id}">Set rate</button><button class="ghost" data-wallet-adjust="${item.id}">Adjust wallet</button><button class="ghost" data-user-profile="${item.id}">Full history</button><button class="ghost" data-edit-listener="${item.id}">Edit details</button></div></article>`;
     }).join('') : '<p class="empty-copy">No listener wallets match this search.</p>';
   }
 
@@ -540,8 +558,8 @@
   async function createEmployee(event) {
     event.preventDefault();
     try {
-      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, email: $('#empEmail').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value }) });
-      event.target.reset(); $('#empLanguage').value = 'Malayalam'; P.toast('Listener created.', 'success'); loadUsers();
+      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value }) });
+      event.target.reset(); $('#empLanguage').value = 'Malayalam'; $('#empRate').value = '1'; P.toast('Approved listener created.', 'success'); loadUsers();
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
@@ -608,6 +626,79 @@
     try {
       reports = (await P.api('/api/admin/reports')).reports || [];
       $('#reportsList').innerHTML = reports.map(report => `<article class="ticket"><div><div><span class="pill ${P.esc(report.status)}">${P.esc(report.status)}</span> ${report.priority === 'high' ? '<span class="pill open">HIGH</span>' : ''}</div><strong>${profileLink(report.reporter_id, report.reporter_name)} <span class="connection-arrow">→</span> ${profileLink(report.target_id, report.target_name || 'Unknown')}</strong><p><b>${P.esc(report.reason)}</b></p><p>${P.esc(report.details || '')}</p><small>${P.date(report.created_at)}</small>${report.admin_note ? `<p>Admin note: ${P.esc(report.admin_note)}</p>` : ''}</div><div class="actions"><button class="warning" data-report-review="${report.id}">Review</button><button class="ghost" data-report-close="${report.id}">Close</button>${report.target_id ? `<button class="danger" data-target="${report.target_id}">Suspend target</button>` : ''}</div></article>`).join('') || '<p>No reports.</p>';
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function loadVerifications() {
+    verificationAudioUrls.forEach(url => URL.revokeObjectURL(url)); verificationAudioUrls = [];
+    try {
+      const data = await P.api('/api/admin/verifications');
+      verificationSubmissions = data.submissions || [];
+      $('#verificationPrompt').value = data.prompt || '';
+      $('#verificationPendingCount').textContent = verificationSubmissions.filter(item => item.status === 'pending').length;
+      $('#verificationApprovedCount').textContent = verificationSubmissions.filter(item => item.status === 'approved').length;
+      $('#verificationRejectedCount').textContent = verificationSubmissions.filter(item => item.status === 'rejected').length;
+      const cards = await Promise.all(verificationSubmissions.map(async item => {
+        let audioUrl = '';
+        try { const blob = await P.apiBlob(item.audioUrl); audioUrl = URL.createObjectURL(blob); verificationAudioUrls.push(audioUrl); } catch {}
+        return `<article class="verification-admin-card ${P.esc(item.status)}"><header><img src="${P.esc(profileImageSrc(item.profileImage,item.publicName,item.employeeId))}" alt=""><div><span>${P.esc(item.status.toUpperCase())}</span><h3>${P.esc(item.publicName)}</h3><p>Private: ${P.esc(item.privateName)} · ${P.esc(item.phone || 'No phone')}</p></div></header><blockquote lang="ml">${P.esc(item.promptText)}</blockquote>${audioUrl ? `<audio controls preload="metadata" src="${P.esc(audioUrl)}"></audio>` : '<p class="audio-error">Recording could not be loaded.</p>'}<div class="verification-admin-meta"><small>${(Number(item.audioSize || 0) / 1024).toFixed(0)} KB</small><small>${P.date(item.createdAt)}</small></div>${item.adminNote ? `<p class="admin-note"><b>Review note:</b> ${P.esc(item.adminNote)}</p>` : ''}${item.status === 'pending' ? `<div class="verification-admin-actions"><button class="primary" data-verification-approve="${P.esc(item.id)}" type="button">Approve listener</button><button class="danger" data-verification-reject="${P.esc(item.id)}" type="button">Request new recording</button></div>` : ''}</article>`;
+      }));
+      $('#verificationCards').innerHTML = cards.join('') || '<p class="empty-copy">No voice recordings yet.</p>';
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function saveVerificationPrompt(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try { await P.api('/api/admin/verification-prompt', { method: 'PATCH', body: JSON.stringify({ prompt: $('#verificationPrompt').value }) }); P.toast('Malayalam verification line saved.', 'success'); loadVerifications(); }
+    catch (error) { P.toast(error.message, 'error'); } finally { button.disabled = false; }
+  }
+
+  async function reviewVerification(id, action) {
+    const note = action === 'reject' ? prompt('Tell the listener why a new recording is needed:') : '';
+    if (action === 'reject' && !note) return;
+    if (action === 'approve' && !confirm('Approve this voice recording and activate the listener account?')) return;
+    try { await P.api(`/api/admin/verifications/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ action, note }) }); P.toast(action === 'approve' ? 'Listener approved and activated.' : 'Listener asked to record again.', 'success'); loadVerifications(); loadUsers(); }
+    catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function loadPayments() {
+    try {
+      adminPayments = await P.api('/api/admin/subscriptions');
+      const summary = adminPayments.summary || {};
+      $('#payActiveSubscriptions').textContent = Number(summary.activeSubscriptions || 0).toLocaleString('en-IN');
+      $('#paySubscriptionRevenue').textContent = P.moneyExact(summary.subscriptionRevenuePaise);
+      $('#payListenerCredits').textContent = P.moneyExact(summary.listenerCreditsPaise);
+      $('#payTopupRevenue').textContent = P.moneyExact(summary.topupRevenuePaise);
+      $('#adminSubscriptions').innerHTML = adminPayments.subscriptions?.length ? adminPayments.subscriptions.slice(0,300).map(item => `<article class="admin-payment-row"><div><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><strong>${P.esc(item.customer_name)} → @${P.esc(item.listener_name)}</strong><small>${P.esc(item.razorpay_subscription_id)}</small></div><div><b>${item.current_period_end ? `Until ${P.date(item.current_period_end)}` : 'Not active'}</b><small>${item.cancel_at_cycle_end ? 'Renewal off' : `${Number(item.paid_count || 0)} paid cycle(s)`}</small></div></article>`).join('') : '<p class="empty-copy">No listener memberships yet.</p>';
+      $('#adminSubscriptionPayments').innerHTML = adminPayments.payments?.length ? adminPayments.payments.slice(0,200).map(item => `<article class="admin-payment-row"><div><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><strong>${P.esc(item.customer_name)} → @${P.esc(item.listener_name)}</strong><small>${P.esc(item.razorpay_payment_id)}</small></div><div><b>${P.moneyExact(item.amount_paise)}</b><small>Listener ${P.moneyExact(item.listener_credit_paise)} · ${P.date(item.paid_at)}</small></div></article>`).join('') : '<p class="empty-copy">No captured subscription payments.</p>';
+      $('#adminTopups').innerHTML = adminPayments.topups?.length ? adminPayments.topups.slice(0,200).map(item => `<article class="admin-payment-row"><div><span class="pill ${P.esc(item.status)}">${P.esc(item.status)}</span><strong>${P.esc(item.customer_name)} · ${P.esc(item.plan_name)}</strong><small>${P.esc(item.razorpay_payment_id || item.razorpay_order_id)}</small></div><div><b>${P.moneyExact(item.amount_paise)}</b><small>${P.duration(item.seconds)} · ${P.date(item.paid_at || item.created_at)}</small></div></article>`).join('') : '<p class="empty-copy">No wallet top-ups yet.</p>';
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function loadAdminPosts() {
+    adminPostUrls.forEach((url) => URL.revokeObjectURL(url));
+    adminPostUrls = [];
+    try {
+      const data = await P.api('/api/admin/posts');
+      const cards = await Promise.all((data.posts || []).map(async (post) => {
+        let imageUrl = '';
+        try {
+          const blob = await P.apiBlob(post.imageUrl);
+          imageUrl = URL.createObjectURL(blob);
+          adminPostUrls.push(imageUrl);
+        } catch {}
+        return `<article class="admin-post-card">${imageUrl ? `<img src="${P.esc(imageUrl)}" alt="Exclusive listener post">` : '<div class="admin-post-missing">Photo unavailable</div>'}<div><span class="eyebrow">@${P.esc(post.listenerName)}</span><h3>${P.esc(post.caption || 'No caption')}</h3><p>Private: ${P.esc(post.privateName)} · ${(Number(post.imageSize || 0) / 1024).toFixed(0)} KB</p><small>${P.date(post.createdAt)}</small><button class="danger" data-admin-post-delete="${P.esc(post.id)}" type="button">Remove post</button></div></article>`;
+      }));
+      $('#adminPostGallery').innerHTML = cards.join('') || '<p class="empty-copy">No listener posts yet.</p>';
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function deleteAdminPost(id) {
+    if (!confirm('Remove this listener post permanently?')) return;
+    try {
+      await P.api(`/api/admin/posts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      P.toast('Listener post removed.', 'success');
+      loadAdminPosts();
     } catch (error) { P.toast(error.message, 'error'); }
   }
 

@@ -42,13 +42,13 @@ router.get('/wallet', asyncHandler(async (req, res) => {
     db.query(`
       SELECT u.listener_rate_paise,
              COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type='call_credit' AND t.created_at>=date_trunc('day',now())
+               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=date_trunc('day',now())
              ),0)::bigint AS today_earnings_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type='call_credit' AND t.created_at>=now()-interval '7 days'
+               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=now()-interval '7 days'
              ),0)::bigint AS week_earnings_paise
       FROM users u
       LEFT JOIN listener_wallet_transactions t ON t.employee_id=u.id
@@ -101,24 +101,35 @@ router.get('/activity', asyncHandler(async (req, res) => {
 }));
 
 router.patch('/profile', asyncHandler(async (req, res) => {
+  if (req.user.listener_verification_status !== 'approved') {
+    return res.status(403).json({ error: 'Your voice verification must be approved before editing the public profile.' });
+  }
   const name = String(req.body.name || '').trim().slice(0, 80);
   const username = String(req.body.username || '').trim().toLowerCase().slice(0, 50) || null;
-  const phone = String(req.body.phone || '').trim().slice(0, 30) || null;
   const bio = String(req.body.bio || '').trim().slice(0, 500) || null;
   const profileImage = normalizeProfileImage(req.body.profileImage);
-  if (name.length < 2) return res.status(400).json({ error: 'Enter a display name.' });
+  const bannerImage = normalizeProfileImage(req.body.bannerImage);
+  if (name.length < 2) return res.status(400).json({ error: 'Enter your private original name.' });
   if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
+  if (bannerImage === false) return res.status(400).json({ error: 'Choose a valid JPG, PNG, or WebP banner photo.' });
 
   try {
     const result = await db.query(
-      `UPDATE users SET name=$2,username=$3,phone=$4,bio=$5,
-       profile_image=CASE WHEN $6::boolean THEN $7 ELSE profile_image END,updated_at=now()
-       WHERE id=$1 RETURNING id,name,username,email,phone,bio,profile_image,employee_code,listener_language,listener_rate_paise`,
-      [req.user.id, name, username, phone, bio, profileImage !== undefined, profileImage === undefined ? null : profileImage],
+      `UPDATE users SET name=$2,username=$3,bio=$4,
+       profile_image=CASE WHEN $5::boolean THEN $6 ELSE profile_image END,
+       banner_image=CASE WHEN $7::boolean THEN $8 ELSE banner_image END,
+       updated_at=now()
+       WHERE id=$1 RETURNING id,name,username,email,phone,bio,profile_image,banner_image,employee_code,listener_language,listener_rate_paise`,
+      [
+        req.user.id, name, username, bio,
+        profileImage !== undefined, profileImage === undefined ? null : profileImage,
+        bannerImage !== undefined, bannerImage === undefined ? null : bannerImage,
+      ],
     );
     await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(req.user.id);
     const user = result.rows[0];
     if (String(user.profile_image || '').startsWith('data:image/')) user.profile_image = `photo:${user.id}`;
+    if (String(user.banner_image || '').startsWith('data:image/')) user.banner_image = `photo:${user.id}`;
     res.json({ user });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That username is already in use.' });

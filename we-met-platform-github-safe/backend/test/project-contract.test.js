@@ -84,7 +84,8 @@ test('ships listener earnings with admin-managed payments and no listener withdr
   assert.match(adminHtml, /id="listenerWalletBalance"/);
   assert.match(adminHtml, /Record paid/);
   assert.doesNotMatch(adminHtml, /withdrawalRequests|empUpi|empUpiPhone/);
-  assert.doesNotMatch(adminHtml, /id="page-payments"|UPI payments/);
+  assert.match(adminHtml, /id="page-payments"/);
+  assert.match(adminHtml, /Listener credits/);
 });
 
 test('isolates portal sessions by role and clears stale mismatched tokens', () => {
@@ -106,7 +107,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '7\.0\.0'/);
+    assert.match(serviceWorker, /const VERSION = '8\.0\.0'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }
@@ -161,17 +162,17 @@ test('uses unique element ids in each primary interface', () => {
 });
 
 
-test('retires manual UPI uploads while preserving customer privacy polish', () => {
+test('retires manual UPI uploads while preserving the private listener directory', () => {
   const customerHtml = read('customer-site', 'index.html');
   const customerApp = read('customer-site', 'app.js');
   const server = read('backend', 'server.js');
   const schema = read('backend', 'database', 'schema.sql');
   assert.match(customerHtml, /id="listenerDiscovery"/);
-  assert.match(customerApp, /Listeners are available now/);
-  assert.doesNotMatch(customerApp, /\$\{malayalamAvailable\} Malayalam listener/);
+  assert.match(customerApp, /loadDirectory/);
+  assert.match(customerApp, /listener-card-v8/);
   assert.doesNotMatch(server, /routes\/manual-payments/);
   assert.doesNotMatch(customerHtml, /manualPaymentForm|manualProof|payWithGooglePay|page-payments/);
   assert.doesNotMatch(customerApp, /manual-payments|submitManualPayment|loadPayments/);
-  assert.match(customerApp, /show\('#listenerDiscovery', false\)/);
+  assert.match(customerApp, /show\('#listenerDiscovery'\)/);
   assert.match(schema, /\('Long Connect',199900,14400,false,true,60\)/);
 });

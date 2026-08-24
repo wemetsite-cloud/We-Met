@@ -70,6 +70,24 @@
     }
   }
 
+  async function apiBlob(path, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    const sessionToken = Store.token;
+    if (sessionToken) headers.Authorization = `Bearer ${sessionToken}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
+    try {
+      const response = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
+      if (!response.ok) {
+        let message = 'The file could not be loaded.';
+        try { const data = await response.json(); message = data?.error || message; } catch {}
+        if (sessionToken && response.status === 401) invalidateSession(message);
+        throw Object.assign(new Error(message), { status: response.status });
+      }
+      return response.blob();
+    } finally { clearTimeout(timer); }
+  }
+
   function escapeHtml(value = '') {
     return String(value).replace(/[&<>"']/g, (character) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -137,6 +155,7 @@
     base,
     Store,
     api,
+    apiBlob,
     esc: escapeHtml,
     duration,
     date,

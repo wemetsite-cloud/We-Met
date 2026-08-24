@@ -1,8 +1,8 @@
 {
   "name": "we-met-backend",
-  "version": "7.0.0",
+  "version": "8.0.0",
   "private": true,
-  "description": "We Met backend for browser calls, role-safe access, admin-managed listener wallets and verified customer Razorpay payments.",
+  "description": "We Met backend for phone OTP, listener verification, recurring Razorpay memberships, private social access, paid browser calls and audited operations.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

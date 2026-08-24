@@ -3,6 +3,7 @@ const path = require('path');
 const { pool } = require('../src/db');
 const { hashPassword } = require('../src/auth');
 const config = require('../src/config');
+const { normalizePhone } = require('../src/phone');
 
 async function upsertAdmin() {
   const passwordHash = await hashPassword(config.admin.password);
@@ -19,21 +20,26 @@ async function upsertAdmin() {
 
 async function upsertInitialListener() {
   const listener = config.initialListener;
-  if (!listener.email || !listener.password) return false;
+  if (!listener.phone || !listener.password) return false;
 
   const passwordHash = await hashPassword(listener.password);
+  const phone = normalizePhone(listener.phone);
   await pool.query(`
-    INSERT INTO users(role,name,email,employee_code,password_hash,bio,listener_language)
-    VALUES('employee',$1,$2,$3,$4,$5,'Malayalam')
-    ON CONFLICT(email) DO UPDATE SET
+    INSERT INTO users(role,name,username,phone,employee_code,password_hash,bio,listener_language,listener_rate_paise,listener_verification_status,listener_verified_at)
+    VALUES('employee',$1,$2,$3,$4,$5,$6,'Malayalam',100,'approved',now())
+    ON CONFLICT(username) DO UPDATE SET
       name=EXCLUDED.name,
+      phone=EXCLUDED.phone,
       employee_code=EXCLUDED.employee_code,
       role='employee',
-      password_hash=CASE WHEN $6 THEN EXCLUDED.password_hash ELSE users.password_hash END,
+      listener_verification_status='approved',
+      listener_verified_at=COALESCE(users.listener_verified_at,now()),
+      password_hash=CASE WHEN $7 THEN EXCLUDED.password_hash ELSE users.password_hash END,
       updated_at=now()
   `, [
     listener.name,
-    listener.email.toLowerCase(),
+    listener.username.toLowerCase(),
+    phone,
     listener.employeeCode,
     passwordHash,
     'A calm listener who gives every conversation time and attention.',
@@ -66,7 +72,7 @@ async function reconcileInterruptedListenerSessions() {
 
   console.log('We Met database initialized successfully.');
   console.log(`Admin: ${config.admin.username}`);
-  if (listenerCreated) console.log(`Initial listener: ${config.initialListener.email}`);
+  if (listenerCreated) console.log(`Initial listener: ${config.initialListener.username}`);
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

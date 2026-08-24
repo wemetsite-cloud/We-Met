@@ -4,6 +4,7 @@ const db = require('../db');
 const { hashPassword } = require('../auth');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
 const { normalizeProfileImage } = require('../profile-image');
+const { normalizePhone, indianMobile } = require('../phone');
 
 const router = express.Router();
 router.use(authenticate, requireRole('admin'));
@@ -84,8 +85,9 @@ router.get('/users', asyncHandler(async (req, res) => {
 
   const result = await db.query(`
     SELECT u.id, u.role, u.name, u.username, u.email, u.phone, u.bio, CASE WHEN u.profile_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.profile_image END AS profile_image,
+           CASE WHEN u.banner_image LIKE 'data:image/%' THEN 'photo:'||u.id::text ELSE u.banner_image END AS banner_image,
            u.employee_code, u.listener_rate_paise,
-           u.listener_availability, u.listener_language,
+           u.listener_availability, u.listener_language,u.listener_verification_status,u.listener_verification_note,u.listener_verified_at,
            u.balance_seconds, u.status, u.suspended_until, u.suspension_reason,
            u.last_login_at, u.last_seen_at, u.created_at,
            COALESCE(call_stats.total_calls,0)::int AS total_calls,
@@ -121,7 +123,7 @@ router.get('/users', asyncHandler(async (req, res) => {
     ) activity_stats ON u.role='employee'
     LEFT JOIN LATERAL (
       SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise
       FROM listener_wallet_transactions t
       WHERE t.employee_id=u.id
@@ -137,43 +139,41 @@ router.get('/users', asyncHandler(async (req, res) => {
 router.post('/employees', asyncHandler(async (req, res) => {
   const name = text(req.body.name, 100);
   const username = text(req.body.username, 80).toLowerCase() || null;
-  const email = text(req.body.email, 180).toLowerCase();
   const password = String(req.body.password || '');
-  const phone = text(req.body.phone, 30) || null;
+  const phone = normalizePhone(req.body.phone);
   const bio = text(req.body.bio, 500) || null;
   const language = text(req.body.language, 60) || 'Malayalam';
-  const ratePaise = integer(req.body.ratePaise, { min: 0, max: 10_000_000 });
+  const hasRate = Object.hasOwn(req.body, 'ratePaise') && req.body.ratePaise !== '';
+  const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : 100;
   const employeeCode = (text(req.body.employeeCode, 40) || `WM-L${Date.now().toString().slice(-6)}`)
     .toUpperCase()
     .replace(/[^A-Z0-9-]/g, '');
 
-  if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
+  if (name.length < 2 || !phone || !indianMobile(phone) || password.length < 8) {
     return res.status(400).json({
-      error: 'Enter a valid name, email address, and a password with at least 8 characters.',
+      error: 'Enter a valid original name, Indian mobile number, and a password with at least 8 characters.',
+    });
+  }
+  if (!username || !/^[a-z0-9._-]{3,80}$/.test(username)) {
+    return res.status(400).json({
+      error: 'Add a public username with 3–80 letters, numbers, dots, underscores or hyphens.',
     });
   }
   if (ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
 
-  if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
-    return res.status(400).json({
-      error: 'Username may contain only letters, numbers, dots, underscores, and hyphens.',
-    });
-  }
-
   try {
     const result = await db.query(`
       INSERT INTO users (
-        role, name, username, email, phone, bio, employee_code,
-        listener_language, listener_rate_paise, password_hash
+        role, name, username, phone, bio, employee_code,
+        listener_language, listener_rate_paise, password_hash,listener_verification_status,listener_verified_at
       )
-      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8,'approved',now())
       RETURNING id, role, name, username, email, phone, bio,
                 employee_code, listener_availability, listener_language,
                 listener_rate_paise, status, created_at
     `, [
       name,
       username,
-      email,
       phone,
       bio,
       employeeCode,
@@ -186,7 +186,7 @@ router.post('/employees', asyncHandler(async (req, res) => {
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({
-        error: 'That email address, username, or employee ID is already in use.',
+        error: 'That phone number, public username, or employee ID is already in use.',
       });
     }
     throw error;
@@ -196,19 +196,18 @@ router.post('/employees', asyncHandler(async (req, res) => {
 router.patch('/employees/:id', asyncHandler(async (req, res) => {
   const name = text(req.body.name, 100);
   const username = text(req.body.username, 80).toLowerCase() || null;
-  const email = text(req.body.email, 180).toLowerCase();
-  const phone = text(req.body.phone, 30) || null;
+  const phone = normalizePhone(req.body.phone);
   const bio = text(req.body.bio, 500) || null;
   const profileImage = normalizeProfileImage(req.body.profileImage);
   const language = text(req.body.language, 60) || 'Malayalam';
   const hasRate = Object.hasOwn(req.body, 'ratePaise');
   const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : null;
 
-  if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email)) {
-    return res.status(400).json({ error: 'Enter a valid name and email address.' });
+  if (name.length < 2 || !phone || !indianMobile(phone)) {
+    return res.status(400).json({ error: 'Enter a valid original name and Indian mobile number.' });
   }
-  if (username && !/^[a-z0-9._-]{3,80}$/.test(username)) {
-    return res.status(400).json({ error: 'Username may contain only letters, numbers, dots, underscores, and hyphens.' });
+  if (!username || !/^[a-z0-9._-]{3,80}$/.test(username)) {
+    return res.status(400).json({ error: 'Add a public username with 3–80 letters, numbers, dots, underscores or hyphens.' });
   }
   if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
   if (hasRate && ratePaise === null) return res.status(400).json({ error: 'Set a valid listener rate per minute.' });
@@ -216,9 +215,9 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
   try {
     const result = await db.query(`
       UPDATE users
-      SET name=$2,username=$3,email=$4,phone=$5,bio=$6,listener_language=$7,
-          listener_rate_paise=CASE WHEN $8::boolean THEN $9 ELSE listener_rate_paise END,
-          profile_image=CASE WHEN $10::boolean THEN $11 ELSE profile_image END,
+      SET name=$2,username=$3,phone=$4,bio=$5,listener_language=$6,
+          listener_rate_paise=CASE WHEN $7::boolean THEN $8 ELSE listener_rate_paise END,
+          profile_image=CASE WHEN $9::boolean THEN $10 ELSE profile_image END,
           updated_at=now()
       WHERE id=$1 AND role='employee'
       RETURNING id,role,name,username,email,phone,bio,profile_image,employee_code,
@@ -227,7 +226,6 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
       req.params.id,
       name,
       username,
-      email,
       phone,
       bio,
       language,
@@ -242,7 +240,7 @@ router.patch('/employees/:id', asyncHandler(async (req, res) => {
     if (String(employee.profile_image || '').startsWith('data:image/')) employee.profile_image = `photo:${employee.id}`;
     res.json({ employee });
   } catch (error) {
-    if (error.code === '23505') return res.status(409).json({ error: 'That email address or username is already in use.' });
+    if (error.code === '23505') return res.status(409).json({ error: 'That phone number or public username is already in use.' });
     throw error;
   }
 }));
@@ -380,8 +378,9 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
   ] = await Promise.all([
     db.query(`
       SELECT id, role, name, username, email, phone, bio, CASE WHEN profile_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE profile_image END AS profile_image,
+             CASE WHEN banner_image LIKE 'data:image/%' THEN 'photo:'||id::text ELSE banner_image END AS banner_image,
              employee_code, listener_rate_paise,
-             listener_availability, listener_language,
+             listener_availability, listener_language,listener_verification_status,listener_verification_note,listener_verified_at,
              balance_seconds, status, suspended_until, suspension_reason,
              last_login_at, last_seen_at, created_at, updated_at
       FROM users WHERE id = $1
@@ -411,13 +410,13 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     `, [req.params.id]),
     db.query(`
       SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(amount_paise) FILTER (WHERE type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(amount_paise) FILTER (WHERE type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-amount_paise) FILTER (WHERE type='payout'),0)::bigint AS lifetime_paid_paise,
              COALESCE(SUM(amount_paise) FILTER (
-               WHERE type='call_credit' AND created_at>=date_trunc('day',now())
+               WHERE type IN ('call_credit','subscription_credit') AND created_at>=date_trunc('day',now())
              ),0)::bigint AS today_earnings_paise,
              COALESCE(SUM(amount_paise) FILTER (
-               WHERE type='call_credit' AND created_at>=now()-interval '7 days'
+               WHERE type IN ('call_credit','subscription_credit') AND created_at>=now()-interval '7 days'
              ),0)::bigint AS week_earnings_paise
       FROM listener_wallet_transactions
       WHERE employee_id=$1
@@ -511,13 +510,13 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
     FROM users u
     LEFT JOIN LATERAL (
       SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type='call_credit'),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type='call_credit' AND t.created_at>=date_trunc('day',now())
+               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=date_trunc('day',now())
              ),0)::bigint AS today_earnings_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type='call_credit' AND t.created_at>=now()-interval '7 days'
+               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=now()-interval '7 days'
              ),0)::bigint AS week_earnings_paise,
              MAX(t.created_at) FILTER (WHERE t.type='payout') AS last_paid_at
       FROM listener_wallet_transactions t

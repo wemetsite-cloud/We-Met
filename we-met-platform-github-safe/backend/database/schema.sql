@@ -9,12 +9,16 @@ CREATE TABLE IF NOT EXISTS users (
   phone text,
   bio text,
   profile_image text,
+  banner_image text,
   employee_code text UNIQUE,
   upi_id text,
   upi_phone text,
   listener_rate_paise integer NOT NULL DEFAULT 0 CONSTRAINT users_listener_rate_nonnegative CHECK (listener_rate_paise >= 0),
   listener_availability text NOT NULL DEFAULT 'offline' CHECK (listener_availability IN ('online','break','offline')),
   listener_language text NOT NULL DEFAULT 'Malayalam',
+  listener_verification_status text NOT NULL DEFAULT 'approved' CHECK (listener_verification_status IN ('voice_required','pending','approved','rejected')),
+  listener_verification_note text,
+  listener_verified_at timestamptz,
   password_hash text NOT NULL,
   auth_version integer NOT NULL DEFAULT 0,
   balance_seconds integer NOT NULL DEFAULT 0 CHECK (balance_seconds >= 0),
@@ -103,7 +107,7 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
 CREATE TABLE IF NOT EXISTS listener_wallet_transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type text NOT NULL CHECK (type IN ('call_credit','payout','admin_adjustment')),
+  type text NOT NULL CHECK (type IN ('call_credit','subscription_credit','payout','admin_adjustment')),
   amount_paise bigint NOT NULL CHECK (amount_paise <> 0),
   reference_id uuid,
   billed_seconds integer CHECK (billed_seconds IS NULL OR billed_seconds >= 0),
@@ -277,15 +281,125 @@ CREATE TABLE IF NOT EXISTS razorpay_orders (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS otp_challenges (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone text NOT NULL,
+  role text NOT NULL CHECK (role IN ('customer','employee')),
+  code_hash text NOT NULL,
+  attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  expires_at timestamptz NOT NULL,
+  verified_at timestamptz,
+  registration_token_hash text,
+  registration_expires_at timestamptz,
+  consumed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS platform_settings (
+  key text PRIMARY KEY,
+  value text NOT NULL,
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS listener_verifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  prompt_text text NOT NULL,
+  audio_mime text NOT NULL,
+  audio_size integer NOT NULL CHECK (audio_size > 0 AND audio_size <= 8388608),
+  audio_data bytea NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  admin_note text,
+  reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS listener_posts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  image_mime text NOT NULL CHECK (image_mime IN ('image/jpeg','image/png','image/webp')),
+  image_size integer NOT NULL CHECK (image_size > 0 AND image_size <= 4194304),
+  image_data bytea NOT NULL,
+  caption text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS listener_follows (
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (customer_id, employee_id)
+);
+
+CREATE TABLE IF NOT EXISTS listener_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  razorpay_plan_id text NOT NULL,
+  razorpay_subscription_id text NOT NULL UNIQUE,
+  status text NOT NULL DEFAULT 'created' CHECK (status IN ('created','authenticated','active','paused','halted','pending','cancelled','completed','expired')),
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  cancel_at_cycle_end boolean NOT NULL DEFAULT false,
+  paid_count integer NOT NULL DEFAULT 0 CHECK (paid_count >= 0),
+  total_count integer NOT NULL DEFAULT 120 CHECK (total_count > 0),
+  last_payment_id text,
+  last_event_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS listener_subscription_payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id uuid NOT NULL REFERENCES listener_subscriptions(id) ON DELETE CASCADE,
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  razorpay_payment_id text NOT NULL UNIQUE,
+  amount_paise integer NOT NULL CHECK (amount_paise > 0),
+  listener_credit_paise integer NOT NULL DEFAULT 5000 CHECK (listener_credit_paise >= 0),
+  listener_credited_at timestamptz,
+  status text NOT NULL DEFAULT 'captured' CHECK (status IN ('authorized','captured','failed','refunded')),
+  paid_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS direct_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id uuid NOT NULL REFERENCES listener_subscriptions(id) ON DELETE CASCADE,
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message text NOT NULL CHECK (char_length(message) BETWEEN 1 AND 2000),
+  read_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS razorpay_webhook_events (
+  event_id text PRIMARY KEY,
+  event_type text NOT NULL,
+  processed_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE listener_subscriptions ADD COLUMN IF NOT EXISTS last_event_at timestamptz;
+ALTER TABLE listener_subscription_payments ADD COLUMN IF NOT EXISTS listener_credited_at timestamptz;
+
 -- Safe upgrades from earlier packages.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_image text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_phone text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_rate_paise integer NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_availability text NOT NULL DEFAULT 'offline';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_language text NOT NULL DEFAULT 'Malayalam';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_verification_status text NOT NULL DEFAULT 'approved';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_verification_note text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS listener_verified_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
@@ -379,6 +493,16 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
+  ALTER TABLE listener_wallet_transactions DROP CONSTRAINT IF EXISTS listener_wallet_transactions_type_check;
+  ALTER TABLE listener_wallet_transactions ADD CONSTRAINT listener_wallet_transactions_type_check CHECK (type IN ('call_credit','subscription_credit','payout','admin_adjustment'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE users DROP CONSTRAINT IF EXISTS users_listener_verification_status_check;
+  ALTER TABLE users ADD CONSTRAINT users_listener_verification_status_check CHECK (listener_verification_status IN ('voice_required','pending','approved','rejected'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
   ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
   ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status IN ('active','blocked','suspended'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -389,6 +513,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_employee_code ON users(employee_code) WHERE employee_code IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_role_phone ON users(role,phone) WHERE phone IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_name ON plans(name);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_customer ON calls(customer_id) WHERE status IN ('ringing','connecting','active');
 CREATE UNIQUE INDEX IF NOT EXISTS uq_open_call_employee ON calls(employee_id) WHERE status IN ('ringing','connecting','active');
@@ -396,6 +521,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_open_listener_activity ON listener_activity
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_call_credit ON listener_wallet_transactions(reference_id) WHERE type='call_credit' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_subscription_credit ON listener_wallet_transactions(reference_id) WHERE type='subscription_credit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_payout ON listener_wallet_transactions(reference_id) WHERE type='payout' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_pending_withdrawal ON listener_withdrawal_requests(employee_id) WHERE status='pending';
 CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role,status);
@@ -435,6 +561,21 @@ CREATE INDEX IF NOT EXISTS idx_payments_customer ON payment_submissions(customer
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payment_submissions(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_razorpay_orders_customer ON razorpay_orders(customer_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_razorpay_orders_status ON razorpay_orders(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_otp_challenges_phone ON otp_challenges(phone,role,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_verifications_employee ON listener_verifications(employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_verifications_status ON listener_verifications(status,created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_listener_posts_employee ON listener_posts(employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_follows_employee ON listener_follows(employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_subscriptions_customer ON listener_subscriptions(customer_id,updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_subscriptions_employee ON listener_subscriptions(employee_id,updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_subscriptions_status ON listener_subscriptions(status,current_period_end);
+CREATE INDEX IF NOT EXISTS idx_subscription_payments_employee ON listener_subscription_payments(employee_id,paid_at DESC);
+CREATE INDEX IF NOT EXISTS idx_direct_messages_pair ON direct_messages(customer_id,employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_direct_messages_unread ON direct_messages(employee_id,read_at,created_at DESC) WHERE read_at IS NULL;
+
+INSERT INTO platform_settings(key,value) VALUES
+('listener_verification_prompt','ഞാൻ വി മെറ്റിൽ ആദരവോടെയും ഉത്തരവാദിത്തത്തോടെയും സംസാരിക്കും.')
+ON CONFLICT (key) DO NOTHING;
 UPDATE plans SET active=false,updated_at=now()
 WHERE name IN ('Starter','Value','Silver','Gold','Queen','King');
 
