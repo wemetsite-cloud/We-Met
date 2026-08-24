@@ -187,7 +187,7 @@ router.patch('/profile', asyncHandler(async (req, res) => {
   const profileImage = normalizeProfileImage(req.body.profileImage);
   const bannerImage = normalizeProfileImage(req.body.bannerImage);
   if (name.length < 2) return res.status(400).json({ error: 'Enter your private original name.' });
-  if (profileImage === false) return res.status(400).json({ error: 'Choose a built-in avatar or upload a valid JPG, PNG, or WebP profile photo.' });
+  if (profileImage === false) return res.status(400).json({ error: 'Upload a valid JPG, PNG, or WebP profile photo.' });
   if (bannerImage === false) return res.status(400).json({ error: 'Choose a valid JPG, PNG, or WebP banner photo.' });
 
   try {

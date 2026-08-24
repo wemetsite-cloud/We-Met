@@ -90,7 +90,7 @@ test('listener verification, private posts, followers and member messaging are e
   assert.match(adminRoutes, /router\.patch\('\/verifications\/:id'/);
   assert.match(adminRoutes, /router\.delete\('\/posts\/:id'/);
   assert.match(listenerHtml, /id="verificationView"/);
-  assert.match(listenerHtml, /id="profileUploadBanner"/);
+  assert.match(listenerHtml, /id="profileBannerEdit"/);
   assert.match(adminHtml, /id="page-verifications"/);
   assert.match(adminHtml, /id="page-content"/);
 });
@@ -106,7 +106,7 @@ test('customer talk-time balance is presented only in the wallet page', () => {
   assert.match(html.slice(walletStart, walletEnd), /Choose your minutes/);
 });
 
-test('v8.2 repairs legacy duplicate phone records before Render creates the unique index', () => {
+test('v8.3 repairs legacy duplicate phone records before Render creates the unique index', () => {
   const schema = read('backend', 'database', 'schema.sql');
   const repair = schema.indexOf('WITH ranked_phone_accounts AS');
   const uniqueIndex = schema.indexOf('CREATE UNIQUE INDEX IF NOT EXISTS uq_users_role_phone');
@@ -117,7 +117,7 @@ test('v8.2 repairs legacy duplicate phone records before Render creates the uniq
   assert.doesNotMatch(schema.slice(repair, uniqueIndex), /DELETE FROM users/);
 });
 
-test('v8.2 customer home contains only connection, language choice and verified discovery', () => {
+test('v8.3 customer home contains only connection, language choice and verified discovery', () => {
   const html = read('customer-site', 'index.html');
   const app = read('customer-site', 'app.js');
   const css = read('customer-site', 'style.css');
@@ -135,7 +135,7 @@ test('v8.2 customer home contains only connection, language choice and verified 
   assert.match(css, /\.wallet-plan-card/);
 });
 
-test('v8.2 admin-created listeners are approved by default with an optional voice check', () => {
+test('v8.3 admin-created listeners are approved by default with an optional voice check', () => {
   const route = read('backend', 'src', 'routes', 'admin.js');
   const adminHtml = read('admin-site', 'index.html');
   const adminApp = read('admin-site', 'app.js');
@@ -164,7 +164,7 @@ test('listener portal uses app-style bottom navigation with no repeated greeting
   assert.doesNotMatch(app, /\$\('#hello'\)/);
 });
 
-test('v8.2 listener withdrawals and administrator new/history queues are wired end to end', () => {
+test('v8.3 listener withdrawals and administrator new/history queues are wired end to end', () => {
   const schema = read('backend', 'database', 'schema.sql');
   const listenerRoute = read('backend', 'src', 'routes', 'employee.js');
   const adminRoute = read('backend', 'src', 'routes', 'admin.js');
@@ -183,4 +183,58 @@ test('v8.2 listener withdrawals and administrator new/history queues are wired e
   assert.match(adminHtml, /id="page-withdrawals"/);
   assert.match(adminHtml, /data-queue-group="withdrawals"/);
   assert.match(adminApp, /const queueFilters = \{ verifications: 'new', withdrawals: 'new'/);
+});
+
+test('v8.3 screenshot regressions keep calls, profiles, messages and checkout in the intended UI', () => {
+  const customerHtml = read('customer-site', 'index.html');
+  const customerApp = read('customer-site', 'app.js');
+  const customerCss = read('customer-site', 'style.css');
+  const listenerHtml = read('employee-site', 'index.html');
+  const listenerApp = read('employee-site', 'app.js');
+  const listenerCss = read('employee-site', 'style.css');
+
+  const listenerProfile = customerApp.slice(
+    customerApp.indexOf('async function openListenerProfile'),
+    customerApp.indexOf('async function renderPrivatePosts'),
+  );
+  assert.match(listenerProfile, /listener-call-fab/);
+  assert.doesNotMatch(listenerProfile, />Call now</);
+  assert.doesNotMatch(listenerProfile, />Offline</);
+  assert.match(listenerProfile, /status === 'available'/);
+
+  const walletCheckout = customerApp.slice(
+    customerApp.indexOf('async function beginWalletCheckout'),
+    customerApp.indexOf('async function redeem'),
+  );
+  const membershipCheckout = customerApp.slice(
+    customerApp.indexOf('async function beginMembershipCheckout'),
+    customerApp.indexOf('async function cancelSubscription'),
+  );
+  for (const checkout of [walletCheckout, membershipCheckout]) {
+    assert.match(checkout, /assets\/icon-192\.png/);
+    assert.match(checkout, /redirect: false/);
+    assert.match(checkout, /backdrop_color: '#0c0d10'/);
+  }
+  assert.doesNotMatch(walletCheckout, /show\('#walletCheckoutModal', false\)/);
+  assert.doesNotMatch(membershipCheckout, /show\('#membershipCheckoutModal', false\)/);
+
+  const customerProfile = customerHtml.slice(
+    customerHtml.indexOf('id="tab-profile"'),
+    customerHtml.indexOf('id="authModal"'),
+  );
+  assert.equal((customerProfile.match(/data-jump="following"/g) || []).length, 1);
+  assert.match(customerApp, /async function chooseCustomerPhoto/);
+  assert.match(customerApp, /Profile photo updated\./);
+  assert.match(customerCss, /\.plans-grid\{width:min\(880px,100%\);grid-template-columns:repeat\(3/);
+  assert.match(customerCss, /@media\(max-width:760px\)[\s\S]*\.plans-grid\{grid-template-columns:repeat\(2/);
+  assert.match(customerCss, /\.direct-message-layout\.no-conversations \.direct-chat\{display:none\}/);
+
+  assert.match(listenerHtml, /id="profileBannerEdit"/);
+  assert.match(listenerHtml, /id="profilePhotoFile"/);
+  assert.doesNotMatch(listenerHtml, /id="profileMediaChoices"|id="showAvatarChoices"|>Choose from gallery<|>Choose avatar<|>Change banner</);
+  assert.match(listenerApp, /async function saveProfileMedia/);
+  assert.match(listenerApp, /saveProfileMedia\('profileImage'/);
+  assert.match(listenerApp, /saveProfileMedia\('bannerImage'/);
+  assert.match(listenerCss, /\.app-profile\{min-height:0!important;padding:0 0 20px!important/);
+  assert.match(listenerCss, /\.follower-count\{min-width:0;padding:0;border:0;border-radius:0;background:transparent/);
 });
