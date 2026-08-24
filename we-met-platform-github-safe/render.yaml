@@ -39,9 +39,29 @@ services:
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
+      - key: RAZORPAY_SUBSCRIPTION_PLAN_ID
+        value: "plan_TTIsGpwDtJmgi5"
+      - key: RAZORPAY_SUBSCRIPTION_AMOUNT_PAISE
+        value: "39900"
+      - key: RAZORPAY_SUBSCRIPTION_TOTAL_COUNT
+        value: "120"
+      - key: LISTENER_SUBSCRIPTION_CREDIT_PAISE
+        value: "5000"
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SMS_ENABLED
+        value: "false"
+      - key: FAST2SMS_API_KEY
+        sync: false
+      - key: FAST2SMS_OTP_TEMPLATE_ID
+        sync: false
+      - key: SMS_OTP_EXPIRY_MINUTES
+        value: "10"
       - key: INITIAL_LISTENER_NAME
         value: "First Listener"
-      - key: INITIAL_LISTENER_EMAIL
+      - key: INITIAL_LISTENER_USERNAME
+        value: "first.listener"
+      - key: INITIAL_LISTENER_PHONE
         sync: false
       - key: INITIAL_LISTENER_PASSWORD
         sync: false

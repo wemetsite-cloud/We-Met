@@ -6,13 +6,13 @@
   function show(message, ok = false) { status.hidden = false; status.textContent = message; status.dataset.ok = ok ? '1' : '0'; }
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const email = document.getElementById('deleteEmail').value.trim().toLowerCase();
+    const phone = document.getElementById('deletePhone').value.replace(/\D/g, '');
     const password = document.getElementById('deletePassword').value;
     const confirmation = document.getElementById('deleteConfirm').value.trim().toUpperCase();
     if (confirmation !== 'DELETE') return show('Type DELETE exactly to continue.');
     const button = form.querySelector('button'); button.disabled = true;
     try {
-      const loginResponse = await fetch(`${base}/api/auth/login`, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify({ identifier: email, password }) });
+      const loginResponse = await fetch(`${base}/api/auth/login`, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify({ identifier: phone, password, role: 'customer' }) });
       const login = await loginResponse.json();
       if (!loginResponse.ok || !login.token) throw new Error(login.error || 'Could not verify this customer account.');
       if (login.user?.role !== 'customer') throw new Error('This deletion page is for customer accounts.');

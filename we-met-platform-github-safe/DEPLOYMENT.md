@@ -1,30 +1,60 @@
-# We Met v7.0.0 deployment
+# We Met v8 deployment
 
-Deploy the repository root with `render.yaml`. The supported same-origin staff URLs are:
+This package contains the customer site, listener workspace, admin operations portal, API server and PostgreSQL schema.
 
-- Admin: `https://wemet.xyz/admin/`
+## Portal URLs
+
+When `SERVE_FRONTENDS=true`, one deployment serves:
+
+- Customer: `https://wemet.xyz/`
 - Listener: `https://wemet.xyz/listener/`
-- Legacy listener alias: `https://wemet.xyz/employee/`
+- Admin: `https://wemet.xyz/admin/`
+- Health check: `https://wemet.xyz/api/health`
 
-These path-based URLs work without separate subdomain routing and should be used until the staff subdomains are healthy.
+The optional `listener.wemet.xyz` and `admin.wemet.xyz` custom domains can point to the same Render service. The server selects the correct portal from the hostname.
 
-## Required Render settings
+## Deploy on Render
 
-Keep the existing environment variables configured in the Render service. In particular, do not put `JWT_SECRET`, `ADMIN_PASSWORD`, `DATABASE_URL`, or `RAZORPAY_KEY_SECRET` in frontend files. Razorpay uses the server-side key pair configured on Render; both variables must belong to the same mode. Use an `rzp_live_` key pair only when the approved live account is ready.
+1. Create or connect a PostgreSQL database.
+2. Deploy the repository root using `render.yaml`.
+3. Open the Render service's **Environment** page and enter every value marked `sync: false`.
+4. Follow `SMS_RAZORPAY_SETUP.md` for SMS OTP, recurring memberships and the Razorpay webhook.
+5. Deploy again after saving the environment variables.
+6. Confirm `/api/health` returns `{"ok":true}` and test all three portal URLs.
 
-Razorpay Standard Checkout is used only to collect customer talk-time top-ups. This build does not call RazorpayX or any automated listener-payment API. Listener earnings are paid separately and then recorded by an administrator from **Listener wallets → Record paid**.
+The start command runs the idempotent database schema before the server starts. Keep database backups enabled before every production release.
 
-## Deferred features
+## Required production secrets
 
-SMS OTP sign-in and automated listener payments are intentionally not active in v7.0.0. Add them only after selecting an SMS provider and completing the separate payment-provider onboarding required for automated listener transfers. The current email/username-and-password login and admin-managed listener ledger remain the supported production paths.
+Never add these values to frontend files or commit them to source control:
 
-## Optional staff subdomains
+- `DATABASE_URL`
+- `JWT_SECRET` — random, private and at least 48 characters
+- `ADMIN_PASSWORD` — at least 10 characters
+- `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
+- `FAST2SMS_API_KEY` and `FAST2SMS_OTP_TEMPLATE_ID`
 
-To use `admin.wemet.xyz` and `listener.wemet.xyz`, add both as custom domains on the same Render web service, then point their Cloudflare DNS records to the hostname Render provides. Remove any Cloudflare Origin Rule that sends either hostname to a different origin or port. Wait until Render shows the custom domain certificate as active before using those URLs.
+Use matching Razorpay test credentials while testing and matching live credentials only after the account is approved for production. HTTPS is required in production.
 
-## After deployment
+## Local start
 
-1. Open `https://wemet.xyz/api/health` and confirm it returns `ok: true`.
-2. Open the admin and listener path URLs above.
-3. Refresh each portal once after deploying v7.0.0 so the new service worker replaces the old cache.
-4. Confirm one tap changes a page or tab and that a temporary network interruption does not sign the user out.
+1. Copy `.env.example` to `.env` and fill in the local values.
+2. Run `npm run install:backend`.
+3. Run `npm run db:init`.
+4. Run `npm start`.
+
+The default local customer URL is `http://localhost:3000/`; listener and admin are under `/listener/` and `/admin/`.
+
+## Release checks
+
+1. Register a new customer by OTP and confirm returning login asks for the password.
+2. Register a listener, record the Malayalam line and approve the submission from Admin → Verifications.
+3. Confirm the customer can follow the listener but cannot view exclusive posts or message/call before membership.
+4. Buy the listener's ₹399 membership and confirm posts and messages unlock.
+5. Confirm a subscribed customer with insufficient talk-time is sent to Wallet, and that membership never provides a free call.
+6. Buy talk-time from Wallet, call an online subscribed listener and confirm billing starts only after audio connects.
+7. Confirm Admin → Payments records the top-up, subscription payment and ₹50 listener credit exactly once.
+8. Refresh each portal once so the v8 service worker replaces the old cache.
+
+Listener payouts remain administrator-managed: pay the listener by the agreed external method, then use **Admin → Listener wallets → Record paid** to create the audited ledger entry.

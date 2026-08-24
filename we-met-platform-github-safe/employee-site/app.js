@@ -15,6 +15,16 @@
 
   let me = null;
   let profileImageDraft = '';
+  let bannerImageDraft;
+  let listenerAuthState = { phone: '', challengeId: '', registrationToken: '' };
+  let verificationState = null;
+  let voiceRecorder = null;
+  let voiceChunks = [];
+  let voiceBlob = null;
+  let voiceStream = null;
+  let postObjectUrls = [];
+  let inbox = [];
+  let activeCustomerId = null;
   const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let socket = null;
   let audioCall = null;
@@ -29,7 +39,7 @@
   let statsRefreshTimer = null;
 
   const NAVIGATION_MARKER = 'we-met-listener-navigation';
-  const VALID_TABS = new Set(['desk', 'wallet', 'history', 'profile', 'notifications']);
+  const VALID_TABS = new Set(['desk', 'posts', 'inbox', 'followers', 'wallet', 'history', 'profile', 'notifications']);
 
   function navigationState(tab = activeTab, overlay = null) {
     return { marker: NAVIGATION_MARKER, tab: VALID_TABS.has(tab) ? tab : 'desk', overlay };
@@ -114,7 +124,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=7.0.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.0.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -122,6 +132,9 @@
     P.Store.clear();
     socket?.disconnect();
     audioCall?.stop();
+    voiceStream?.getTracks().forEach((track) => track.stop());
+    postObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    postObjectUrls = [];
     stopRing();
     ringContext?.close().catch(() => {});
     ringContext = null;
@@ -131,11 +144,13 @@
     status = 'offline';
     show('#loginView');
     show('#appView', false);
+    show('#verificationView', false);
     show('#incomingModal', false);
     show('#callView', false);
     show('#recoveryModal', false);
     show('#restoreListenerCall', false);
-    if ($('#loginPassword')) $('#loginPassword').value = '';
+    ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm'].forEach((id) => document.getElementById(id)?.reset());
+    showListenerAuthStep('welcome');
     activeTab = 'desk';
     history.replaceState(navigationState('desk', null), document.title);
     sessionResetPending = false;
@@ -156,6 +171,14 @@
     const grid = $('#profileAvatarGrid');
     if (!grid) return;
     grid.innerHTML = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-profile-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="assets/${avatar}" alt=""></button>`).join('');
+    if ($('#profilePreviewUsername')) $('#profilePreviewUsername').textContent = `@${me?.username || 'listener'}`;
+    if ($('#profileBannerPreview')) {
+      const banner = bannerImageDraft === undefined ? me?.bannerImage : bannerImageDraft;
+      const url = String(banner || '').startsWith('photo:')
+        ? `${P.base}/api/public/listener-banner-image/${encodeURIComponent(me.id)}`
+        : /^data:image\//.test(String(banner || '')) ? banner : '';
+      $('#profileBannerPreview').style.backgroundImage = url ? `linear-gradient(180deg,transparent,rgba(16,11,14,.68)),url("${url}")` : 'linear-gradient(135deg,#6b0d3e,#d91b72)';
+    }
   }
 
   async function compressProfilePhoto(file) {
@@ -178,9 +201,35 @@
     } finally { URL.revokeObjectURL(url); }
   }
 
+  async function compressBannerPhoto(file) {
+    if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP banner.');
+    if (file.size > 7 * 1024 * 1024) throw new Error('Choose a banner smaller than 7 MB.');
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; });
+      const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 430;
+      const ctx = canvas.getContext('2d');
+      const sourceRatio = image.naturalWidth / image.naturalHeight; const targetRatio = canvas.width / canvas.height;
+      let sx = 0; let sy = 0; let sw = image.naturalWidth; let sh = image.naturalHeight;
+      if (sourceRatio > targetRatio) { sw = image.naturalHeight * targetRatio; sx = (image.naturalWidth - sw) / 2; }
+      else { sh = image.naturalWidth / targetRatio; sy = (image.naturalHeight - sh) / 2; }
+      ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      const result = canvas.toDataURL('image/jpeg', .8);
+      if (result.length > 610000) throw new Error('Choose a simpler or smaller banner image.');
+      return result;
+    } finally { URL.revokeObjectURL(url); }
+  }
+
   function bind() {
-    $('#loginForm').addEventListener('submit', login);
-    $('#forgotBtn').addEventListener('click', openRecovery);
+    $('#listenerAuthBegin').addEventListener('click', () => showListenerAuthStep('phone'));
+    $('#listenerPhoneForm').addEventListener('submit', startListenerPhone);
+    $('#listenerPasswordForm').addEventListener('submit', listenerPasswordLogin);
+    $('#listenerForgotPassword').addEventListener('click', openRecovery);
+    $('#listenerOtpForm').addEventListener('submit', verifyListenerOtp);
+    $('#listenerDetailsForm').addEventListener('submit', registerListener);
+    $$('[data-listener-auth-back]').forEach((button) => button.addEventListener('click', () => showListenerAuthStep('phone')));
+    $('#verificationLogout').addEventListener('click', leaveListenerSession);
     $('#closeRecovery').addEventListener('click', () => closeManagedOverlay('recoveryModal'));
     $('#listenerRecoveryBack').addEventListener('click', goBackInListener);
     $('#recoveryRequestForm').addEventListener('submit', requestRecovery);
@@ -202,15 +251,21 @@
     $('#profileForm').addEventListener('submit', saveProfile);
     $('#profileUploadPhoto').addEventListener('click', () => $('#profilePhotoFile').click());
     $('#profilePhotoFile').addEventListener('change', async (event) => { try { profileImageDraft = await compressProfilePhoto(event.target.files?.[0]); renderProfileImageEditor(); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
+    $('#profileUploadBanner').addEventListener('click', () => $('#profileBannerFile').click());
+    $('#profileBannerFile').addEventListener('change', async (event) => { try { bannerImageDraft = await compressBannerPhoto(event.target.files?.[0]); renderProfileImageEditor(); } catch (error) { P.toast(error.message, 'error'); } finally { event.target.value = ''; } });
     $('#profileAutoAvatar').addEventListener('click', () => { profileImageDraft = ''; renderProfileImageEditor(); });
     $('#profileAvatarGrid').addEventListener('click', (event) => { const button = event.target.closest('[data-profile-avatar]'); if (!button) return; profileImageDraft = button.dataset.profileAvatar; renderProfileImageEditor(); });
     $('#passwordForm').addEventListener('submit', changePassword);
-    $('#employeeEmailForm').addEventListener('submit', changeEmail);
     $('#refreshHistory').addEventListener('click', loadHistory);
     $('#refreshWallet').addEventListener('click', loadWallet);
     $('#refreshActivity').addEventListener('click', () => { loadStats(); loadActivity(); });
     $('#minimizeListenerCall').addEventListener('click', () => minimizeListenerCall());
     $('#restoreListenerCall').addEventListener('click', restoreListenerCall);
+    $('#choosePostPhoto').addEventListener('click', () => $('#postPhoto').click());
+    $('#postPhoto').addEventListener('change', previewPostPhoto);
+    $('#postForm').addEventListener('submit', publishPost);
+    $('#listenerMessageForm').addEventListener('submit', sendListenerMessage);
+    document.addEventListener('click', handleListenerSocialClick);
   }
 
   async function init() {
@@ -233,28 +288,65 @@
     if (tab === 'history') loadHistory();
     if (tab === 'wallet') loadWallet();
     if (tab === 'notifications') loadNotifications();
+    if (tab === 'posts') loadPosts();
+    if (tab === 'inbox') loadInbox();
+    if (tab === 'followers') loadFollowers();
     if (tab === 'desk') { loadStats(); loadActivity(); }
     syncBackButton();
   }
 
-  async function login(event) {
+  function showListenerAuthStep(step) {
+    $$('.listener-auth-step').forEach((section) => section.classList.toggle('active', section.dataset.listenerAuth === step));
+    const progress = { welcome: 0, phone: 18, password: 100, otp: 46, details: 100 }[step] || 0;
+    $('#listenerAuthProgress').style.width = `${progress}%`;
+    setTimeout(() => $(`[data-listener-auth="${step}"] input`)?.focus(), 50);
+  }
+
+  async function startListenerPhone(event) {
     event.preventDefault();
-    const button = event.submitter;
-    button?.setAttribute('disabled', '');
+    const button = event.submitter; button.disabled = true;
+    const phone = $('#listenerPhone').value.replace(/\D/g, '');
     try {
-      const response = await P.api('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ identifier: $('#loginEmail').value, password: $('#loginPassword').value }),
-      });
+      const response = await P.api('/api/auth/phone/start', { method: 'POST', body: JSON.stringify({ phone, role: 'employee' }) });
+      listenerAuthState.phone = phone;
+      $('#listenerPhonePreview').textContent = response.phone;
+      $('#listenerOtpPhone').textContent = response.phone;
+      if (response.mode === 'password') showListenerAuthStep('password');
+      else {
+        listenerAuthState.challengeId = response.challengeId;
+        if (response.developmentOtp) { $('#listenerDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#listenerDevelopmentOtp'); }
+        showListenerAuthStep('otp');
+      }
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function listenerPasswordLogin(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/login', { method: 'POST', body: JSON.stringify({ identifier: listenerAuthState.phone, password: $('#listenerLoginPassword').value, role: 'employee' }) });
       if (response.user.role !== 'employee') throw new Error('This is not a listener account.');
-      P.Store.token = response.token;
-      me = response.user;
-      enter();
-    } catch (error) {
-      P.toast(error.message, 'error');
-    } finally {
-      button?.removeAttribute('disabled');
-    }
+      P.Store.token = response.token; me = response.user; await enter();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function verifyListenerOtp(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: listenerAuthState.challengeId, otp: $('#listenerOtp').value }) });
+      listenerAuthState.registrationToken = response.registrationToken; showListenerAuthStep('details');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function registerListener(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/register/listener', { method: 'POST', body: JSON.stringify({ registrationToken: listenerAuthState.registrationToken, username: $('#listenerPublicUsername').value, name: $('#listenerLegalName').value, password: $('#listenerNewPassword').value, termsAccepted: $('#listenerTerms').checked }) });
+      P.Store.token = response.token; me = response.user; await enter();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
   }
 
   function recoveryStorage(value) {
@@ -297,7 +389,7 @@
     try {
       const response = await P.api('/api/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ identifier: $('#recoveryEmail').value }),
+        body: JSON.stringify({ identifier: $('#recoveryPhone').value }),
       });
       if (response.requestId && response.recoveryKey) {
         recoveryStorage({ requestId: response.requestId, recoveryKey: response.recoveryKey });
@@ -371,26 +463,34 @@
       const response = await P.api('/api/auth/me');
       if (response.user.role !== 'employee') throw new Error('Wrong account type.');
       me = response.user;
-      enter();
+      await enter();
     } catch (error) {
       if (P.isAuthError(error)) return;
       P.toast('The server is temporarily unavailable. Your listener login is still saved; try again shortly.', 'error');
     }
   }
 
-  function enter() {
+  async function enter() {
     sessionResetPending = false;
     show('#loginView', false);
+    verificationState = await loadVerificationState();
+    if (verificationState?.status !== 'approved') {
+      show('#appView', false);
+      show('#verificationView');
+      renderVerification();
+      return;
+    }
+    show('#verificationView', false);
     show('#appView');
-    $('#hello').textContent = `Hello, ${me.name}`;
+    $('#hello').textContent = `Hello, @${me.username || me.name}`;
     $('#profileName').value = me.name || '';
     $('#profileUsername').value = me.username || '';
-    $('#profileEmail').value = me.email || '';
     $('#profilePhone').value = me.phone || '';
     $('#profileBio').value = me.bio || '';
     $('#profileCode').value = me.employeeCode || '';
     $('#profileLanguage').value = me.listenerLanguage || 'Malayalam';
     profileImageDraft = me.profileImage || '';
+    bannerImageDraft = undefined;
     renderProfileImageEditor();
     $('#deskLanguage').textContent = `${me.listenerLanguage || 'Malayalam'} calls`;
     connect();
@@ -399,13 +499,83 @@
     loadWallet();
     loadHistory();
     loadNotifications();
+    loadPosts();
+    loadInbox();
+    loadFollowers();
     clearInterval(statsRefreshTimer);
     statsRefreshTimer = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (activeTab === 'desk') loadStats();
       if (activeTab === 'wallet') loadWallet();
+      if (activeTab === 'inbox') {
+        if (activeCustomerId) openListenerConversation(activeCustomerId);
+        else loadInbox();
+      }
     }, 30_000);
     syncBackButton();
+  }
+
+  async function loadVerificationState() {
+    try { return await P.api('/api/employee/verification'); }
+    catch (error) { P.toast(error.message, 'error'); return { status: me?.listenerVerificationStatus || 'voice_required', prompt: '' }; }
+  }
+
+  function renderVerification() {
+    const content = $('#verificationContent');
+    if (!content || !verificationState) return;
+    if (verificationState.status === 'pending') {
+      content.innerHTML = `<div class="verification-wait-art"><div class="wait-orbit one"></div><div class="wait-orbit two"></div><img src="assets/logo.svg" alt=""></div><span class="eyebrow">RECORDING RECEIVED</span><h1>We’re verifying your voice.</h1><p>Your listener account stays private while the admin reviews the Malayalam recording. This page will open automatically after approval.</p><div class="verification-status-line"><i></i><span>Review in progress</span></div><small>Submitted ${P.date(verificationState.submission?.created_at)}</small>`;
+      window.setTimeout(checkVerificationApproval, 15000);
+      return;
+    }
+    const rejected = verificationState.status === 'rejected';
+    content.innerHTML = `<span class="eyebrow">VOICE VERIFICATION</span><h1>${rejected ? 'Record the line again' : 'One quick voice check'}</h1><p>Read this Malayalam line clearly in a quiet room. The admin uses only this clip to verify the listener account.</p>${rejected && verificationState.note ? `<div class="verification-note"><b>Admin note</b><span>${P.esc(verificationState.note)}</span></div>` : ''}<blockquote lang="ml">${P.esc(verificationState.prompt)}</blockquote><div id="recordingVisualizer" class="recording-visualizer"><i></i><i></i><i></i><i></i><i></i><span id="recordingStatus">Ready to record</span></div><audio id="voicePreview" class="hidden" controls></audio><div class="verification-actions"><button id="startVoiceRecord" class="button button-primary button-large" type="button">● Start recording</button><button id="stopVoiceRecord" class="button button-soft button-large hidden" type="button">Stop recording</button><button id="submitVoiceRecord" class="button button-primary button-large hidden" type="button">Send for verification</button></div><small>Your phone number and original name are never shown publicly.</small>`;
+    $('#startVoiceRecord').onclick = startVoiceRecording;
+    $('#stopVoiceRecord').onclick = stopVoiceRecording;
+    $('#submitVoiceRecord').onclick = submitVoiceRecording;
+  }
+
+  async function checkVerificationApproval() {
+    if (!me || $('#verificationView').classList.contains('hidden')) return;
+    const latest = await loadVerificationState();
+    verificationState = latest;
+    if (latest.status === 'approved') {
+      const response = await P.api('/api/auth/me'); me = response.user; P.toast('Voice verified. Welcome to your listener workspace!', 'success'); await enter();
+    } else if (latest.status !== 'pending') renderVerification();
+    else window.setTimeout(checkVerificationApproval, 15000);
+  }
+
+  async function startVoiceRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return P.toast('Voice recording is not supported in this browser. Use current Chrome, Edge or Safari.', 'error');
+    try {
+      voiceStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported?.(type));
+      voiceRecorder = preferred ? new MediaRecorder(voiceStream, { mimeType: preferred }) : new MediaRecorder(voiceStream);
+      voiceChunks = []; voiceBlob = null;
+      voiceRecorder.ondataavailable = (event) => { if (event.data?.size) voiceChunks.push(event.data); };
+      voiceRecorder.onstop = () => {
+        voiceBlob = new Blob(voiceChunks, { type: String(voiceRecorder.mimeType || 'audio/webm').split(';')[0] });
+        const preview = $('#voicePreview'); preview.src = URL.createObjectURL(voiceBlob); show('#voicePreview'); show('#submitVoiceRecord');
+        $('#recordingStatus').textContent = 'Recording ready — listen before sending'; $('#recordingVisualizer').classList.remove('recording');
+        voiceStream?.getTracks().forEach((track) => track.stop()); voiceStream = null;
+      };
+      voiceRecorder.start(250); show('#startVoiceRecord', false); show('#stopVoiceRecord'); $('#recordingVisualizer').classList.add('recording'); $('#recordingStatus').textContent = 'Recording… read the complete line';
+    } catch (error) { P.toast(error.name === 'NotAllowedError' ? 'Allow microphone access to record the verification line.' : error.message, 'error'); }
+  }
+
+  function stopVoiceRecording() {
+    if (voiceRecorder?.state === 'recording') voiceRecorder.stop();
+    show('#stopVoiceRecord', false); show('#startVoiceRecord'); $('#startVoiceRecord').textContent = 'Record again';
+  }
+
+  async function submitVoiceRecording() {
+    if (!voiceBlob?.size) return P.toast('Record the Malayalam line first.', 'info');
+    const button = $('#submitVoiceRecord'); button.disabled = true;
+    try {
+      const form = new FormData(); form.append('audio', voiceBlob, voiceBlob.type === 'audio/mp4' ? 'verification.m4a' : 'verification.webm');
+      const response = await P.api('/api/employee/verification/audio', { method: 'POST', body: form, timeout: 30000 });
+      P.toast(response.message, 'success'); verificationState = await loadVerificationState(); renderVerification();
+    } catch (error) { P.toast(error.message, 'error'); button.disabled = false; }
   }
 
   function sendAvailabilityCommand(event, payload = {}) {
@@ -524,7 +694,6 @@
     });
     socket.on('call:tick', (data) => {
       $('#callTimer').textContent = P.duration(data.billedSeconds);
-      $('#customerBalance').textContent = P.duration(data.balanceSeconds);
     });
     socket.on('call:ended', (data) => {
       stopRing();
@@ -591,7 +760,6 @@
     $('#rejectBtn').disabled = false;
     $('#incomingName').textContent = data.customer.name;
     $('#incomingInitials').textContent = initials(data.customer.name);
-    $('#incomingBalance').textContent = P.duration(data.balanceSeconds);
     $('#activeCallLanguage').textContent = `${me?.listenerLanguage || 'Malayalam'} conversation`;
     openManagedOverlay('#incomingModal', 'incomingModal');
     startRing();
@@ -683,6 +851,85 @@
     $('#chatMessages').scrollTo({ top: $('#chatMessages').scrollHeight, behavior: 'smooth' });
   }
 
+  function previewPostPhoto(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file); postObjectUrls.push(url);
+    $('#postUploadPreview').innerHTML = `<img src="${url}" alt="Selected post"><b>${P.esc(file.name)}</b><small>${(file.size / 1024 / 1024).toFixed(1)} MB</small>`;
+  }
+
+  async function publishPost(event) {
+    event.preventDefault();
+    const file = $('#postPhoto').files?.[0];
+    if (!file) return P.toast('Choose a photo first.', 'info');
+    const button = event.submitter; button.disabled = true;
+    try {
+      const form = new FormData(); form.append('photo', file); form.append('caption', $('#postCaption').value);
+      await P.api('/api/employee/posts', { method: 'POST', body: form, timeout: 30000 });
+      event.target.reset(); $('#postUploadPreview').innerHTML = '<span>＋</span><b>Choose a photo</b><small>JPG, PNG or WebP · max 4 MB</small>'; await loadPosts(); P.toast('Exclusive post published.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function loadPosts() {
+    try {
+      const response = await P.api('/api/employee/posts');
+      const markup = await Promise.all((response.posts || []).map(async (post) => {
+        try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); postObjectUrls.push(url); return `<figure class="listener-post"><img src="${url}" alt="Your exclusive post"><figcaption><p>${P.esc(post.caption || 'No caption')}</p><small>${P.date(post.created_at)}</small><button data-delete-post="${P.esc(post.id)}" type="button">Delete</button></figcaption></figure>`; }
+        catch { return ''; }
+      }));
+      $('#listenerPosts').innerHTML = markup.filter(Boolean).join('') || emptyState('No exclusive posts', 'Publish your first member-only photo from the form.');
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function deletePost(id) {
+    if (!confirm('Delete this exclusive post?')) return;
+    try { await P.api(`/api/employee/posts/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadPosts(); P.toast('Post deleted.', 'success'); }
+    catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function loadInbox() {
+    try {
+      const response = await P.api('/api/employee/inbox'); inbox = response.conversations || [];
+      $('#listenerInbox').innerHTML = inbox.length ? inbox.map((item) => `<button class="listener-inbox-row ${activeCustomerId === item.customerId ? 'active' : ''}" data-inbox-customer="${P.esc(item.customerId)}" type="button"><span>${initials(item.customerName)}</span><div><b>${P.esc(item.customerName)}</b><small>${P.esc(item.lastMessage || (item.active ? 'New exclusive member' : 'Membership ended'))}</small></div>${item.unreadCount ? `<i>${item.unreadCount}</i>` : ''}</button>`).join('') : emptyState('Inbox is empty', 'Messages arrive after a customer subscribes to your exclusive profile.');
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function openListenerConversation(customerId) {
+    activeCustomerId = customerId; await loadInbox();
+    const item = inbox.find((row) => row.customerId === customerId);
+    if (!item) return;
+    $('#listenerChatHead').innerHTML = `<strong>${P.esc(item.customerName)}</strong><small>${item.active ? `Active member until ${P.date(item.currentPeriodEnd)}` : 'Membership ended · history remains visible'}</small>`;
+    show('#listenerMessageForm', item.active);
+    try {
+      const response = await P.api(`/api/employee/inbox/${encodeURIComponent(customerId)}/messages`);
+      $('#listenerDirectMessages').innerHTML = response.messages.length ? response.messages.map((message) => `<div class="listener-direct-bubble ${message.sender_id === me.id ? 'mine' : ''}"><p>${P.esc(message.message)}</p><small>${P.date(message.created_at)}</small></div>`).join('') : '<div class="chat-empty">Start a respectful private conversation.</div>';
+      $('#listenerDirectMessages').scrollTop = $('#listenerDirectMessages').scrollHeight;
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function sendListenerMessage(event) {
+    event.preventDefault(); const message = $('#listenerMessageInput').value.trim(); if (!message || !activeCustomerId) return; const button = event.submitter; button.disabled = true;
+    try { await P.api(`/api/employee/inbox/${encodeURIComponent(activeCustomerId)}/messages`, { method: 'POST', body: JSON.stringify({ message }) }); $('#listenerMessageInput').value = ''; await openListenerConversation(activeCustomerId); }
+    catch (error) { P.toast(error.message, 'error'); } finally { button.disabled = false; }
+  }
+
+  async function loadFollowers() {
+    try {
+      const response = await P.api('/api/employee/followers'); $('#followerCount').textContent = Number(response.count || 0).toLocaleString('en-IN');
+      const cards = await Promise.all((response.followers || []).map(async (item) => {
+        let image = ''; if (String(item.profileImage || '').startsWith('photo:')) { try { const blob = await P.apiBlob(`/api/employee/followers/${encodeURIComponent(item.customerId)}/image`); image = URL.createObjectURL(blob); postObjectUrls.push(image); } catch {} }
+        return `<article class="follower-card">${image ? `<img src="${image}" alt="">` : `<span>${initials(item.name)}</span>`}<div><strong>${P.esc(item.name)}</strong><small>${item.subscribed ? 'Exclusive member' : 'Follower'} · ${P.date(item.followedAt)}</small></div>${item.subscribed ? '<i>Member</i>' : ''}</article>`;
+      }));
+      $('#followerGrid').innerHTML = cards.join('') || emptyState('No followers yet', 'Customers can follow your profile privately.');
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function handleListenerSocialClick(event) {
+    const post = event.target.closest('[data-delete-post]'); if (post) return deletePost(post.dataset.deletePost);
+    const conversation = event.target.closest('[data-inbox-customer]'); if (conversation) return openListenerConversation(conversation.dataset.inboxCustomer);
+  }
+
   async function loadStats() {
     try {
       const response = await P.api('/api/employee/stats');
@@ -714,11 +961,12 @@
         : balancePaise > 0
           ? `${P.moneyExact(balancePaise)} is awaiting manual payment by the administrator.`
           : Number(summary.lifetimePaidPaise || 0) > 0
-            ? 'Your recorded earnings are fully settled. New call earnings will appear here automatically.'
-            : 'Call earnings are credited automatically after each connected call.';
+            ? 'Your recorded earnings are fully settled. New call and subscription earnings will appear here automatically.'
+            : 'Call earnings and ₹50 successful-subscription credits are added automatically.';
 
       const labels = {
         call_credit: 'Call earnings',
+        subscription_credit: 'Exclusive subscription earning',
         payout: 'Payment recorded',
         admin_adjustment: 'Administrator adjustment',
       };
@@ -728,13 +976,16 @@
           const callDetail = entry.type === 'call_credit'
             ? `${P.duration(entry.billed_seconds)} at ${P.moneyExact(entry.rate_paise_per_minute)}/min`
             : '';
+          const subscriptionDetail = entry.type === 'subscription_credit'
+            ? '₹50 for a successful exclusive membership payment'
+            : '';
           const paymentDetail = entry.type === 'payout'
             ? `${entry.payment_reference ? `Reference ${entry.payment_reference}` : 'Recorded by administrator'}`
             : '';
-          const detail = [callDetail || paymentDetail, entry.note].filter(Boolean).join(' · ');
+          const detail = [callDetail || paymentDetail || subscriptionDetail, entry.note].filter(Boolean).join(' · ');
           return `<article class="wallet-entry ${amount < 0 ? 'debit' : 'credit'}"><div><strong>${P.esc(labels[entry.type] || entry.type)}</strong><p>${P.esc(detail || 'Wallet entry')}</p><small>${P.date(entry.created_at)}</small></div><b>${amount >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(amount))}</b></article>`;
         }).join('')
-        : emptyState('No wallet activity', 'Connected-call earnings and recorded payments will appear here.');
+        : emptyState('No wallet activity', 'Connected-call earnings, ₹50 subscription credits and recorded payments will appear here.');
     } catch (error) {
       P.toast(error.message, 'error');
     }
@@ -795,30 +1046,18 @@
         body: JSON.stringify({
           name: $('#profileName').value,
           username: $('#profileUsername').value,
-          phone: $('#profilePhone').value,
           bio: $('#profileBio').value,
           profileImage: profileImageDraft,
+          ...(bannerImageDraft !== undefined ? { bannerImage: bannerImageDraft } : {}),
         }),
       });
-      me = { ...me, ...response.user, profileImage: response.user.profile_image ?? response.user.profileImage ?? profileImageDraft };
+      me = { ...me, ...response.user, profileImage: response.user.profile_image ?? response.user.profileImage ?? profileImageDraft, bannerImage: response.user.banner_image ?? response.user.bannerImage ?? me.bannerImage };
       profileImageDraft = me.profileImage || '';
+      bannerImageDraft = undefined;
       renderProfileImageEditor();
-      $('#hello').textContent = `Hello, ${me.name}`;
+      $('#profilePreviewUsername').textContent = `@${me.username || 'listener'}`;
+      $('#hello').textContent = `Hello, @${me.username || me.name}`;
       P.toast('Profile saved.', 'success');
-    } catch (error) {
-      P.toast(error.message, 'error');
-    }
-  }
-
-  async function changeEmail(event) {
-    event.preventDefault();
-    try {
-      await P.api('/api/auth/change-login', {
-        method: 'POST',
-        body: JSON.stringify({ newEmail: $('#employeeNewEmail').value, currentPassword: $('#employeeEmailPassword').value }),
-      });
-      P.toast('Email updated. Please sign in again.', 'success');
-      setTimeout(logout, 900);
     } catch (error) {
       P.toast(error.message, 'error');
     }

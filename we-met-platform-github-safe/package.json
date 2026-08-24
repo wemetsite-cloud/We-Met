@@ -1,8 +1,8 @@
 {
   "name": "we-met-platform",
-  "version": "7.0.0",
+  "version": "8.0.0",
   "private": true,
-  "description": "We Met platform with customer Razorpay checkout, role-safe portals, connected-second billing and admin-managed listener wallets.",
+  "description": "We Met phone-first platform with listener verification, recurring exclusive memberships, private posts and messaging, paid browser calls and audited operations.",
   "scripts": {
     "install:backend": "npm --prefix backend ci --registry=https://registry.npmjs.org/",
     "start": "npm --prefix backend run start:production",

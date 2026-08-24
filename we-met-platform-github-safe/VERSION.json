@@ -1,12 +1,13 @@
 {
-  "version": "7.0.0",
-  "name": "We Met v7.0.0 Customer App Experience",
+  "version": "8.0.0",
+  "name": "We Met v8.0.0 Exclusive Listener Platform",
   "changes": [
-    "Introduces a polished dark application interface with fixed bottom navigation",
-    "Adds guided one-question-at-a-time sign-in and account creation",
-    "Shows three minute packs per mobile row, then adds columns on larger screens",
-    "Rebuilds live listener cards around voice calling without video controls",
-    "Replaces customer-facing wallet language with clear talk-time and minutes",
-    "Refreshes all portal service-worker caches while preserving production flows"
+    "Introduces phone-first OTP onboarding with password login for returning customers and listeners",
+    "Adds administrator-reviewed Malayalam voice verification for every self-created listener account",
+    "Adds private listener photos, follows, member messaging and listener-owned profile photo and banner controls",
+    "Adds separate recurring ₹399 Razorpay memberships for each listener using plan_TTIsGpwDtJmgi5",
+    "Keeps paid calls separate from membership access and bills every connected second from the main talk-time wallet",
+    "Adds audited subscription payments, ₹50 listener credits, post moderation and a complete operations dashboard",
+    "Rebuilds customer, listener, admin, wallet, Razorpay and login interfaces in the We Met pink-and-black theme"
   ]
 }
