@@ -46,15 +46,20 @@ Calls never require a membership and a membership never includes free calls. Ran
 
 ### Match Checkout to We Met
 
-The site keeps the exact wallet or listener-membership summary open underneath Razorpay Standard Checkout. It uses the square We Met PNG logo, pink **#E62D7D** action colour, a **#0C0D10** loading surface and a dark backdrop. Cancelling Checkout returns to the same summary instead of an empty page.
+The site keeps the exact wallet or listener-membership summary open underneath Razorpay Standard Checkout. It uses the square We Met PNG logo, pink **#E62D7D** action colour, a **#0C0D10** backdrop and disables Razorpay's large pre-checkout loading animation. Cancelling Checkout returns to the same summary instead of an empty page.
 
 1. Open Razorpay Dashboard → **Account & Settings** → **Checkout Styling**.
 2. Upload the We Met logo and use **We Met** as the brand name.
-3. Choose background **#17181D** and accent **#E62D7D**. This Dashboard background setting is required to replace Razorpay's white payment-method surface on mobile.
+3. Set the Checkout background to **#17181D**. The project already sends **#E62D7D** as the Checkout action colour and **#0C0D10** as the outside backdrop.
 4. Choose rounded borders, a clean font, and enable the trusted-business badge if available.
 5. Preview desktop and mobile, save in Test mode, and repeat in Live mode if required.
 
-Secure card, UPI and bank fields are hosted by Razorpay. Browser security prevents the project CSS from redesigning those provider-owned fields. The project now preserves the correct underlying We Met page and controls the branded summary, loading background, logo, description and theme options; **Checkout Styling** controls Razorpay's inner payment-method background.
+Secure card, UPI and bank fields are hosted by Razorpay. Browser security prevents the project CSS from redesigning those provider-owned fields. The project preserves the correct underlying We Met page and controls its branded summary, logo, description, action colour, backdrop and loading-animation setting; **Checkout Styling** controls Razorpay's inner payment-method background, font, logo and borders.
+
+Official Razorpay references:
+
+- Checkout Styling: https://razorpay.com/docs/payments/dashboard/account-settings/checkout-styling/
+- Standard Checkout options: https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/
 
 ## 3. Add the signed webhook
 

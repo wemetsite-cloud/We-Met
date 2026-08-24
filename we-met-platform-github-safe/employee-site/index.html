@@ -8,8 +8,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.3.0">
-  <link rel="stylesheet" href="style.css?v=8.3.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.5.0">
+  <link rel="stylesheet" href="style.css?v=8.5.0">
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -159,12 +159,12 @@
         <form id="profileForm" class="panel settings-panel stack listener-profile-editor hidden">
           <div class="editor-head"><div><span class="eyebrow">EDIT PROFILE</span><h2>Public details</h2></div><button id="closeListenerProfileEdit" class="icon-close" type="button" aria-label="Close">×</button></div>
           <label>Public username<input id="profileUsername" autocomplete="username" required></label>
-          <label>Private original name<input id="profileName" required><small>Only the admin can see this.</small></label>
-          <label>Public bio<textarea id="profileBio" maxlength="500"></textarea></label>
+          <label class="profile-private-name-field"><span>Private original name</span><input id="profileName" required><small>Only the admin can see this.</small></label>
+          <label class="profile-bio-field"><span>Public bio</span><textarea id="profileBio" maxlength="500"></textarea></label>
           <label>Verified phone<input id="profilePhone" disabled></label>
-          <label>Language<input id="profileLanguage" disabled></label>
+          <label class="profile-language-field">Language<input id="profileLanguage" disabled></label>
           <input id="profileCode" type="hidden">
-          <button class="button button-primary button-large">Save profile</button>
+          <button class="button button-primary button-large profile-save-button">Save profile</button>
         </form>
 
         <section class="profile-menu">
@@ -202,6 +202,25 @@
     </div>
   </div>
 
+  <div id="listenerPostDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerPostDetailTitle">
+    <div class="modal-card listener-post-detail-card"><button id="closeListenerPostDetail" class="close" type="button" aria-label="Close">×</button><div id="listenerPostDetailContent"><h2 id="listenerPostDetailTitle">Post</h2></div></div>
+  </div>
+
+  <div id="listenerPostEditModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerPostEditTitle">
+    <div class="modal-card listener-post-edit-card">
+      <button id="closeListenerPostEdit" class="close" type="button" aria-label="Close">×</button>
+      <div class="post-edit-head"><span class="eyebrow">EDIT POST</span><h2 id="listenerPostEditTitle">Update your post</h2><p>Change the caption, the photo, or both.</p></div>
+      <form id="listenerPostEditForm" class="stack">
+        <input id="listenerPostEditId" type="hidden">
+        <div id="listenerPostEditPreview" class="post-edit-preview"><span>Loading photo…</span></div>
+        <input id="listenerPostEditPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <button id="chooseListenerPostEditPhoto" class="button button-soft" type="button">Change photo</button>
+        <label>Caption<textarea id="listenerPostEditCaption" maxlength="1000" placeholder="Write a caption"></textarea></label>
+        <button class="button button-primary button-large" type="submit">Save changes</button>
+      </form>
+    </div>
+  </div>
+
   <div id="incomingModal" class="incoming hidden" role="dialog" aria-modal="true" aria-label="Incoming call"><div class="incoming-card"><div class="incoming-top"><span class="ring-label"><i></i> INCOMING CALL</span><span id="ringCountdown">30s</span></div><div class="incoming-avatar" id="incomingInitials">CU</div><h2 id="incomingName">Customer</h2><p>Wallet-paid private call</p><div class="ring-progress"><i></i></div><div class="incoming-actions"><button id="rejectBtn" class="call-button reject" type="button"><span>×</span><small>Reject</small></button><button id="acceptBtn" class="call-button accept" type="button"><span>☎</span><small>Accept</small></button></div></div></div>
 
   <div id="recoveryModal" class="recovery-modal hidden" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle"><div class="recovery-card"><button id="listenerRecoveryBack" class="modal-back" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button id="closeRecovery" class="recovery-close" type="button" aria-label="Close">×</button><span class="eyebrow">ACCOUNT RECOVERY</span><h2 id="recoveryTitle">Reset listener password</h2><form id="recoveryRequestForm" class="stack"><p>Enter your complete registered number, including country code.</p><label>Mobile number<input id="recoveryPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+919876543210" maxlength="16" required></label><button class="button button-primary">Send request</button></form><section id="employeeRecoveryPanel" class="hidden"><p id="employeeRecoveryStatus">Waiting for administrator review.</p><label>Recovery key<input id="employeeRecoveryKey" autocomplete="off" spellcheck="false"></label><input id="employeeRecoveryId" type="hidden"><div class="recovery-buttons"><button id="employeeCopyRecovery" class="button button-quiet" type="button">Copy key</button><button id="employeeCheckRecovery" class="button button-soft" type="button">Check status</button></div><form id="employeeResetForm" class="stack hidden"><label>New password<input id="employeeRecoveryPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm password<input id="employeeRecoveryConfirm" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Set new password</button></form></section></div></div>
@@ -210,6 +229,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.3.0"></script><script src="socket-loader.js?v=8.3.0"></script><script src="api.js?v=8.3.0"></script><script src="webrtc.js?v=8.3.0"></script><script src="app.js?v=8.3.0"></script>
+  <script src="config.js?v=8.5.0"></script><script src="socket-loader.js?v=8.5.0"></script><script src="api.js?v=8.5.0"></script><script src="webrtc.js?v=8.5.0"></script><script src="app.js?v=8.5.0"></script>
 </body>
 </html>

@@ -26,6 +26,11 @@
   let voicePreviewUrl = '';
   let postPreviewUrl = '';
   let renderedPostUrls = [];
+  let postDetailUrls = [];
+  let postEditPreviewUrl = '';
+  let listenerPosts = [];
+  let postDetailRequestId = 0;
+  let profileMediaVersion = Date.now();
   let followerPhotoUrls = [];
   const inboxPhotoUrls = new Map();
   let inbox = [];
@@ -50,6 +55,8 @@
   }
 
   function currentOverlay() {
+    if (!$('#listenerPostEditModal')?.classList.contains('hidden')) return 'listenerPostEditModal';
+    if (!$('#listenerPostDetailModal')?.classList.contains('hidden')) return 'listenerPostDetailModal';
     if (!$('#listenerSupportModal')?.classList.contains('hidden')) return 'listenerSupportModal';
     if (!$('#recoveryModal')?.classList.contains('hidden')) return 'recoveryModal';
     if (!$('#incomingModal')?.classList.contains('hidden')) return 'incomingModal';
@@ -81,6 +88,8 @@
       return;
     }
     show(`#${overlay}`, false);
+    if (overlay === 'listenerPostDetailModal') releasePostDetailUrls();
+    if (overlay === 'listenerPostEditModal') releasePostEditPreview();
     setNavigationState({ overlay: null }, 'replace');
     syncBackButton();
   }
@@ -122,6 +131,10 @@
       show('#incomingModal', false);
       show('#recoveryModal', false);
       show('#listenerSupportModal', false);
+      show('#listenerPostDetailModal', false);
+      show('#listenerPostEditModal', false);
+      releasePostDetailUrls();
+      releasePostEditPreview();
       if (me) selectTab(state.tab, { historyMode: 'none' });
       syncBackButton();
     });
@@ -130,7 +143,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.3.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.5.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -139,10 +152,13 @@
     socket?.disconnect();
     audioCall?.stop();
     voiceStream?.getTracks().forEach((track) => track.stop());
-    [voicePreviewUrl, postPreviewUrl, ...renderedPostUrls, ...followerPhotoUrls].filter(Boolean).forEach((url) => URL.revokeObjectURL(url));
+    [voicePreviewUrl, postPreviewUrl, postEditPreviewUrl, ...renderedPostUrls, ...postDetailUrls, ...followerPhotoUrls].filter(Boolean).forEach((url) => URL.revokeObjectURL(url));
     voicePreviewUrl = '';
     postPreviewUrl = '';
     renderedPostUrls = [];
+    postDetailUrls = [];
+    postEditPreviewUrl = '';
+    listenerPosts = [];
     followerPhotoUrls = [];
     inboxPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
     inboxPhotoUrls.clear();
@@ -160,6 +176,8 @@
     show('#callView', false);
     show('#recoveryModal', false);
     show('#listenerSupportModal', false);
+    show('#listenerPostDetailModal', false);
+    show('#listenerPostEditModal', false);
     show('#restoreListenerCall', false);
     ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm','listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm'].forEach((id) => document.getElementById(id)?.reset());
     showListenerAuthStep('welcome');
@@ -171,7 +189,7 @@
   function profileImageSrc(value, name = 'Listener', userId = me?.id) {
     const image = String(value || '');
     if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(image)) return `assets/${image}`;
-    if ((image === 'photo' || image === `photo:${userId}`) && userId) return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(userId)}`;
+    if ((image === 'photo' || image === `photo:${userId}`) && userId) return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(userId)}?v=${encodeURIComponent(profileMediaVersion)}`;
     if (/^data:image\/(?:jpeg|png|webp);base64,/.test(image)) return image;
     let total = 0; for (const char of String(name || 'Listener')) total += char.charCodeAt(0);
     return `assets/avatar-${String((total % 20) + 1).padStart(2, '0')}.svg`;
@@ -186,9 +204,9 @@
     if ($('#profileBannerPreview')) {
       const banner = bannerImageDraft === undefined ? me?.bannerImage : bannerImageDraft;
       const url = String(banner || '').startsWith('photo:')
-        ? `${P.base}/api/public/listener-banner-image/${encodeURIComponent(me.id)}`
-        : /^data:image\//.test(String(banner || '')) ? banner : '';
-      $('#profileBannerPreview').style.backgroundImage = url ? `linear-gradient(180deg,transparent,rgba(16,11,14,.68)),url("${url}")` : 'linear-gradient(135deg,#6b0d3e,#d91b72)';
+        ? `${P.base}/api/public/listener-banner-image/${encodeURIComponent(me.id)}?v=${encodeURIComponent(profileMediaVersion)}`
+        : /^data:image\//.test(String(banner || '')) ? banner : 'assets/default-listener-banner.png';
+      $('#profileBannerPreview').style.backgroundImage = `linear-gradient(180deg,rgba(16,11,14,.03),rgba(16,11,14,.52)),url("${url}")`;
     }
   }
 
@@ -233,11 +251,13 @@
   }
 
   function applyProfileResponse(user) {
+    profileMediaVersion = Date.now();
     me = {
       ...me,
       ...user,
       profileImage: user.profile_image ?? user.profileImage ?? me.profileImage,
       bannerImage: user.banner_image ?? user.bannerImage ?? me.bannerImage,
+      updatedAt: user.updated_at ?? user.updatedAt ?? new Date().toISOString(),
     };
     profileImageDraft = me.profileImage || '';
     bannerImageDraft = undefined;
@@ -333,6 +353,11 @@
     $('#postPhoto').addEventListener('change', previewPostPhoto);
     $('#postForm').addEventListener('submit', publishPost);
     $('#listenerMessageForm').addEventListener('submit', sendListenerMessage);
+    $('#closeListenerPostDetail').addEventListener('click', () => closeManagedOverlay('listenerPostDetailModal'));
+    $('#closeListenerPostEdit').addEventListener('click', () => closeManagedOverlay('listenerPostEditModal'));
+    $('#chooseListenerPostEditPhoto').addEventListener('click', () => $('#listenerPostEditPhoto').click());
+    $('#listenerPostEditPhoto').addEventListener('change', previewPostEditPhoto);
+    $('#listenerPostEditForm').addEventListener('submit', savePostEdit);
     document.addEventListener('click', handleListenerSocialClick);
     document.addEventListener('contextmenu', (event) => { if (event.target.closest('img,.listener-post,.follower-card')) event.preventDefault(); });
     document.addEventListener('dragstart', (event) => { if (event.target.closest('img')) event.preventDefault(); });
@@ -1000,8 +1025,14 @@
     const nextUrls = [];
     try {
       const response = await P.api('/api/employee/posts');
-      const markup = await Promise.all((response.posts || []).map(async (post) => {
-        try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); nextUrls.push(url); return `<figure class="listener-post"><img src="${url}" alt="Your exclusive post" draggable="false"><figcaption><p>${P.esc(post.caption || 'No caption')}</p><small>${P.date(post.created_at)}</small><button data-delete-post="${P.esc(post.id)}" type="button">Delete</button></figcaption></figure>`; }
+      listenerPosts = response.posts || [];
+      const markup = await Promise.all(listenerPosts.map(async (post) => {
+        try {
+          const blob = await P.apiBlob(post.imageUrl, { cache: 'no-store' });
+          const url = URL.createObjectURL(blob);
+          nextUrls.push(url);
+          return `<article class="listener-post"><button class="listener-post-open" data-open-post="${P.esc(post.id)}" type="button" aria-label="Open post details"><img src="${url}" alt="Your exclusive post" draggable="false"><span class="listener-post-like-count">♥ ${Number(post.likeCount || 0).toLocaleString('en-IN')}</span><span class="listener-post-caption"><b>${P.esc(post.caption || 'No caption')}</b><small>${P.date(post.updated_at || post.created_at)}</small></span></button><details class="listener-post-options"><summary aria-label="Post options"><span></span><span></span><span></span></summary><div role="menu"><button data-edit-post="${P.esc(post.id)}" type="button" role="menuitem">Edit</button><button class="danger" data-delete-post="${P.esc(post.id)}" type="button" role="menuitem">Delete</button></div></details></article>`;
+        }
         catch { return ''; }
       }));
       $('#listenerPosts').innerHTML = markup.filter(Boolean).join('') || emptyState('No exclusive posts', 'Publish your first member-only photo from the form.');
@@ -1012,8 +1043,128 @@
 
   async function deletePost(id) {
     if (!confirm('Delete this exclusive post?')) return;
-    try { await P.api(`/api/employee/posts/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadPosts(); P.toast('Post deleted.', 'success'); }
+    try {
+      await P.api(`/api/employee/posts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const overlay = currentOverlay();
+      if (overlay === 'listenerPostDetailModal' || overlay === 'listenerPostEditModal') closeManagedOverlay(overlay);
+      await loadPosts();
+      P.toast('Post deleted.', 'success');
+    }
     catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function releasePostEditPreview() {
+    if (postEditPreviewUrl) URL.revokeObjectURL(postEditPreviewUrl);
+    postEditPreviewUrl = '';
+    $('#listenerPostEditForm')?.reset();
+    if ($('#listenerPostEditPreview')) $('#listenerPostEditPreview').innerHTML = '<span>Choose a post to edit.</span>';
+  }
+
+  async function openPostEditor(postId) {
+    const post = listenerPosts.find((item) => item.id === postId);
+    if (!post) return P.toast('This post is no longer available.', 'error');
+    const replacingDetail = !$('#listenerPostDetailModal').classList.contains('hidden');
+    if (replacingDetail) {
+      show('#listenerPostDetailModal', false);
+      releasePostDetailUrls();
+      show('#listenerPostEditModal');
+      setNavigationState({ overlay: 'listenerPostEditModal' }, 'replace');
+    } else {
+      openManagedOverlay('#listenerPostEditModal', 'listenerPostEditModal');
+    }
+    releasePostEditPreview();
+    $('#listenerPostEditId').value = postId;
+    $('#listenerPostEditCaption').value = post.caption || '';
+    $('#listenerPostEditPreview').innerHTML = '<span>Loading photo…</span>';
+    try {
+      const blob = await P.apiBlob(post.imageUrl, { cache: 'no-store' });
+      if ($('#listenerPostEditModal').classList.contains('hidden') || $('#listenerPostEditId').value !== postId) return;
+      postEditPreviewUrl = URL.createObjectURL(blob);
+      $('#listenerPostEditPreview').innerHTML = `<img src="${P.esc(postEditPreviewUrl)}" alt="Current post photo" draggable="false">`;
+    } catch (error) {
+      $('#listenerPostEditPreview').innerHTML = `<span>${P.esc(error.message)}</span>`;
+    }
+  }
+
+  function previewPostEditPhoto(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+      event.target.value = '';
+      return P.toast('Choose a JPG, PNG or WebP photo.', 'error');
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      event.target.value = '';
+      return P.toast('Choose a photo smaller than 4 MB.', 'error');
+    }
+    if (postEditPreviewUrl) URL.revokeObjectURL(postEditPreviewUrl);
+    postEditPreviewUrl = URL.createObjectURL(file);
+    $('#listenerPostEditPreview').innerHTML = `<img src="${P.esc(postEditPreviewUrl)}" alt="New post photo" draggable="false">`;
+  }
+
+  async function savePostEdit(event) {
+    event.preventDefault();
+    const postId = $('#listenerPostEditId').value;
+    if (!postId) return;
+    const button = event.submitter;
+    button.disabled = true;
+    try {
+      const form = new FormData();
+      form.append('caption', $('#listenerPostEditCaption').value);
+      const photo = $('#listenerPostEditPhoto').files?.[0];
+      if (photo) form.append('photo', photo);
+      await P.api(`/api/employee/posts/${encodeURIComponent(postId)}`, { method: 'PATCH', body: form, timeout: 30000 });
+      await loadPosts();
+      closeManagedOverlay('listenerPostEditModal');
+      P.toast('Post updated.', 'success');
+    } catch (error) {
+      P.toast(error.message, 'error');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function releasePostDetailUrls() {
+    postDetailRequestId += 1;
+    postDetailUrls.forEach((url) => URL.revokeObjectURL(url));
+    postDetailUrls = [];
+  }
+
+  async function openPostInsights(postId) {
+    releasePostDetailUrls();
+    const requestId = postDetailRequestId;
+    const createdUrls = [];
+    const isCurrentRequest = () => requestId === postDetailRequestId && !$('#listenerPostDetailModal').classList.contains('hidden');
+    openManagedOverlay('#listenerPostDetailModal', 'listenerPostDetailModal');
+    $('#listenerPostDetailContent').innerHTML = '<div class="post-insights-loading"><span></span><p>Loading post…</p></div>';
+    try {
+      const response = await P.api(`/api/employee/posts/${encodeURIComponent(postId)}/insights`);
+      if (!isCurrentRequest()) return;
+      const imageBlob = await P.apiBlob(response.post.imageUrl);
+      const postImage = URL.createObjectURL(imageBlob);
+      createdUrls.push(postImage);
+      const likerMarkup = await Promise.all((response.likes || []).map(async (like) => {
+        let photo = '';
+        if (like.imageUrl) {
+          try {
+            const blob = await P.apiBlob(like.imageUrl);
+            photo = URL.createObjectURL(blob);
+            createdUrls.push(photo);
+          } catch {}
+        }
+        return `<li>${photo ? `<img src="${P.esc(photo)}" alt="" draggable="false">` : `<span>${initials(like.name)}</span>`}<div><b>${P.esc(like.name)}</b><small>${like.username ? `@${P.esc(like.username)} · ` : ''}${P.date(like.likedAt)}</small></div></li>`;
+      }));
+      if (!isCurrentRequest()) {
+        createdUrls.forEach((url) => URL.revokeObjectURL(url));
+        return;
+      }
+      postDetailUrls.push(...createdUrls);
+      const count = Number(response.post.likeCount || 0);
+      $('#listenerPostDetailContent').innerHTML = `<div class="post-insights-head"><div><span class="eyebrow">YOUR POST</span><h2 id="listenerPostDetailTitle">Post insights</h2></div><details class="listener-post-options post-insights-options"><summary aria-label="Post options"><span></span><span></span><span></span></summary><div role="menu"><button data-edit-post="${P.esc(response.post.id)}" type="button" role="menuitem">Edit</button><button class="danger" data-delete-post="${P.esc(response.post.id)}" type="button" role="menuitem">Delete</button></div></details></div><img class="post-insights-image" src="${P.esc(postImage)}" alt="Your exclusive post" draggable="false"><div class="post-insights-copy"><p>${P.esc(response.post.caption || 'No caption')}</p><small>${P.date(response.post.updatedAt || response.post.createdAt)}</small><strong>♥ ${count.toLocaleString('en-IN')} ${count === 1 ? 'like' : 'likes'}</strong></div><div class="post-likers"><h3>Liked by</h3>${likerMarkup.length ? `<ul>${likerMarkup.join('')}</ul>` : '<p>No likes yet.</p>'}</div>`;
+    } catch (error) {
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+      if (isCurrentRequest()) $('#listenerPostDetailContent').innerHTML = `<div class="post-insights-error"><h2 id="listenerPostDetailTitle">Post unavailable</h2><p>${P.esc(error.message)}</p></div>`;
+    }
   }
 
   async function loadInbox() {
@@ -1075,6 +1226,8 @@
   }
 
   function handleListenerSocialClick(event) {
+    const currentOptions = event.target.closest('.listener-post-options');
+    $$('.listener-post-options[open]').forEach((menu) => { if (menu !== currentOptions) menu.removeAttribute('open'); });
     if (event.target.closest('[data-close-conversation]')) {
       activeCustomerId = null;
       $('.listener-inbox-layout')?.classList.remove('conversation-open');
@@ -1082,7 +1235,9 @@
       show('#listenerMessageForm', false);
       return loadInbox();
     }
+    const editPost = event.target.closest('[data-edit-post]'); if (editPost) return openPostEditor(editPost.dataset.editPost);
     const post = event.target.closest('[data-delete-post]'); if (post) return deletePost(post.dataset.deletePost);
+    const openPost = event.target.closest('[data-open-post]'); if (openPost) return openPostInsights(openPost.dataset.openPost);
     const conversation = event.target.closest('[data-inbox-customer]'); if (conversation) return openListenerConversation(conversation.dataset.inboxCustomer);
   }
 
@@ -1221,20 +1376,32 @@
 
   async function saveProfile(event) {
     event.preventDefault();
+    const button = event.submitter;
+    const previous = { name: me.name, username: me.username, bio: me.bio };
+    const draft = {
+      name: $('#profileName').value.trim(),
+      username: $('#profileUsername').value.trim().toLowerCase(),
+      bio: $('#profileBio').value.trim(),
+    };
+    me = { ...me, ...draft };
+    renderProfileImageEditor();
+    button.disabled = true;
+    button.textContent = 'Saving…';
     try {
       const response = await P.api('/api/employee/profile', {
         method: 'PATCH',
-        body: JSON.stringify({
-          name: $('#profileName').value,
-          username: $('#profileUsername').value,
-          bio: $('#profileBio').value,
-        }),
+        body: JSON.stringify(draft),
       });
       applyProfileResponse(response.user);
       show('#profileForm', false);
       P.toast('Profile saved.', 'success');
     } catch (error) {
+      me = { ...me, ...previous };
+      renderProfileImageEditor();
       P.toast(error.message, 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Save profile';
     }
   }
 

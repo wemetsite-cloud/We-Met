@@ -51,7 +51,7 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
     try {
-      const response = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
+      const response = await fetch(`${base}${path}`, { cache: 'no-store', ...options, headers, signal: controller.signal });
       const isJson = (response.headers.get('content-type') || '').includes('json');
       const data = isJson ? await response.json() : await response.text();
       if (!response.ok) {
@@ -77,7 +77,7 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
     try {
-      const response = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal });
+      const response = await fetch(`${base}${path}`, { cache: 'no-store', ...options, headers, signal: controller.signal });
       if (!response.ok) {
         let message = 'The image could not be loaded.';
         try { const data = await response.json(); message = data?.error || message; } catch {}

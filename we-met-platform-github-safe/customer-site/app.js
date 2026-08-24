@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const esc = P.esc;
-  const NAV_MARKER = 'we-met-customer-v84';
+  const NAV_MARKER = 'we-met-customer-v85';
   const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'following', 'notifications', 'support']);
   const TAB_PARENT = { history: 'profile', following: 'profile', notifications: 'profile', support: 'profile' };
 
@@ -34,6 +34,9 @@
   let pendingWalletCheckout = null;
   let pendingMembershipCheckout = null;
   let pendingCallRequest = null;
+  let razorpayLoader = null;
+  let activeListenerProfileId = null;
+  let activeWalletRazorpay = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
     P.toast(event.detail?.message || 'Your session expired. Please start again.', 'error');
@@ -46,12 +49,16 @@
 
   function listenerImage(listener, kind = 'profile') {
     const reference = String(kind === 'banner' ? listener.bannerImage || listener.banner || listener.banner_image || '' : listener.profileImage || listener.listenerImage || listener.avatar || listener.profile_image || '');
-    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(reference)) return `assets/${reference}`;
+    const listenerId = listener.id || listener.listenerId;
+    const mediaVersion = listener.updatedAt || listener.updated_at || 'current';
     if (reference.startsWith('photo:')) {
       const endpoint = kind === 'banner' ? 'listener-banner-image' : 'listener-profile-image';
-      return `${P.base}/api/public/${endpoint}/${encodeURIComponent(listener.id || listener.listenerId)}`;
+      return `${P.base}/api/public/${endpoint}/${encodeURIComponent(listenerId)}?v=${encodeURIComponent(mediaVersion)}`;
     }
-    const seed = String(listener.id || listener.listenerId || listener.name || 'listener');
+    if (/^data:image\/(?:jpeg|png|webp);base64,/.test(reference)) return reference;
+    if (kind === 'banner') return 'assets/default-listener-banner.png';
+    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(reference)) return `assets/${reference}`;
+    const seed = String(listenerId || listener.name || 'listener');
     let total = 0;
     for (const char of seed) total += char.charCodeAt(0);
     return `assets/avatar-${String((total % 20) + 1).padStart(2, '0')}.svg`;
@@ -73,7 +80,7 @@
   }
 
   function currentOverlay() {
-    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'walletCheckoutModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
+    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
   function syncBodyState() {
@@ -93,8 +100,7 @@
   function closeOverlay(id, useHistory = true) {
     if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
     document.getElementById(id)?.classList.add('hidden');
-    if (id === 'listenerProfileModal') releasePostUrls();
-    if (id === 'walletCheckoutModal') pendingWalletCheckout = null;
+    if (id === 'listenerProfileModal') { activeListenerProfileId = null; releasePostUrls(); }
     if (id === 'membershipCheckoutModal') pendingMembershipCheckout = null;
     syncBodyState();
   }
@@ -111,15 +117,26 @@
   function initNavigation() {
     history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title);
     window.addEventListener('popstate', (event) => {
-      const state = event.state?.marker === NAV_MARKER ? event.state : { tab: 'home' };
-      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'walletCheckoutModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
-      if (state.overlay !== 'walletCheckoutModal') pendingWalletCheckout = null;
+      const wasRazorpayOpen = document.body.classList.contains('razorpay-open');
+      if (wasRazorpayOpen && activeWalletRazorpay) {
+        const checkout = activeWalletRazorpay;
+        activeWalletRazorpay = null;
+        try { checkout.close(); } catch {}
+      }
+      const state = event.state?.marker === NAV_MARKER
+        ? event.state
+        : { tab: wasRazorpayOpen && pendingWalletCheckout ? 'wallet' : (activeTab || 'home') };
+      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
       if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
       document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
-      if (state.overlay !== 'listenerProfileModal') releasePostUrls();
+      if (pendingWalletCheckout && state.tab === 'wallet') {
+        show('#walletCheckoutSection');
+        $('#tab-wallet').classList.add('wallet-checkout-active');
+      }
+      if (state.overlay !== 'listenerProfileModal') { activeListenerProfileId = null; releasePostUrls(); }
       syncBodyState();
     });
   }
@@ -257,7 +274,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.4.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.5.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -293,6 +310,7 @@
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
     $('#walletCheckoutPay').onclick = beginWalletCheckout;
+    $('#walletCheckoutBack').onclick = closeWalletCheckout;
     $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
     $('#couponForm').onsubmit = redeem;
     $('#supportForm').onsubmit = sendSupport;
@@ -408,9 +426,17 @@
 
   async function logout(clear = true) {
     if (clear) P.Store.clear();
+    if (activeWalletRazorpay) {
+      const checkout = activeWalletRazorpay;
+      activeWalletRazorpay = null;
+      try { checkout.close(); } catch {}
+    }
     clearInterval(directPollTimer);
     clearPendingCallRequest();
     currentCall = null;
+    pendingWalletCheckout = null;
+    pendingMembershipCheckout = null;
+    activeListenerProfileId = null;
     socket?.disconnect();
     audioCall?.stop();
     me = null;
@@ -418,7 +444,9 @@
     liveListeners = [];
     if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
     customerPhotoObjectUrl = '';
-    document.body.classList.remove('signed-in');
+    document.body.classList.remove('signed-in', 'razorpay-open');
+    $('#tab-wallet').classList.remove('wallet-checkout-active');
+    show('#walletCheckoutSection', false);
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
     activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
   }
@@ -448,7 +476,7 @@
 
   async function loadDirectory() {
     if (!me) return;
-    try { const response = await P.api('/api/customer/listeners'); directory = response.listeners || []; renderDirectory(); }
+    try { const response = await P.api('/api/customer/listeners', { cache: 'no-store' }); directory = response.listeners || []; renderDirectory(); }
     catch (error) { P.toast(error.message, 'error'); }
   }
 
@@ -474,6 +502,7 @@
   }
 
   async function openListenerProfile(listenerId) {
+    activeListenerProfileId = listenerId;
     releasePostUrls(); openOverlay('listenerProfileModal');
     $('#listenerProfileContent').innerHTML = '<div class="profile-loading"><span></span><p>Opening listener profile…</p></div>';
     try {
@@ -521,8 +550,37 @@
     node.innerHTML = subscriptions.length ? subscriptions.map((item) => `<article class="membership-card ${item.active ? 'active' : 'expired'}"><div class="membership-listener"><img src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt=""><div><span>${item.active ? 'ACTIVE MEMBERSHIP' : esc(String(item.status).toUpperCase())}</span><h3>${esc(item.listenerName)}</h3><p>${esc(item.language)}</p></div></div><div class="membership-date"><small>${item.active ? 'Access until' : 'Last updated'}</small><strong>${P.date(item.currentPeriodEnd)}</strong></div><div class="membership-actions"><button class="button button-soft" data-listener-profile="${esc(item.listenerId)}" type="button">View profile</button>${item.active ? `<button class="button button-primary" data-listener-message="${esc(item.listenerId)}" type="button">Message${item.unreadCount ? ` · ${item.unreadCount}` : ''}</button>` : ''}${item.active && !item.cancelAtCycleEnd ? `<button class="text-action" data-cancel-subscription="${esc(item.id)}" type="button">Turn off renewal</button>` : item.cancelAtCycleEnd ? '<small>Renewal is off</small>' : ''}</div></article>`).join('') : emptyState('No listener memberships yet', 'Open a listener profile and subscribe to unlock their exclusive posts and messages.');
   }
 
+  function loadRazorpayCheckout() {
+    if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
+    if (razorpayLoader) return razorpayLoader;
+    razorpayLoader = new Promise((resolve, reject) => {
+      document.querySelector('script[data-we-met-razorpay]')?.remove();
+      const script = document.createElement('script');
+      let timeout = 0;
+      const cleanup = () => { clearTimeout(timeout); script.onload = null; script.onerror = null; };
+      script.onload = () => {
+        cleanup();
+        if (typeof window.Razorpay === 'function') resolve(window.Razorpay);
+        else reject(new Error('Secure checkout did not initialize. Please try again.'));
+      };
+      script.onerror = () => { cleanup(); script.remove(); reject(new Error('Secure checkout could not load. Check your connection and try again.')); };
+      timeout = window.setTimeout(() => {
+        cleanup();
+        script.remove();
+        reject(new Error('Secure checkout is taking too long to load. Please try again.'));
+      }, 15000);
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.dataset.weMetRazorpay = 'true';
+      document.head.appendChild(script);
+    }).catch((error) => {
+      razorpayLoader = null;
+      throw error;
+    });
+    return razorpayLoader;
+  }
+
   async function subscribeToListener(listenerId, button) {
-    if (typeof window.Razorpay !== 'function') return P.toast('Secure checkout could not load. Check your connection.', 'error');
     const listener = directory.find((item) => item.id === listenerId) || { id: listenerId, name: 'this listener' };
     pendingMembershipCheckout = { listenerId, listener, button };
     $('#membershipCheckoutContent').innerHTML = `<div class="wallet-checkout-summary membership-summary"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="" draggable="false"><div><small>Exclusive membership</small><h2 id="membershipCheckoutTitle">${esc(listener.name)}</h2><p>Posts and direct messages for this listener.</p></div><strong>₹399</strong></div><div class="wallet-checkout-trust"><span>Listener-specific access</span><span>Renews monthly</span><span>Calls still use wallet minutes</span></div>`;
@@ -536,6 +594,7 @@
     const payButton = $('#membershipCheckoutPay');
     payButton.disabled = true; button?.setAttribute('disabled', '');
     try {
+      await loadRazorpayCheckout();
       const order = await P.api('/api/subscriptions/create', { method: 'POST', body: JSON.stringify({ employeeId: listenerId }) });
       document.body.classList.add('razorpay-open');
       $('#membershipCheckoutModal').setAttribute('aria-busy', 'true');
@@ -629,18 +688,51 @@
 
   async function loadPlans() {
     if (!me) return;
-    try { const response = await P.api('/api/customer/plans'); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
+    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''} ${pendingWalletCheckout?.plan?.id === plan.id ? 'selected' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
     catch (error) { P.toast(error.message, 'error'); }
   }
 
   function openPayment(planId, button) {
     const plan = paymentPlans.find((item) => item.id === planId);
-    if (!plan || typeof window.Razorpay !== 'function') return P.toast('Secure checkout is unavailable.', 'error');
+    if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
+    pendingWalletCheckout?.button?.removeAttribute('disabled');
     pendingWalletCheckout = { plan, button };
     $('#walletCheckoutContent').innerHTML = `<div class="wallet-checkout-summary"><span class="wallet-checkout-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>minutes</small></span><div><small>Talk-time pack</small><h2 id="walletCheckoutTitle">${esc(plan.name)}</h2><p>Added after secure payment confirmation.</p></div><strong>${P.money(plan.price_paise)}</strong></div><div class="wallet-checkout-trust"><span>Secure payment</span><span>Connected-second billing</span><span>No card data stored by We Met</span></div>`;
+    $('#walletCheckoutStatus').className = 'wallet-checkout-status hidden';
+    $('#walletCheckoutStatus').textContent = '';
     $('#walletCheckoutPay').textContent = `Pay ${P.money(plan.price_paise)}`;
     $('#walletCheckoutPay').disabled = false;
-    openOverlay('walletCheckoutModal');
+    show('#walletCheckoutPay');
+    show('#walletCheckoutSection');
+    $('#tab-wallet').classList.add('wallet-checkout-active');
+    $$('.wallet-plan-card').forEach((card) => card.classList.toggle('selected', card.contains(button)));
+    if (activeTab !== 'wallet') selectTab('wallet', { historyMode: 'none' });
+    history.replaceState({ marker: NAV_MARKER, tab: 'wallet', checkout: 'wallet' }, document.title);
+    window.setTimeout(() => $('#walletCheckoutSection').scrollIntoView({ behavior: 'smooth', block: 'center' }), 40);
+  }
+
+  function closeWalletCheckout() {
+    pendingWalletCheckout?.button?.removeAttribute('disabled');
+    pendingWalletCheckout = null;
+    $('#tab-wallet').classList.remove('wallet-checkout-active');
+    show('#walletCheckoutSection', false);
+    show('#walletCheckoutPay');
+    $('#walletCheckoutSection').removeAttribute('aria-busy');
+    $('#walletCheckoutStatus').className = 'wallet-checkout-status hidden';
+    $('#walletCheckoutStatus').textContent = '';
+    $$('.wallet-plan-card').forEach((card) => card.classList.remove('selected'));
+    if (me) {
+      if (activeTab !== 'wallet') selectTab('wallet', { historyMode: 'none' });
+      history.replaceState({ marker: NAV_MARKER, tab: 'wallet' }, document.title);
+      window.setTimeout(() => $('#plansGrid').scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+    }
+  }
+
+  function showWalletCheckoutResult(message, type = 'info') {
+    const statusNode = $('#walletCheckoutStatus');
+    statusNode.className = `wallet-checkout-status ${type}`;
+    statusNode.textContent = message;
+    show('#walletCheckoutStatus');
   }
 
   async function beginWalletCheckout() {
@@ -648,30 +740,62 @@
     const { plan, button } = pendingWalletCheckout;
     const payButton = $('#walletCheckoutPay');
     payButton.disabled = true;
+    payButton.textContent = 'Opening secure checkout…';
     button?.setAttribute('disabled', '');
+    showWalletCheckoutResult('Preparing Razorpay inside your We Met wallet.', 'loading');
     try {
+      await loadRazorpayCheckout();
       const order = await P.api('/api/create-order', { method: 'POST', body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }) });
       document.body.classList.add('razorpay-open');
-      $('#walletCheckoutModal').setAttribute('aria-busy', 'true');
+      $('#walletCheckoutSection').setAttribute('aria-busy', 'true');
+      history.replaceState({ marker: NAV_MARKER, tab: 'wallet', checkout: 'razorpay' }, document.title);
       let handled = false;
-      const restore = (settled = false) => {
+      const restore = ({ settled = false, error = '', reference = '', message = '' } = {}) => {
+        activeWalletRazorpay = null;
         button?.removeAttribute('disabled');
         payButton.disabled = false;
+        payButton.textContent = `Pay ${P.money(plan.price_paise)}`;
         document.body.classList.remove('razorpay-open');
-        $('#walletCheckoutModal').removeAttribute('aria-busy');
-        if (!settled) return;
+        $('#walletCheckoutSection').removeAttribute('aria-busy');
+        if (activeTab !== 'wallet') selectTab('wallet', { historyMode: 'none' });
+        show('#walletCheckoutSection');
+        history.replaceState({ marker: NAV_MARKER, tab: 'wallet', checkout: settled ? 'result' : 'wallet' }, document.title);
+        if (!settled) {
+          showWalletCheckoutResult('Payment window closed. You are still in your wallet and can continue when ready.', 'info');
+          return;
+        }
         pendingWalletCheckout = null;
-        closeOverlay('walletCheckoutModal', false);
-        replaceOverlayHistory();
+        show('#walletCheckoutPay', false);
+        $$('.wallet-plan-card').forEach((card) => card.classList.remove('selected'));
+        showWalletCheckoutResult(error
+          ? `${error}${reference ? ` Reference: ${reference}. Do not pay again.` : ' Do not pay again until support checks it.'}`
+          : (message || 'Payment verified. Your talk-time is ready.'), error ? 'error' : 'success');
       };
-      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met', description: `Wallet · ${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met', description: `Wallet · ${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(); } }, handler: async (payment) => {
         handled = true;
-        try { const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) }); updateBalance(verified.balance_seconds); await loadHistory(); P.toast(verified.message || 'Talk-time added.', 'success'); }
-        catch (error) { P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error'); }
-        finally { restore(true); }
+        try {
+          const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
+          updateBalance(verified.balance_seconds);
+          await loadHistory();
+          restore({ settled: true, message: verified.message || 'Talk-time added.' });
+          P.toast(verified.message || 'Talk-time added.', 'success');
+        } catch (error) {
+          restore({ settled: true, error: error.message, reference: payment.razorpay_payment_id || '' });
+          P.toast('Payment needs verification. Do not pay again; use the reference shown in your wallet.', 'error');
+        }
       } });
+      activeWalletRazorpay = checkout;
       checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Payment failed.', 'error')); checkout.open();
-    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; $('#walletCheckoutModal').removeAttribute('aria-busy'); document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
+    } catch (error) {
+      activeWalletRazorpay = null;
+      button?.removeAttribute('disabled');
+      payButton.disabled = false;
+      payButton.textContent = `Pay ${P.money(plan.price_paise)}`;
+      $('#walletCheckoutSection').removeAttribute('aria-busy');
+      document.body.classList.remove('razorpay-open');
+      showWalletCheckoutResult(error.message, 'error');
+      P.toast(error.message, 'error');
+    }
   }
 
   async function redeem(event) {
@@ -700,7 +824,37 @@
       renderDirectory();
       if (wasRequesting || hadCall) P.toast('Calling is reconnecting. Please try again shortly.', 'error');
     });
-    socket.on('listeners:update', ({ listeners = [] }) => { liveListeners = listeners; liveDirectoryReady = true; renderDirectory(); });
+    socket.on('listeners:update', ({ listeners = [] }) => {
+      liveListeners = listeners;
+      liveDirectoryReady = true;
+      for (const live of listeners) {
+        const saved = directory.find((item) => item.id === live.id);
+        if (!saved) continue;
+        saved.name = live.name || saved.name;
+        saved.bio = live.bio || saved.bio;
+        saved.profileImage = live.avatar || saved.profileImage;
+        saved.bannerImage = live.banner || saved.bannerImage;
+        saved.language = live.language || saved.language;
+        saved.updatedAt = live.updatedAt || saved.updatedAt;
+      }
+      renderDirectory();
+    });
+    socket.on('listener:profile-updated', ({ listener = {} } = {}) => {
+      if (!listener.id) return;
+      const saved = directory.find((item) => item.id === listener.id);
+      if (saved) {
+        saved.name = listener.name || saved.name;
+        saved.bio = listener.bio ?? saved.bio;
+        saved.profileImage = listener.avatar ?? saved.profileImage;
+        saved.bannerImage = listener.banner ?? saved.bannerImage;
+        saved.language = listener.language || saved.language;
+        saved.updatedAt = listener.updatedAt || new Date().toISOString();
+        renderDirectory();
+      }
+      if (activeListenerProfileId === listener.id && !$('#listenerProfileModal').classList.contains('hidden')) {
+        openListenerProfile(listener.id);
+      }
+    });
     socket.on('call:ringing', (data) => {
       clearPendingCallRequest();
       currentCall = { id: data.callId, employee: data.employee, billed: 0, mediaConnected: false };

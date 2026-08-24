@@ -1,4 +1,4 @@
-const VERSION = '8.4.0';
+const VERSION = '8.5.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -29,6 +29,7 @@ const STATIC = [
   'assets/icon-192.png',
   'assets/icon-512.png',
   'assets/profile-placeholder.svg',
+  'assets/default-listener-banner.png',
   'assets/avatar-01.svg',
   'assets/avatar-02.svg',
   'assets/avatar-03.svg',
