@@ -1,0 +1,13 @@
+{
+  "version": "8.8.0",
+  "name": "We Met v8.8.0 No Payment Gateway",
+  "changes": [
+    "Removes every online checkout SDK, popup, order endpoint, verification endpoint and payment webhook",
+    "Removes customer purchase buttons, recurring-access purchase controls and payment-specific public pages",
+    "Removes unused manual-transfer, QR and app-store purchase modules and dependencies",
+    "Keeps customer talk-time balances, redeem codes, calls, profiles, support and existing private-access records",
+    "Keeps screenshot deterrence on every shipped customer page with app-switch obscuring, print blocking and capture restrictions",
+    "Locks the browser policy to self-hosted scripts with no third-party payment frames",
+    "Bumps all portal service-worker and asset cache versions to 8.8.0"
+  ]
+}

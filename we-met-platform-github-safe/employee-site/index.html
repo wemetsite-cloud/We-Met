@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12070f">
+  <meta name="description" content="The private We Met listener app for calls, exclusive posts, messages and earnings.">
+  <title>We Met Listener</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest?v=8.8.0">
+  <link rel="stylesheet" href="style.css?v=8.8.0">
+</head>
+<body>
+  <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
+  <div class="listener-glow listener-glow-two" aria-hidden="true"></div>
+
+  <div id="loginView" class="login-view">
+    <section class="listener-auth-shell">
+      <div class="listener-auth-progress" aria-hidden="true"><i id="listenerAuthProgress"></i></div>
+      <a class="brand listener-auth-brand" aria-label="We Met listener"><img src="assets/logo.svg" alt=""><span><strong>We Met</strong><small>Listener</small></span></a>
+
+      <section class="listener-auth-step active welcome-step" data-listener-auth="welcome">
+        <div class="listener-welcome-art" aria-hidden="true"><img src="assets/avatar-04.svg" alt=""><span class="welcome-bubble one"></span><span class="welcome-bubble two"></span><i></i></div>
+        <span class="eyebrow">LISTENER APP</span>
+        <h1>Ready when you are.</h1>
+        <p>Manage calls, members, posts and earnings in one private place.</p>
+        <div class="number-trust"><b>Your number stays private</b><small>It is used only to verify and protect your account. We never publish it.</small></div>
+        <button id="listenerAuthBegin" class="button button-primary button-large" type="button">Let’s go</button>
+      </section>
+
+      <form id="listenerPhoneForm" class="listener-auth-step stack" data-listener-auth="phone">
+        <span class="step-label">1 / 5</span><h2>Your mobile number</h2><p>India is selected by default. Change the country code when needed.</p>
+        <label>Mobile number
+          <div class="listener-phone-field international">
+            <select id="listenerCountry" aria-label="Country code">
+              <option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option><option value="+49">🇩🇪 +49</option><option value="+33">🇫🇷 +33</option><option value="+81">🇯🇵 +81</option>
+            </select>
+            <input id="listenerPhone" inputmode="tel" autocomplete="tel-national" maxlength="14" placeholder="Mobile number" required>
+          </div>
+        </label>
+        <button class="button button-primary button-large">Continue</button>
+      </form>
+
+      <form id="listenerPasswordForm" class="listener-auth-step stack" data-listener-auth="password">
+        <span class="step-label">2 / 2</span><h2>Welcome back</h2><p>Enter the password for <b id="listenerPhonePreview">your number</b>.</p>
+        <label>Password<input id="listenerLoginPassword" type="password" minlength="8" autocomplete="current-password" required></label>
+        <button class="button button-primary button-large">Open listener app</button>
+        <button id="listenerForgotPassword" class="auth-back" type="button">Forgot password?</button>
+        <button class="auth-back" data-listener-auth-back type="button">← Change number</button>
+      </form>
+
+      <form id="listenerOtpForm" class="listener-auth-step stack" data-listener-auth="otp">
+        <span class="step-label">2 / 5</span><h2>Verify your number</h2><p>Enter the OTP sent to <b id="listenerOtpPhone">your number</b>.</p>
+        <label>6-digit OTP<input id="listenerOtp" class="listener-otp" inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="6" pattern="[0-9]{6}" required></label>
+        <small id="listenerDevelopmentOtp" class="dev-otp hidden"></small>
+        <button class="button button-primary button-large">Verify OTP</button>
+        <button class="auth-back" data-listener-auth-back type="button">← Change number</button>
+      </form>
+
+      <form id="listenerDetailsForm" class="listener-auth-step stack" data-listener-auth="details">
+        <span class="step-label">3–5 / 5</span><h2>Create your profile</h2>
+        <label>Public username<small>Customers see this.</small><input id="listenerPublicUsername" autocomplete="username" minlength="3" maxlength="50" pattern="[a-zA-Z0-9._-]{3,50}" placeholder="friendly.listener" required></label>
+        <label>Original name<small>Private. Use your real name for admin verification.</small><input id="listenerLegalName" autocomplete="name" minlength="2" maxlength="100" required></label>
+        <label>Create password<input id="listenerNewPassword" type="password" minlength="8" autocomplete="new-password" required></label>
+        <label class="check"><input id="listenerTerms" type="checkbox" required><span>I am 18+ and accept the Terms and Privacy Policy.</span></label>
+        <div class="automatic-terms"><span>₹1/min starting rate</span><span>Connected-time earnings</span><small>The admin can update your private call rate.</small></div>
+        <button class="button button-primary button-large">Create listener account</button>
+      </form>
+    </section>
+    <button id="listenerSupportButton" class="prelogin-support" type="button">Need login help?</button>
+  </div>
+
+  <div id="verificationView" class="verification-view hidden">
+    <section class="verification-card">
+      <a class="brand"><img src="assets/logo.svg" alt=""><span><strong>We Met</strong><small>Listener verification</small></span></a>
+      <div id="verificationContent"></div>
+      <button id="verificationLogout" class="button button-quiet" type="button">Log out</button>
+    </section>
+  </div>
+
+  <div id="appView" class="app hidden">
+    <header class="topbar">
+      <button id="listenerBackButton" class="app-back hidden" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+      <a class="brand"><img src="assets/logo.svg" alt=""><span><strong>We Met</strong><small>Listener</small></span></a>
+      <div class="header-actions"><span id="connectionBadge" class="status offline">Connecting…</span><button id="logoutBtn" class="icon-logout" type="button" aria-label="Log out"><svg viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button></div>
+    </header>
+
+    <main class="shell listener-main">
+      <nav class="tabs listener-bottom-nav" aria-label="Listener navigation">
+        <button class="active" data-tab="desk" type="button" aria-label="Home"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>Home</span></button>
+        <button data-tab="inbox" type="button" aria-label="Messages"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg><span>Inbox</span></button>
+        <button data-tab="posts" type="button" aria-label="Create post"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Create</span></button>
+        <button data-tab="wallet" type="button" aria-label="Earnings"><svg viewBox="0 0 24 24"><path d="M4 6h16v13H4z"/><path d="M4 9h16M15 14h3"/></svg><span>Earnings</span></button>
+        <button data-tab="profile" type="button" aria-label="Profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4.3 3.4-6.5 8-6.5s7.2 2.2 8 6.5"/></svg><span>Profile</span></button>
+      </nav>
+
+      <section id="tab-desk" class="tab active">
+        <section class="desk-status-panel app-card">
+          <div><span class="eyebrow">AVAILABILITY</span><h1>Ready to listen?</h1><p>Go online whenever you want to receive wallet-paid calls.</p></div>
+          <div class="shift-card"><span>Current status</span><strong id="shiftStatus">Offline</strong><small id="currentShiftSince" class="shift-since">No active session</small><div class="shift-buttons"><button id="onlineBtn" class="button button-primary" type="button">Go online</button><button id="breakBtn" class="button button-soft" type="button" disabled>Take break</button><button id="offlineBtn" class="button button-quiet" type="button" disabled>Go offline</button></div></div>
+        </section>
+        <div class="stats talk-stats"><article><small>Today</small><strong id="todayTime">0:00</strong></article><article><small>This week</small><strong id="weekTime">0:00</strong></article><article><small>Calls</small><strong id="totalCalls">0</strong></article><article><small>All time</small><strong id="totalTime">0:00</strong></article></div>
+        <section class="availability-card compact-status-card"><div class="desk-mark"><img src="assets/logo.svg" alt=""></div><div><span id="deskLanguage" class="language-chip">Listener calls</span><h2 id="deskTitle">You are offline</h2><p id="deskText">Go online when you are ready.</p></div></section>
+        <details class="panel activity-panel compact-details"><summary><span><b>Availability activity</b><small>Work and break sessions</small></span><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button></summary><div id="activityList" class="activity-list"></div></details>
+      </section>
+
+      <section id="tab-posts" class="tab">
+        <div class="compact-page-title"><h1>Create post</h1><small>Visible to your active Exclusive members.</small></div>
+        <form id="postForm" class="post-composer">
+          <button id="choosePostPhoto" class="post-plus" type="button" aria-label="Choose photo"><span>＋</span><small>Select photo</small></button>
+          <div id="postUploadPreview" class="post-upload-preview compact-upload"><span>＋</span><b>Choose one photo</b><small>JPG, PNG or WebP · max 4 MB</small></div>
+          <input id="postPhoto" type="file" accept="image/jpeg,image/png,image/webp" required hidden>
+          <label>Title or caption<textarea id="postCaption" maxlength="1000" placeholder="Add a caption…"></textarea></label>
+          <button class="button button-primary button-large" type="submit">Share post</button>
+        </form>
+      </section>
+
+      <section id="tab-inbox" class="tab">
+        <div class="compact-page-title"><h1>Messages</h1><small>Your current and previous Exclusive members.</small></div>
+        <div class="listener-inbox-layout">
+          <aside id="listenerInbox" class="listener-inbox-list"></aside>
+          <section class="listener-direct-chat">
+            <div id="listenerChatHead" class="listener-chat-head"><strong>Select a message</strong><small>Tap a profile to open the chat.</small></div>
+            <div id="listenerDirectMessages" class="listener-direct-messages"></div>
+            <form id="listenerMessageForm" class="listener-message-form hidden"><input id="listenerMessageInput" maxlength="2000" placeholder="Message…" autocomplete="off"><button type="submit" aria-label="Send"><svg viewBox="0 0 24 24"><path d="m3 11 18-8-8 18-2-8z"/><path d="m11 13 4-4"/></svg></button></form>
+          </section>
+        </div>
+      </section>
+
+      <section id="tab-wallet" class="tab">
+        <section class="wallet-hero">
+          <div><span class="eyebrow">EARNINGS</span><h2>Available balance</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus">Connected-call earnings appear here.</p></div>
+          <div class="wallet-rate-card"><small>Your private rate</small><strong id="walletRate">₹0.00/min</strong><span>Only you and the admin see this rate.</span></div>
+        </section>
+        <div class="wallet-metrics"><article><small>Today</small><strong id="walletToday">₹0.00</strong></article><article><small>Week</small><strong id="walletWeek">₹0.00</strong></article><article><small>Lifetime</small><strong id="walletLifetime">₹0.00</strong></article><article><small>Paid</small><strong id="walletPaid">₹0.00</strong></article></div>
+        <div class="wallet-grid">
+          <section class="panel withdrawal-panel">
+            <span class="eyebrow">WITHDRAW</span><h2>UPI payout</h2>
+            <form id="payoutDetailsForm" class="stack compact-form"><label>UPI ID<input id="listenerUpiId" autocomplete="off" placeholder="name@bank" maxlength="120" required></label><label>UPI-linked phone <small>Optional</small><input id="listenerUpiPhone" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+919876543210"></label><button class="button button-soft" type="submit">Save payout details</button></form>
+            <form id="withdrawalForm" class="stack compact-form"><label>Amount (₹)<input id="withdrawalAmount" type="number" min="100" step="1" inputmode="decimal" placeholder="Minimum ₹100" required></label><button class="button button-primary" type="submit">Request withdrawal</button></form>
+            <p class="withdrawal-note">Admin reviews requests within 24 hours. UTR appears here after payment.</p>
+            <div id="withdrawalHistory" class="withdrawal-history"></div>
+          </section>
+          <section class="panel wallet-history-panel"><div class="section-head compact"><div><span class="eyebrow">LEDGER</span><h2>Wallet history</h2></div><button id="refreshWallet" class="button button-quiet" type="button">Refresh</button></div><div id="walletHistory" class="wallet-history"></div></section>
+        </div>
+      </section>
+
+      <section id="tab-profile" class="tab">
+        <section class="listener-profile-preview app-profile">
+          <div id="profileBannerPreview" class="profile-banner-preview"><button id="profileBannerEdit" class="profile-media-pencil banner-pencil" type="button" aria-label="Change banner"><svg viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4Z"/><path d="m13.5 6.5 4 4"/></svg></button></div>
+          <input id="profileBannerFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          <button id="profilePhotoMenu" class="profile-photo-preview" type="button" aria-label="Change profile photo"><img id="profileImagePreview" alt="Your listener profile photo" draggable="false"><i><svg viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4Z"/><path d="m13.5 6.5 4 4"/></svg></i></button>
+          <input id="profilePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          <div class="profile-public-copy"><h2 id="profileDisplayName">Listener</h2><p id="profilePreviewUsername">@listener</p><small id="profileCodeText">Listener</small></div>
+          <div class="profile-primary-actions"><button id="toggleListenerProfileEdit" class="button button-primary" type="button">Edit profile</button><button class="button button-soft" data-tab="followers" type="button">Followers</button></div>
+        </section>
+
+        <form id="profileForm" class="panel settings-panel stack listener-profile-editor hidden">
+          <div class="editor-head"><div><span class="eyebrow">EDIT PROFILE</span><h2>Public details</h2></div><button id="closeListenerProfileEdit" class="icon-close" type="button" aria-label="Close">×</button></div>
+          <label>Public username<input id="profileUsername" autocomplete="username" required></label>
+          <label class="profile-private-name-field"><span>Private original name</span><input id="profileName" required><small>Only the admin can see this.</small></label>
+          <label class="profile-bio-field"><span>Public bio</span><textarea id="profileBio" maxlength="500"></textarea></label>
+          <label>Verified phone<input id="profilePhone" disabled></label>
+          <label class="profile-language-field">Language<input id="profileLanguage" disabled></label>
+          <input id="profileCode" type="hidden">
+          <button class="button button-primary button-large profile-save-button">Save profile</button>
+        </form>
+
+        <section class="profile-menu">
+          <button data-tab="followers" type="button"><span><b>Followers</b><small>People following your profile</small></span><i>›</i></button>
+          <button data-tab="history" type="button"><span><b>Call history</b><small>Completed and missed calls</small></span><i>›</i></button>
+          <button data-tab="settings" type="button"><span><b>Settings</b><small>Password and admin updates</small></span><i>›</i></button>
+        </section>
+        <div class="profile-post-heading"><h2>Your posts</h2><button class="button button-soft button-small" data-tab="posts" type="button">＋ Add</button></div>
+        <div id="listenerPosts" class="listener-post-grid profile-post-grid"></div>
+      </section>
+
+      <section id="tab-followers" class="tab"><div class="compact-page-title with-count"><div><h1>Followers</h1><small>Private to you</small></div><strong id="followerCount" class="follower-count">0 followers</strong></div><div id="followerGrid" class="follower-grid"></div></section>
+
+      <section id="tab-history" class="tab"><div class="compact-page-title row"><div><h1>Calls</h1><small>Your call activity.</small></div><button id="refreshHistory" class="button button-quiet" type="button">Refresh</button></div><div id="historyList" class="list"></div></section>
+
+      <section id="tab-settings" class="tab">
+        <div class="compact-page-title"><h1>Settings</h1></div>
+        <div class="listener-settings-list">
+          <details class="listener-settings-item">
+            <summary><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/></svg></span><span><b>Account security</b><small>Change your password</small></span><svg class="settings-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <form id="passwordForm" class="stack listener-settings-body"><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form>
+          </details>
+          <section class="listener-settings-item updates-item"><div class="settings-static-head"><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Updates</b><small>Account and payment notices</small></span></div><div id="notificationList" class="settings-notification-list"></div></section>
+        </div>
+      </section>
+      <section id="tab-notifications" class="tab"><div id="notificationListLegacy" class="list"></div></section>
+    </main>
+  </div>
+
+  <div id="listenerSupportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerSupportTitle">
+    <div class="modal-card support-auth-card"><button id="closeListenerSupport" class="close" type="button" aria-label="Close">×</button><span class="eyebrow">LOGIN SUPPORT</span><h2 id="listenerSupportTitle">Verify your number</h2>
+      <form id="listenerSupportPhoneForm" class="stack"><label>Mobile number<div class="listener-phone-field international"><select id="listenerSupportCountry" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option></select><input id="listenerSupportPhone" inputmode="tel" maxlength="14" required></div></label><button class="button button-primary">Send OTP</button></form>
+      <form id="listenerSupportOtpForm" class="stack hidden"><p>Enter the OTP sent to <b id="listenerSupportPhonePreview">your number</b>.</p><label>OTP<input id="listenerSupportOtp" class="listener-otp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required></label><small id="listenerSupportDevelopmentOtp" class="dev-otp hidden"></small><button class="button button-primary">Verify</button></form>
+      <form id="listenerSupportIssueForm" class="stack hidden"><label>What is stopping you?<textarea id="listenerSupportIssue" minlength="5" maxlength="3000" placeholder="Describe the login problem" required></textarea></label><button class="button button-primary">Submit issue</button></form>
+    </div>
+  </div>
+
+  <div id="listenerPostDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerPostDetailTitle">
+    <div class="modal-card listener-post-detail-card"><button id="closeListenerPostDetail" class="close" type="button" aria-label="Close">×</button><div id="listenerPostDetailContent"><h2 id="listenerPostDetailTitle">Post</h2></div></div>
+  </div>
+
+  <div id="listenerPostEditModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerPostEditTitle">
+    <div class="modal-card listener-post-edit-card">
+      <button id="closeListenerPostEdit" class="close" type="button" aria-label="Close">×</button>
+      <div class="post-edit-head"><span class="eyebrow">EDIT POST</span><h2 id="listenerPostEditTitle">Update your post</h2><p>Change the caption, the photo, or both.</p></div>
+      <form id="listenerPostEditForm" class="stack">
+        <input id="listenerPostEditId" type="hidden">
+        <div id="listenerPostEditPreview" class="post-edit-preview"><span>Loading photo…</span></div>
+        <input id="listenerPostEditPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <button id="chooseListenerPostEditPhoto" class="button button-soft" type="button">Change photo</button>
+        <label>Caption<textarea id="listenerPostEditCaption" maxlength="1000" placeholder="Write a caption"></textarea></label>
+        <button class="button button-primary button-large" type="submit">Save changes</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="incomingModal" class="incoming hidden" role="dialog" aria-modal="true" aria-label="Incoming call"><div class="incoming-card"><div class="incoming-top"><span class="ring-label"><i></i> INCOMING CALL</span><span id="ringCountdown">30s</span></div><div class="incoming-avatar" id="incomingInitials">CU</div><h2 id="incomingName">Customer</h2><p>Wallet-paid private call</p><div class="ring-progress"><i></i></div><div class="incoming-actions"><button id="rejectBtn" class="call-button reject" type="button"><span>×</span><small>Reject</small></button><button id="acceptBtn" class="call-button accept" type="button"><span>☎</span><small>Accept</small></button></div></div></div>
+
+  <div id="recoveryModal" class="recovery-modal hidden" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle"><div class="recovery-card"><button id="listenerRecoveryBack" class="modal-back" type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button id="closeRecovery" class="recovery-close" type="button" aria-label="Close">×</button><span class="eyebrow">ACCOUNT RECOVERY</span><h2 id="recoveryTitle">Reset listener password</h2><form id="recoveryRequestForm" class="stack"><p>Enter your complete registered number, including country code.</p><label>Mobile number<input id="recoveryPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+919876543210" maxlength="16" required></label><button class="button button-primary">Send request</button></form><section id="employeeRecoveryPanel" class="hidden"><p id="employeeRecoveryStatus">Waiting for administrator review.</p><label>Recovery key<input id="employeeRecoveryKey" autocomplete="off" spellcheck="false"></label><input id="employeeRecoveryId" type="hidden"><div class="recovery-buttons"><button id="employeeCopyRecovery" class="button button-quiet" type="button">Copy key</button><button id="employeeCheckRecovery" class="button button-soft" type="button">Check status</button></div><form id="employeeResetForm" class="stack hidden"><label>New password<input id="employeeRecoveryPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm password<input id="employeeRecoveryConfirm" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Set new password</button></form></section></div></div>
+
+  <div id="callView" class="call-view hidden" role="dialog" aria-modal="true" aria-label="Active call"><div class="call-shell"><div class="call-head"><button id="minimizeListenerCall" class="call-back" type="button" aria-label="Return to listener app"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span id="callState">Connecting secure audio…</span><strong id="callTimer">0:00</strong></div><div class="person"><div class="person-avatar" id="customerInitials">CU</div><span id="activeCallLanguage" class="language-chip">Conversation</span><h2 id="customerName">Customer</h2><p>Private browser conversation</p></div><div class="chat"><div id="chatMessages" class="messages" aria-live="polite"></div><form id="chatForm"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Message…"><button type="submit" aria-label="Send">➤</button></form></div><div class="call-actions"><button id="muteBtn" class="call-control" type="button"><span>🎙</span><small>Mute</small></button><button id="reportBtn" class="call-control" type="button"><span>⚑</span><small>Report</small></button><button id="endBtn" class="call-control end" type="button"><span>☎</span><small>End</small></button></div></div></div>
+  <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
+
+  <audio id="remoteAudio" autoplay></audio>
+  <script src="config.js?v=8.8.0"></script><script src="socket-loader.js?v=8.8.0"></script><script src="api.js?v=8.8.0"></script><script src="webrtc.js?v=8.8.0"></script><script src="app.js?v=8.8.0"></script>
+</body>
+</html>
