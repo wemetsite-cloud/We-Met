@@ -1,11 +1,11 @@
-const VERSION = '8.9.2';
+const VERSION = '8.9.3';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
   './',
   'index.html',
-  'style-v8.9.2.css',
-  'app-v8.9.2.js',
+  'style.css',
+  'app.js',
   'api.js',
   '/shared/socket-loader.js',
   '/shared/webrtc.js',

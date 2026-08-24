@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#12070f">
+  <meta name="theme-color" content="#fff8fb">
   <meta name="description" content="Private browser voice conversations with clear listener profiles, live availability, transparent connected-second billing and no phone-number sharing.">
   <meta name="robots" content="index,follow">
   <meta property="og:title" content="We Met — Real conversations, when you need one">
@@ -14,8 +14,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.1">
-  <link rel="stylesheet" href="style-v8.9.2.css">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.3">
+  <link rel="stylesheet" href="style.css?v=8.9.3">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -223,6 +223,8 @@
 
   <div id="customerRecoveryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="customerRecoveryTitle"><div class="modal-card support-auth-card"><button class="close" data-close="customerRecoveryModal" type="button" aria-label="Close">×</button><span class="eyebrow">SMS RECOVERY</span><h2 id="customerRecoveryTitle">Reset your password</h2><form id="customerRecoveryPhoneForm" class="stack"><p>No administrator approval is needed.</p><label>Registered mobile number<input id="customerRecoveryPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+919876543210" maxlength="16" required></label><button class="button button-primary" type="submit">Send OTP</button></form><form id="customerRecoveryOtpForm" class="stack hidden"><p>Enter the OTP sent to <b id="customerRecoveryPhonePreview">your number</b>.</p><label>6-digit OTP<input id="customerRecoveryOtp" class="otp-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></label><small id="customerRecoveryDevelopmentOtp" class="dev-otp hidden"></small><button class="button button-primary" type="submit">Verify OTP</button></form><form id="customerRecoveryPasswordForm" class="stack hidden"><label>New password<input id="customerRecoveryPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm password<input id="customerRecoveryConfirm" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary" type="submit">Set new password</button></form></div></div>
 
+  <div id="membershipCheckoutModal" class="modal wallet-checkout-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="membershipCheckoutTitle"><div class="modal-card wallet-checkout-card"><button class="close" data-close="membershipCheckoutModal" type="button" aria-label="Close">×</button><div class="wallet-checkout-brand"><img src="/shared/logo.svg" alt=""><span><b>We Met Exclusive</b><small>Listener-specific access</small></span></div><div id="membershipCheckoutContent"></div><button id="membershipCheckoutPay" class="button button-primary button-large" type="button">Continue securely</button><small class="wallet-checkout-provider">Razorpay securely completes the recurring payment.</small></div></div>
+
   <div id="listenerProfileModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerProfileName"><div class="modal-card listener-profile-modal"><button class="close" data-close="listenerProfileModal" type="button" aria-label="Close">×</button><div id="listenerProfileContent"></div></div></div>
 
   <section id="customerPostFeed" class="customer-post-feed hidden" role="dialog" aria-modal="true" aria-labelledby="customerPostFeedTitle">
@@ -245,11 +247,11 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.2"></script>
-  <script src="/shared/socket-loader.js?v=8.9.2"></script>
-  <script src="api.js?v=8.9.2"></script>
-  <script src="/shared/webrtc.js?v=8.9.2"></script>
+  <script src="config.js?v=8.9.3"></script>
+  <script src="/shared/socket-loader.js?v=8.9.3"></script>
+  <script src="api.js?v=8.9.3"></script>
+  <script src="/shared/webrtc.js?v=8.9.3"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app-v8.9.2.js"></script>
+  <script src="app.js?v=8.9.3"></script>
 </body>
 </html>
