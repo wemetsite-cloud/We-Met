@@ -78,12 +78,12 @@ test('the customer portal ships the v8 membership layout and phone-first authent
   }
   assert.match(html, /id="walletBalance"/);
   assert.equal((html.match(/id="walletBalance"/g) || []).length, 1);
-  assert.match(css, /\.plan-card-v8/);
+  assert.match(css, /\.wallet-plan-card/);
   assert.match(css, /\.listener-card-v8/);
   assert.match(app, /data-buy-plan/);
-  assert.match(app, /Buy talk-time/);
+  assert.match(app, /type="button">Buy<\/button>/);
   assert.match(app, /data-subscribe/);
   assert.match(app, /Membership does not include free calls/);
   assert.doesNotMatch(app, /data-video|Start video call/);
-  assert.match(serviceWorker, /const VERSION = '8\.0\.0'/);
+  assert.match(serviceWorker, /const VERSION = '8\.1\.0'/);
 });

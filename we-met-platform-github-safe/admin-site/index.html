@@ -8,8 +8,8 @@
   <title>We Met Operations</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.0.0">
-  <link rel="stylesheet" href="style.css?v=8.0.0">
+  <link rel="manifest" href="manifest.webmanifest?v=8.1.0">
+  <link rel="stylesheet" href="style.css?v=8.1.0">
 </head>
 <body>
   <div id="loginView" class="login-screen">
@@ -63,9 +63,24 @@
         </section>
 
         <section id="page-employees" class="page">
-          <div class="toolbar"><div><span class="eyebrow">LISTENER OPERATIONS</span><h2>Presence, connected work and call performance</h2><p>Online time, break time, talk-time and last-seen data update from recorded activity sessions.</p></div><div class="toolbar-actions"><input id="listenerSearch" placeholder="Search listener, phone or ID"><select id="listenerStatusFilter" aria-label="Filter listener availability"><option value="">All availability</option><option value="online">Online</option><option value="break">On break</option><option value="offline">Offline</option></select><button id="reloadEmployees" class="ghost">Refresh</button></div></div>
+          <div class="toolbar"><div><span class="eyebrow">LISTENERS</span><h2>Listener accounts</h2><p>Profiles, availability, rates and verification.</p></div><div class="toolbar-actions"><input id="listenerSearch" placeholder="Search listener, phone or ID"><select id="listenerStatusFilter" aria-label="Filter listener availability"><option value="">All availability</option><option value="online">Online</option><option value="break">On break</option><option value="offline">Offline</option></select><button id="reloadEmployees" class="ghost">Refresh</button></div></div>
           <div class="customer-overview-strip listener-overview-strip"><article><small>Listeners</small><strong id="listenerCount">0</strong></article><article><small>Online now</small><strong id="listenerOnlineCount">0</strong></article><article><small>Work today</small><strong id="listenerTodayWork">0:00</strong></article><article><small>Talk today</small><strong id="listenerTodayTalk">0:00</strong></article></div>
-          <div class="grid-form listener-management"><form id="employeeForm" class="panel stack"><span class="eyebrow">ADD LISTENER</span><h2>Create approved listener</h2><label>Private original name<input id="empName" required></label><label>Public username<input id="empUsername" placeholder="friendly.listener" pattern="[a-zA-Z0-9._-]{3,80}" required></label><label>Verified private phone<input id="empPhone" type="tel" inputmode="numeric" pattern="[6-9][0-9]{9}" maxlength="10" placeholder="9876543210" required></label><label>Temporary password<input id="empPassword" type="password" minlength="8" required></label><label>Employee ID<input id="empCode" placeholder="Optional — generated if blank"></label><label>Rate per connected minute (₹)<input id="empRate" type="number" min="0" max="100000" step="0.01" value="1" required></label><label>Language<input id="empLanguage" list="listenerLanguages" value="Malayalam" maxlength="60" required></label><label>Short public bio<textarea id="empBio" maxlength="500" placeholder="Short introduction shown to customers"></textarea></label><button class="primary">Create approved listener</button></form><section class="panel listener-directory-panel"><div class="panel-head"><div><span class="eyebrow">STAFF DIRECTORY</span><h2>Listener accounts</h2></div></div><div id="employeeCards" class="employee-cards listener-cards"></div></section></div>
+          <div class="grid-form listener-management">
+            <form id="employeeForm" class="panel stack">
+              <span class="eyebrow">ADD LISTENER</span><h2>Create listener</h2>
+              <label>Private original name<input id="empName" required></label>
+              <label>Public username<input id="empUsername" placeholder="friendly.listener" pattern="[a-zA-Z0-9._-]{3,80}" required></label>
+              <label>Private phone<input id="empPhone" type="tel" inputmode="numeric" pattern="[6-9][0-9]{9}" maxlength="10" placeholder="9876543210" required></label>
+              <label>Temporary password<input id="empPassword" type="password" minlength="8" required></label>
+              <label>Employee ID<input id="empCode" placeholder="Generated if blank"></label>
+              <label>Rate per minute (₹)<input id="empRate" type="number" min="0" max="100000" step="0.01" value="1" required></label>
+              <label>Language<input id="empLanguage" list="listenerLanguages" value="Malayalam" maxlength="60" required></label>
+              <label>Public bio<textarea id="empBio" maxlength="500" placeholder="Short introduction"></textarea></label>
+              <label class="check admin-verification-toggle"><input id="empRequireVerification" type="checkbox"><span><b>Require voice verification</b><small>Off by default for admin-created accounts.</small></span></label>
+              <button class="primary">Create listener</button>
+            </form>
+            <section class="panel listener-directory-panel"><div class="panel-head"><div><span class="eyebrow">DIRECTORY</span><h2>All listeners</h2></div></div><div id="employeeCards" class="employee-cards listener-cards"></div></section>
+          </div>
         </section>
 
         <section id="page-verifications" class="page">
@@ -109,6 +124,6 @@
 
   <datalist id="listenerLanguages"><option value="Malayalam"><option value="English"><option value="Hindi"><option value="Tamil"><option value="Kannada"><option value="Telugu"></datalist>
   <div id="actionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-card profile-modal"><button id="closeModal" class="close" type="button" aria-label="Close">×</button><h2 id="modalTitle">Account details</h2><div id="modalBody"></div></div></div>
-  <script src="config.js?v=8.0.0"></script><script src="api.js?v=8.0.0"></script><script src="app.js?v=8.0.0"></script>
+  <script src="config.js?v=8.1.0"></script><script src="api.js?v=8.1.0"></script><script src="app.js?v=8.1.0"></script>
 </body>
 </html>

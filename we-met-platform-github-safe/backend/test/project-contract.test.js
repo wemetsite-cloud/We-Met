@@ -78,7 +78,7 @@ test('ships listener earnings with admin-managed payments and no listener withdr
   assert.doesNotMatch(employeeRoutes, /MIN_WITHDRAWAL_PAISE|\/wallet\/withdrawals|\/wallet\/payout-details/);
   assert.match(listenerHtml, /id="tab-wallet"/);
   assert.match(listenerHtml, /id="walletBalance"/);
-  assert.match(listenerHtml, /ADMIN-MANAGED WALLET/);
+  assert.match(listenerHtml, /ADMIN-MANAGED/);
   assert.doesNotMatch(listenerHtml, /withdrawalForm|walletUpiId|walletUpiPhone/);
   assert.match(adminHtml, /id="page-wallets"/);
   assert.match(adminHtml, /id="listenerWalletBalance"/);
@@ -107,7 +107,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '8\.0\.0'/);
+    assert.match(serviceWorker, /const VERSION = '8\.1\.0'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }

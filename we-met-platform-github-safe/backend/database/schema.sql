@@ -512,6 +512,30 @@ DO $$ BEGIN
   ALTER TABLE calls ADD CONSTRAINT calls_status_check CHECK (status IN ('ringing','connecting','active','ended','rejected','cancelled','failed'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Older releases allowed the same phone to be stored on more than one account.
+-- Keep the active account with the most wallet value and the newest activity,
+-- then detach the phone from older duplicates before enforcing phone-first login.
+-- No account, wallet entry, call, payment or message is deleted by this repair.
+WITH ranked_phone_accounts AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY role, phone
+           ORDER BY
+             CASE WHEN status='active' THEN 0 ELSE 1 END,
+             balance_seconds DESC,
+             COALESCE(last_login_at, updated_at, created_at) DESC,
+             created_at DESC,
+             id
+         ) AS duplicate_rank
+  FROM users
+  WHERE phone IS NOT NULL AND btrim(phone)<>''
+)
+UPDATE users u
+SET phone=NULL,
+    updated_at=now()
+FROM ranked_phone_accounts ranked
+WHERE u.id=ranked.id AND ranked.duplicate_rank>1;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_employee_code ON users(employee_code) WHERE employee_code IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_role_phone ON users(role,phone) WHERE phone IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_name ON plans(name);

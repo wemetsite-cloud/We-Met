@@ -22,7 +22,7 @@ test('v8 phone-first OTP flow covers customers and listeners without email regis
   assert.match(sms, /FAST2SMS|fast2sms/i);
   assert.match(customer, /Let’s start/);
   assert.match(customer, /id="authProgressFill"/);
-  assert.match(listener, /Your number is fully safe/);
+  assert.match(listener, /Your number stays private/);
   assert.match(listener, /Public username/);
   assert.match(listener, /Original name/);
   assert.doesNotMatch(listener, /type="email"/);
@@ -97,4 +97,58 @@ test('customer talk-time balance is presented only in the wallet page', () => {
   assert.doesNotMatch(outsideWallet, /id="walletBalance"|minutes-balance/);
   assert.match(html.slice(walletStart, walletEnd), /id="walletBalance"/);
   assert.match(html.slice(walletStart, walletEnd), /Choose your minutes/);
+});
+
+test('v8.1 repairs legacy duplicate phone records before Render creates the unique index', () => {
+  const schema = read('backend', 'database', 'schema.sql');
+  const repair = schema.indexOf('WITH ranked_phone_accounts AS');
+  const uniqueIndex = schema.indexOf('CREATE UNIQUE INDEX IF NOT EXISTS uq_users_role_phone');
+  assert.ok(repair > 0, 'duplicate-phone repair is missing');
+  assert.ok(uniqueIndex > repair, 'duplicate-phone repair must run before the unique index');
+  assert.match(schema.slice(repair, uniqueIndex), /ROW_NUMBER\(\) OVER/);
+  assert.match(schema.slice(repair, uniqueIndex), /SET phone=NULL/);
+  assert.doesNotMatch(schema.slice(repair, uniqueIndex), /DELETE FROM users/);
+});
+
+test('v8.1 customer home contains only connection, language choice and verified discovery', () => {
+  const html = read('customer-site', 'index.html');
+  const app = read('customer-site', 'app.js');
+  const css = read('customer-site', 'style.css');
+  const home = html.slice(html.indexOf('id="tab-home"'), html.indexOf('id="tab-wallet"'));
+
+  assert.match(home, /id="randomConnectButton"/);
+  assert.match(home, /id="otherLanguageToggle"/);
+  assert.match(home, /id="listenerGrid"/);
+  assert.doesNotMatch(html, /helloName|YOUR PRIVATE SPACE/);
+  assert.match(app, /otherLanguageToggle'\)\.onchange = renderDirectory/);
+  assert.match(app, /employeeId: null, allowOtherLanguages:/);
+  assert.match(app, /walletCheckoutModal/);
+  assert.match(app, /theme: \{ color: '#e62d7d', backdrop_color: '#0c0d10' \}/);
+  assert.match(css, /\.plans-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+  assert.match(css, /\.wallet-plan-card/);
+});
+
+test('v8.1 admin-created listeners are approved by default with an optional voice check', () => {
+  const route = read('backend', 'src', 'routes', 'admin.js');
+  const adminHtml = read('admin-site', 'index.html');
+  const adminApp = read('admin-site', 'app.js');
+
+  assert.match(route, /const requireVerification = req\.body\.requireVerification === true/);
+  assert.match(route, /requireVerification \? 'voice_required' : 'approved'/);
+  assert.match(route, /router\.patch\('\/employees\/:id\/verification'/);
+  assert.match(adminHtml, /id="empRequireVerification" type="checkbox"/);
+  assert.doesNotMatch(adminHtml, /id="empRequireVerification"[^>]*checked/);
+  assert.match(adminApp, /requireVerification/);
+});
+
+test('listener availability panel is scoped to the Desk tab with no repeated greeting', () => {
+  const html = read('employee-site', 'index.html');
+  const app = read('employee-site', 'app.js');
+  const deskStart = html.indexOf('id="tab-desk"');
+  const postsStart = html.indexOf('id="tab-posts"');
+  assert.ok(deskStart > 0 && postsStart > deskStart);
+  assert.match(html.slice(deskStart, postsStart), /id="shiftStatus"/);
+  assert.doesNotMatch(html.slice(0, deskStart), /id="shiftStatus"/);
+  assert.doesNotMatch(html, /YOUR LISTENER DESK|id="hello"/);
+  assert.doesNotMatch(app, /\$\('#hello'\)/);
 });

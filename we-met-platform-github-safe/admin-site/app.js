@@ -107,7 +107,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.0.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.1.0', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -221,6 +221,7 @@
     if (d.resetDecline) return reviewReset(d.resetDecline, 'declined');
     if (d.verificationApprove) return reviewVerification(d.verificationApprove, 'approve');
     if (d.verificationReject) return reviewVerification(d.verificationReject, 'reject');
+    if (d.listenerVerification) return setListenerVerification(d.listenerVerification, d.required === 'true');
     if (d.adminPostDelete) return deleteAdminPost(d.adminPostDelete);
     if (d.userProfile) return showDetails(d.userProfile);
   }
@@ -374,7 +375,7 @@
         <header>${listenerAvatarMarkup(user)}<div>${profileLink(user.id, user.username ? `@${user.username}` : user.name, `${user.employee_code || 'No ID'} • ${user.listener_language || 'Malayalam'}`)}</div><div class="listener-statuses"><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span><span class="pill ${user.listener_availability === 'online' ? 'available' : P.esc(user.listener_availability || 'offline')}">${P.esc(user.listener_availability || 'offline')}</span><span class="pill verification-${P.esc(user.listener_verification_status || 'approved')}">${P.esc(user.listener_verification_status || 'approved')}</span></div></header>
         <div class="listener-performance"><div><small>Work today</small><strong>${P.duration(user.today_work_seconds)}</strong></div><div><small>Talk today</small><strong>${P.duration(user.today_talk_seconds)}</strong></div><div><small>Break today</small><strong>${P.duration(user.today_break_seconds)}</strong></div><div><small>Calls today</small><strong>${Number(user.today_calls || 0)}</strong></div><div><small>Rate / min</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div><div><small>Unpaid wallet</small><strong>${P.moneyExact(user.listener_wallet_balance_paise)}</strong></div></div>
         <p class="listener-contact">${P.esc(user.phone || 'Private phone not available')} • Last seen ${user.last_seen_at ? P.date(user.last_seen_at) : 'not recorded'}</p>
-        <div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="ghost" data-wallet-rate="${user.id}">Set rate</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div>
+        <div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="ghost" data-wallet-rate="${user.id}">Set rate</button><button class="ghost" data-listener-verification="${user.id}" data-required="${user.listener_verification_status === 'approved'}">${user.listener_verification_status === 'approved' ? 'Require voice check' : 'Approve without voice'}</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div>
       </article>`).join('') : '<p class="empty-copy">No listeners match this filter.</p>';
   }
 
@@ -558,8 +559,23 @@
   async function createEmployee(event) {
     event.preventDefault();
     try {
-      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value }) });
-      event.target.reset(); $('#empLanguage').value = 'Malayalam'; $('#empRate').value = '1'; P.toast('Approved listener created.', 'success'); loadUsers();
+      const requireVerification = $('#empRequireVerification').checked;
+      await P.api('/api/admin/employees', { method: 'POST', body: JSON.stringify({ name: $('#empName').value, username: $('#empUsername').value, password: $('#empPassword').value, employeeCode: $('#empCode').value, phone: $('#empPhone').value, ratePaise: Math.round(Number($('#empRate').value) * 100), bio: $('#empBio').value, language: $('#empLanguage').value, requireVerification }) });
+      event.target.reset(); $('#empLanguage').value = 'Malayalam'; $('#empRate').value = '1'; P.toast(requireVerification ? 'Listener created with voice verification required.' : 'Approved listener created.', 'success'); loadUsers();
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  async function setListenerVerification(id, required) {
+    const listener = users.find(item => item.id === id && item.role === 'employee');
+    if (!listener) return;
+    const message = required
+      ? `Require @${listener.username || listener.name} to record the Malayalam verification line? They will be signed out and set offline.`
+      : `Approve @${listener.username || listener.name} without a voice recording?`;
+    if (!confirm(message)) return;
+    try {
+      await P.api(`/api/admin/employees/${encodeURIComponent(id)}/verification`, { method: 'PATCH', body: JSON.stringify({ required }) });
+      P.toast(required ? 'Voice verification is now required.' : 'Listener approved without voice verification.', 'success');
+      await Promise.all([loadUsers(), loadVerifications()]);
     } catch (error) { P.toast(error.message, 'error'); }
   }
 

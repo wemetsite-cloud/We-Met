@@ -143,6 +143,8 @@ router.post('/employees', asyncHandler(async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   const bio = text(req.body.bio, 500) || null;
   const language = text(req.body.language, 60) || 'Malayalam';
+  const requireVerification = req.body.requireVerification === true;
+  const verificationStatus = requireVerification ? 'voice_required' : 'approved';
   const hasRate = Object.hasOwn(req.body, 'ratePaise') && req.body.ratePaise !== '';
   const ratePaise = hasRate ? integer(req.body.ratePaise, { min: 0, max: 10_000_000 }) : 100;
   const employeeCode = (text(req.body.employeeCode, 40) || `WM-L${Date.now().toString().slice(-6)}`)
@@ -167,10 +169,11 @@ router.post('/employees', asyncHandler(async (req, res) => {
         role, name, username, phone, bio, employee_code,
         listener_language, listener_rate_paise, password_hash,listener_verification_status,listener_verified_at
       )
-      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8,'approved',now())
+      VALUES ('employee', $1, $2, $3, $4, $5, $6, $7, $8,$9,
+              CASE WHEN $9='approved' THEN now() ELSE NULL END)
       RETURNING id, role, name, username, email, phone, bio,
                 employee_code, listener_availability, listener_language,
-                listener_rate_paise, status, created_at
+                listener_rate_paise, listener_verification_status, status, created_at
     `, [
       name,
       username,
@@ -180,6 +183,7 @@ router.post('/employees', asyncHandler(async (req, res) => {
       language,
       ratePaise,
       await hashPassword(password),
+      verificationStatus,
     ]);
 
     res.status(201).json({ employee: result.rows[0] });
@@ -191,6 +195,49 @@ router.post('/employees', asyncHandler(async (req, res) => {
     }
     throw error;
   }
+}));
+
+router.patch('/employees/:id/verification', asyncHandler(async (req, res) => {
+  const requireVerification = req.body.required === true;
+  const result = await db.query(`
+    UPDATE users
+    SET listener_verification_status=$2,
+        listener_verification_note=NULL,
+        listener_verified_at=CASE WHEN $2='approved' THEN now() ELSE NULL END,
+        listener_availability=CASE WHEN $2='voice_required' THEN 'offline' ELSE listener_availability END,
+        auth_version=auth_version + CASE WHEN $2='voice_required' THEN 1 ELSE 0 END,
+        updated_at=now()
+    WHERE id=$1 AND role='employee'
+    RETURNING id,name,username,listener_verification_status,listener_verified_at
+  `, [req.params.id, requireVerification ? 'voice_required' : 'approved']);
+
+  const employee = result.rows[0];
+  if (!employee) return res.status(404).json({ error: 'Listener not found.' });
+
+  await db.query(`
+    INSERT INTO notifications(user_id,title,body)
+    VALUES($1,$2,$3)
+  `, [
+    employee.id,
+    requireVerification ? 'Voice verification required' : 'Listener account approved',
+    requireVerification
+      ? 'Sign in to read and record the Malayalam verification line.'
+      : 'Your listener workspace is approved and ready to use.',
+  ]);
+
+  if (requireVerification) {
+    await req.app.locals.socketRuntime?.restrictUser(employee.id, 'Voice verification is required before this listener can go online.');
+  } else {
+    await req.app.locals.socketRuntime?.refreshEmployeeProfile?.(employee.id);
+    await req.app.locals.notifyUser?.(employee.id, {
+      title: 'Listener account approved',
+      body: 'Your listener workspace is ready.',
+      url: './',
+      tag: `we-met-listener-approved-${employee.id}`,
+    });
+  }
+
+  res.json({ employee });
 }));
 
 router.patch('/employees/:id', asyncHandler(async (req, res) => {
