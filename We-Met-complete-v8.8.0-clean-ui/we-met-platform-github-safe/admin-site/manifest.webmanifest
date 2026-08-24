@@ -1,0 +1,14 @@
+{
+  "name": "We Met Operations",
+  "short_name": "WM Ops",
+  "description": "Secure We Met operations dashboard for verification, payments, content, calls, accounts and safety.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12070f",
+  "theme_color": "#ff2f8d",
+  "icons": [
+    {"src":"/shared/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"/shared/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
