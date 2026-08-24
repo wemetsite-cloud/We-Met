@@ -107,7 +107,7 @@ router.patch('/payout-details', asyncHandler(async (req, res) => {
   if (!/^[a-z0-9._-]{2,120}@[a-z]{2,64}$/i.test(upiId)) {
     return res.status(400).json({ error: 'Enter a valid UPI ID, such as name@bank.' });
   }
-  if (requestedPhone && !upiPhone) return res.status(400).json({ error: 'Enter a valid UPI-linked phone number with country code.' });
+  if (!requestedPhone || !upiPhone) return res.status(400).json({ error: 'Enter the UPI-linked phone number with country code.' });
   const result = await db.query(`
     UPDATE users SET upi_id=$2,upi_phone=$3,updated_at=now()
     WHERE id=$1 AND role='employee'

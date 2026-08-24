@@ -45,6 +45,7 @@
   let ringCountdown = null;
   let ringSecondsLeft = 30;
   let publicConfig = null;
+  let currentPayoutDetails = { upiId: '', upiPhone: '' };
   let activeTab = 'desk';
   let statsRefreshTimer = null;
 
@@ -349,6 +350,9 @@
     $('#refreshHistory').addEventListener('click', loadHistory);
     $('#refreshWallet').addEventListener('click', loadWallet);
     $('#payoutDetailsForm').addEventListener('submit', savePayoutDetails);
+    $('#changePayoutDetails').addEventListener('click', () => showPayoutEditor(true));
+    $('#cancelPayoutDetails').addEventListener('click', () => showPayoutEditor(false));
+    $('#settingsPayoutChange').addEventListener('click', () => { selectTab('wallet'); showPayoutEditor(true); setTimeout(() => $('#listenerUpiId').focus(), 80); });
     $('#withdrawalForm').addEventListener('submit', requestWithdrawal);
     $('#refreshActivity').addEventListener('click', () => { loadStats(); loadActivity(); });
     $('#minimizeListenerCall').addEventListener('click', () => minimizeListenerCall());
@@ -369,10 +373,58 @@
     document.addEventListener('copy', (event) => { if (!event.target.closest('input,textarea,[contenteditable="true"]')) event.preventDefault(); });
   }
 
+  function dailyShuffle(items) {
+    const copy = [...items]; const stamp = new Date().toISOString().slice(0,10);
+    let seed = [...stamp].reduce((n,char) => ((n*33)^char.charCodeAt(0))>>>0,5381);
+    for (let i=copy.length-1;i>0;i--) { seed=(seed*1664525+1013904223)>>>0; const j=seed%(i+1); [copy[i],copy[j]]=[copy[j],copy[i]]; }
+    return copy;
+  }
+
+  async function loadListenerShowcase() {
+    try {
+      const response = await P.api('/api/public/showcase-images', { cache: 'no-store' });
+      const images = dailyShuffle(Array.isArray(response.images) ? response.images : []);
+      if (!images.length) return;
+      const publicFrame = $('#listenerPublicShowcase');
+      if (publicFrame) publicFrame.innerHTML = Array.from({length: Math.min(3, images.length)}, (_,i) => `<span><img src="${P.esc(images[i % images.length])}" alt=""></span>`).join('');
+      const home = $('#listenerHomeShowcase');
+      if (home) home.innerHTML = `<img src="${P.esc(images[0])}" alt="Listener community preview"><span>${images.length > 1 ? `<img src="${P.esc(images[1])}" alt="">` : ''}</span>`;
+    } catch {}
+  }
+
+  function initAutoHideHeader() {
+    let lastY = window.scrollY; let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (ticking) return; ticking = true;
+      requestAnimationFrame(() => {
+        const y = Math.max(0, window.scrollY);
+        const topbar = document.querySelector('#appView .topbar');
+        if (topbar) {
+          const hide = y > 90 && y > lastY + 4;
+          topbar.classList.toggle('topbar-hidden', hide);
+          if (y < 24 || y < lastY - 4) topbar.classList.remove('topbar-hidden');
+        }
+        lastY = y; ticking = false;
+      });
+    }, { passive: true });
+  }
+
+  function showPayoutEditor(open) {
+    const form = $('#payoutDetailsForm');
+    if (!form) return;
+    show('#payoutDetailsForm', open);
+    if (open) {
+      $('#listenerUpiId').value = currentPayoutDetails.upiId || '';
+      $('#listenerUpiPhone').value = currentPayoutDetails.upiPhone || '';
+      setTimeout(() => $('#listenerUpiId').focus(), 60);
+    }
+  }
+
   async function init() {
     initNavigation();
     bind();
     registerServiceWorker();
+    initAutoHideHeader(); loadListenerShowcase();
     try { publicConfig = await P.api('/api/public/config'); } catch {}
     ringSecondsLeft = publicConfig?.ringSeconds || 30;
     if (P.Store.token) await loadMe();
@@ -1300,8 +1352,11 @@
       $('#walletWeek').textContent = P.moneyExact(summary.weekEarningsPaise);
       $('#walletLifetime').textContent = P.moneyExact(summary.lifetimeEarningsPaise);
       $('#walletPaid').textContent = P.moneyExact(summary.lifetimePaidPaise);
-      if (document.activeElement !== $('#listenerUpiId')) $('#listenerUpiId').value = response.payoutDetails?.upiId || '';
-      if (document.activeElement !== $('#listenerUpiPhone')) $('#listenerUpiPhone').value = response.payoutDetails?.upiPhone || '';
+      currentPayoutDetails = { upiId: response.payoutDetails?.upiId || '', upiPhone: response.payoutDetails?.upiPhone || '' };
+      $('#payoutUpiDisplay').textContent = currentPayoutDetails.upiId || 'Not added';
+      $('#payoutPhoneDisplay').textContent = currentPayoutDetails.upiPhone || 'Not added';
+      $('#changePayoutDetails').textContent = currentPayoutDetails.upiId ? 'Change' : 'Add';
+      if (!$('#payoutDetailsForm').classList.contains('hidden')) { $('#listenerUpiId').value = currentPayoutDetails.upiId; $('#listenerUpiPhone').value = currentPayoutDetails.upiPhone; }
       const balancePaise = Number(summary.balancePaise || 0);
       $('#walletPaymentStatus').textContent = Number(summary.ratePaisePerMinute || 0) <= 0
         ? 'Your rate has not been set yet. Ask the administrator to set it before taking paid calls.'
@@ -1345,7 +1400,7 @@
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
       await P.api('/api/employee/payout-details', { method: 'PATCH', body: JSON.stringify({ upiId: $('#listenerUpiId').value, upiPhone: $('#listenerUpiPhone').value }) });
-      P.toast('UPI payout details saved.', 'success'); await loadWallet();
+      P.toast('UPI payout details saved.', 'success'); showPayoutEditor(false); await loadWallet();
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
@@ -1353,6 +1408,7 @@
   async function requestWithdrawal(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
+      if (!currentPayoutDetails.upiId || !currentPayoutDetails.upiPhone) { showPayoutEditor(true); throw new Error('Add your UPI ID and linked phone before requesting a withdrawal.'); }
       const rupees = Number($('#withdrawalAmount').value);
       if (!Number.isFinite(rupees)) throw new Error('Enter a withdrawal amount.');
       const response = await P.api('/api/employee/withdrawals', { method: 'POST', body: JSON.stringify({ amountPaise: Math.round(rupees * 100) }) });

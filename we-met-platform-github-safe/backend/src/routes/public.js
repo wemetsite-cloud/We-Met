@@ -23,6 +23,18 @@ router.get('/config', (_req, res) => res.json({
 }));
 
 
+
+router.get('/showcase-images', asyncHandler(async (_req, res) => {
+  const result = await db.query("SELECT value,updated_at FROM platform_settings WHERE key='listener_showcase_images'");
+  let images = [];
+  try {
+    const parsed = JSON.parse(result.rows[0]?.value || '[]');
+    if (Array.isArray(parsed)) images = parsed.filter((item) => /^data:image\/(?:jpeg|png|webp);base64,/i.test(String(item || ''))).slice(0, 12);
+  } catch {}
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ images, updatedAt: result.rows[0]?.updated_at || null });
+}));
+
 router.get('/listener-profile-image/:id', asyncHandler(async (req, res) => {
   const result = await db.query(
     `SELECT profile_image FROM users

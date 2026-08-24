@@ -1,12 +1,12 @@
 {
-  "version": "8.9.3",
-  "name": "We Met v8.9.3 Light Theme + Classic Razorpay Popup",
+  "version": "8.9.4",
+  "name": "dark-listener-wallet-showcase",
   "changes": [
-    "Switches customer, listener and admin interfaces back to a clean light theme while preserving v8.9 mobile layouts",
-    "Restores wallet purchases to the classic Razorpay Standard Checkout popup pattern used by the older working customer build",
-    "Makes listener subscriptions open Razorpay directly from Subscribe without an intermediate We Met payment overlay",
-    "Removes razorpay-open full-screen/dark checkout presentation from active payment flows",
-    "Keeps existing server-side Razorpay order/subscription verification and wallet/membership refresh behavior",
-    "Updates legal pages, PWA theme colors and service-worker caches to the light theme"
+    "Returns customer, listener and admin portals to a refined dark theme without changing the working Razorpay Standard Checkout popup flow",
+    "Redesigns the listener signed-in home with a visual hero, clearer availability controls, compact work stats and an auto-hiding header that returns at the top or on upward scroll",
+    "Simplifies the listener wallet to balance, per-minute rate, saved UPI destination and withdrawal amount/request controls; payout details edit only on demand and are reachable from Settings",
+    "Adds an admin Public images manager for up to 12 compressed portrait previews stored in platform settings and shuffled daily on customer/listener public screens",
+    "Reshapes customer talk-time plans into taller narrow cards with 2 columns on phones and up to 5 columns on desktop",
+    "Bumps PWA caches and asset versions to 8.9.4"
   ]
 }

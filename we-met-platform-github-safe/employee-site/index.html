@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#fff8fb">
+  <meta name="theme-color" content="#0b0b0f">
   <meta name="description" content="The private We Met listener app for calls, exclusive posts, messages and earnings.">
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.3">
-  <link rel="stylesheet" href="style.css?v=8.9.3">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.4">
+  <link rel="stylesheet" href="style.css?v=8.9.4">
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -18,7 +18,7 @@
   <div id="loginView" class="login-view">
     <section class="listener-auth-shell">
       <div class="listener-auth-progress" aria-hidden="true"><i id="listenerAuthProgress"></i></div>
-      <a class="brand listener-auth-brand" aria-label="We Met listener"><img src="/shared/logo.svg" alt=""><span><strong>We Met</strong><small>Listener</small></span></a>
+      <a class="brand listener-auth-brand" aria-label="We Met listener"><img src="/shared/logo.svg" alt=""><span><strong>We Met</strong><small>Listener</small></span></a><div id="listenerPublicShowcase" class="listener-public-showcase" aria-hidden="true"><span><img src="/shared/logo.svg" alt=""></span><span><img src="/shared/logo.svg" alt=""></span><span><img src="/shared/logo.svg" alt=""></span></div>
 
       <section class="listener-auth-step active welcome-step" data-listener-auth="welcome">
         <div class="listener-welcome-art" aria-hidden="true"><img src="/shared/logo.svg" alt=""><span class="welcome-bubble one"></span><span class="welcome-bubble two"></span><i></i></div>
@@ -97,13 +97,13 @@
       </nav>
 
       <section id="tab-desk" class="tab active">
-        <section class="desk-status-panel clean-section">
-          <div><span class="eyebrow">AVAILABILITY</span><h1>Ready to listen?</h1></div>
-          <div class="shift-card"><span>Current status</span><strong id="shiftStatus">Offline</strong><small id="currentShiftSince" class="shift-since">No active session</small><div class="shift-buttons"><button id="onlineBtn" class="button button-primary" type="button">Go online</button><button id="breakBtn" class="button button-soft" type="button" disabled>Take break</button><button id="offlineBtn" class="button button-quiet" type="button" disabled>Go offline</button></div></div>
+        <section class="listener-home-hero">
+          <div class="listener-home-copy"><span class="eyebrow">LISTENER DESK</span><h1>Ready when you are.</h1><p>Control your availability, see your work at a glance, and stay ready for the next conversation.</p><div class="listener-home-state"><i></i><div><small>Current status</small><strong id="shiftStatus">Offline</strong><span id="currentShiftSince" class="shift-since">No active session</span></div></div></div>
+          <div id="listenerHomeShowcase" class="listener-home-showcase"><div class="listener-home-placeholder"><img src="/shared/logo.svg" alt=""></div></div>
         </section>
-        <div class="stats talk-stats"><article><small>Today</small><strong id="todayTime">0:00</strong></article><article><small>This week</small><strong id="weekTime">0:00</strong></article><article><small>Calls</small><strong id="totalCalls">0</strong></article><article><small>All time</small><strong id="totalTime">0:00</strong></article></div>
-        <section class="availability-card compact-status-card clean-status"><div class="desk-mark"><img src="/shared/logo.svg" alt=""></div><div><span id="deskLanguage" class="language-chip">Listener calls</span><h2 id="deskTitle">You are offline</h2><p id="deskText">Go online when you are ready.</p></div></section>
-        <details class="panel activity-panel compact-details"><summary><span><b>Availability activity</b></span><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button></summary><div id="activityList" class="activity-list"></div></details>
+        <section class="listener-availability-console"><div><span id="deskLanguage" class="language-chip">Listener calls</span><h2 id="deskTitle">You are offline</h2><p id="deskText">Go online when you are ready.</p></div><div class="shift-buttons"><button id="onlineBtn" class="button button-primary" type="button">Go online</button><button id="breakBtn" class="button button-soft" type="button" disabled>Take break</button><button id="offlineBtn" class="button button-quiet" type="button" disabled>Go offline</button></div></section>
+        <div class="stats talk-stats listener-home-stats"><article><small>Today</small><strong id="todayTime">0:00</strong></article><article><small>This week</small><strong id="weekTime">0:00</strong></article><article><small>Calls</small><strong id="totalCalls">0</strong></article><article><small>All time</small><strong id="totalTime">0:00</strong></article></div>
+        <details class="activity-drawer"><summary>Availability activity <span>›</span></summary><div class="activity-drawer-body"><button id="refreshActivity" class="button button-quiet button-small" type="button">Refresh</button><div id="activityList" class="activity-list"></div></div></details>
       </section>
 
       <section id="tab-posts" class="tab">
@@ -130,21 +130,15 @@
       </section>
 
       <section id="tab-wallet" class="tab">
-        <section class="wallet-hero">
-          <div><span class="eyebrow">EARNINGS</span><h2>Available balance</h2><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus" class="hidden"></p></div>
-          <div class="wallet-rate-card"><small>Your rate</small><strong id="walletRate">₹0.00/min</strong></div>
+        <div class="listener-wallet-title"><span class="eyebrow">EARNINGS</span><h1>Your wallet</h1></div>
+        <section class="wallet-balance-card"><div><small>Available balance</small><strong id="walletBalance">₹0.00</strong><p id="walletPaymentStatus" class="hidden"></p></div><div class="wallet-rate-card"><small>Per minute</small><strong id="walletRate">₹0.00/min</strong></div></section>
+        <section class="wallet-payout-card">
+          <div class="wallet-payout-head"><div><span class="eyebrow">UPI PAYOUT</span><h2>Request withdrawal</h2></div><button id="changePayoutDetails" class="wallet-change" type="button">Change</button></div>
+          <div class="wallet-destination"><div><small>UPI ID</small><strong id="payoutUpiDisplay">Not added</strong></div><div><small>Linked phone</small><strong id="payoutPhoneDisplay">Not added</strong></div></div>
+          <form id="payoutDetailsForm" class="wallet-payout-edit stack hidden"><label>UPI ID<input id="listenerUpiId" autocomplete="off" placeholder="name@bank" maxlength="120" required></label><label>UPI-linked phone<input id="listenerUpiPhone" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+919876543210" required></label><div class="wallet-edit-actions"><button id="cancelPayoutDetails" class="button button-quiet" type="button">Cancel</button><button class="button button-soft" type="submit">Save payout details</button></div></form>
+          <form id="withdrawalForm" class="wallet-withdraw-form"><label>Amount<input id="withdrawalAmount" type="number" min="100" step="1" inputmode="decimal" placeholder="₹100 minimum" required></label><button class="button button-primary" type="submit">Request withdrawal</button></form>
         </section>
-        <div class="wallet-metrics"><article><small>Today</small><strong id="walletToday">₹0.00</strong></article><article><small>Week</small><strong id="walletWeek">₹0.00</strong></article><article><small>Lifetime</small><strong id="walletLifetime">₹0.00</strong></article><article><small>Paid</small><strong id="walletPaid">₹0.00</strong></article></div>
-        <div class="wallet-grid">
-          <section class="panel withdrawal-panel">
-            <span class="eyebrow">WITHDRAW</span><h2>UPI payout</h2>
-            <form id="payoutDetailsForm" class="stack compact-form"><label>UPI ID<input id="listenerUpiId" autocomplete="off" placeholder="name@bank" maxlength="120" required></label><label>UPI-linked phone <small>Optional</small><input id="listenerUpiPhone" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="+919876543210"></label><button class="button button-soft" type="submit">Save payout details</button></form>
-            <form id="withdrawalForm" class="stack compact-form"><label>Amount (₹)<input id="withdrawalAmount" type="number" min="100" step="1" inputmode="decimal" placeholder="Minimum ₹100" required></label><button class="button button-primary" type="submit">Request withdrawal</button></form>
-            
-            <div id="withdrawalHistory" class="withdrawal-history"></div>
-          </section>
-          <section class="panel wallet-history-panel"><div class="section-head compact"><div><span class="eyebrow">LEDGER</span><h2>Wallet history</h2></div><button id="refreshWallet" class="button button-quiet" type="button">Refresh</button></div><div id="walletHistory" class="wallet-history"></div></section>
-        </div>
+        <div id="walletToday" class="hidden">₹0.00</div><div id="walletWeek" class="hidden">₹0.00</div><div id="walletLifetime" class="hidden">₹0.00</div><div id="walletPaid" class="hidden">₹0.00</div><button id="refreshWallet" class="hidden" type="button">Refresh</button><div id="walletHistory" class="hidden"></div><div id="withdrawalHistory" class="hidden"></div>
       </section>
 
       <section id="tab-profile" class="tab">
@@ -189,6 +183,7 @@
             <summary><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/></svg></span><span><b>Account security</b></span><svg class="settings-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
             <form id="passwordForm" class="stack listener-settings-body"><label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-primary">Update password</button></form>
           </details>
+          <button id="settingsPayoutChange" class="listener-settings-item settings-action-row" type="button"><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v11H4z"/><path d="M4 10h16M15 14h3"/></svg></span><span><b>Payout details</b><small>UPI ID and linked phone</small></span><svg class="settings-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
           <section class="listener-settings-item updates-item"><div class="settings-static-head"><span class="listener-settings-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Updates</b></span></div><div id="notificationList" class="settings-notification-list"></div></section>
         </div>
       </section>
@@ -233,6 +228,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.3"></script><script src="/shared/socket-loader.js?v=8.9.3"></script><script src="api.js?v=8.9.3"></script><script src="/shared/webrtc.js?v=8.9.3"></script><script src="app.js?v=8.9.3"></script>
+  <script src="config.js?v=8.9.4"></script><script src="/shared/socket-loader.js?v=8.9.3"></script><script src="api.js?v=8.9.4"></script><script src="/shared/webrtc.js?v=8.9.3"></script><script src="app.js?v=8.9.4"></script>
 </body>
 </html>

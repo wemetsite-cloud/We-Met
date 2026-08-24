@@ -461,8 +461,30 @@
     finally { button.disabled = false; }
   }
 
+  function dailyShuffle(items) {
+    const copy = [...items];
+    const stamp = new Date().toISOString().slice(0, 10);
+    let seed = [...stamp].reduce((n, char) => ((n * 33) ^ char.charCodeAt(0)) >>> 0, 5381);
+    for (let i = copy.length - 1; i > 0; i--) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const j = seed % (i + 1); [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  async function loadPublicShowcase() {
+    try {
+      const response = await P.api('/api/public/showcase-images', { cache: 'no-store' });
+      const images = dailyShuffle(Array.isArray(response.images) ? response.images : []);
+      if (!images.length) return;
+      const hero = $('#publicHeroListenerImage'); if (hero) hero.src = images[0];
+      const frame = $('#publicListenerShowcase');
+      if (frame) frame.innerHTML = Array.from({ length: Math.min(3, images.length) }, (_, index) => `<img src="${esc(images[index % images.length])}" alt="">`).join('');
+    } catch {}
+  }
+
   async function init() {
-    initNavigation(); bind(); registerServiceWorker(); syncInstallControls();
+    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); loadPublicShowcase();
     try { publicConfig = await P.api('/api/public/config'); } catch (error) { P.toast(error.message, 'error'); }
     if (P.Store.token) await loadMe();
   }

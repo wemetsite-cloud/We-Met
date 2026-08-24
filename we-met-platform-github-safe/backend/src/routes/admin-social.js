@@ -34,6 +34,35 @@ router.use((req, res, next) => {
   return next();
 });
 
+
+router.get('/showcase-images', asyncHandler(async (_req, res) => {
+  const result = await db.query("SELECT value,updated_at FROM platform_settings WHERE key='listener_showcase_images'");
+  let images = [];
+  try {
+    const parsed = JSON.parse(result.rows[0]?.value || '[]');
+    if (Array.isArray(parsed)) images = parsed.filter((item) => /^data:image\/(?:jpeg|png|webp);base64,/i.test(String(item || ''))).slice(0, 12);
+  } catch {}
+  res.json({ images, updatedAt: result.rows[0]?.updated_at || null });
+}));
+
+router.patch('/showcase-images', asyncHandler(async (req, res) => {
+  if (!Array.isArray(req.body.images)) return res.status(400).json({ error: 'Send an image list.' });
+  const images = req.body.images.map((item) => String(item || '')).filter(Boolean);
+  if (images.length > 12) return res.status(400).json({ error: 'Keep up to 12 showcase photos.' });
+  if (images.some((item) => !/^data:image\/(?:jpeg|png|webp);base64,/i.test(item))) {
+    return res.status(400).json({ error: 'Use JPG, PNG or WebP showcase photos.' });
+  }
+  const encoded = JSON.stringify(images);
+  if (encoded.length > 900000) return res.status(413).json({ error: 'The showcase photo set is too large. Remove a photo or use smaller images.' });
+  const result = await db.query(`
+    INSERT INTO platform_settings(key,value,updated_by,updated_at)
+    VALUES('listener_showcase_images',$1,$2,now())
+    ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=now()
+    RETURNING updated_at
+  `, [encoded, req.user.id]);
+  res.json({ images, updatedAt: result.rows[0].updated_at });
+}));
+
 router.get('/verifications', asyncHandler(async (_req, res) => {
   const [setting, submissions] = await Promise.all([
     db.query("SELECT value,updated_at FROM platform_settings WHERE key='listener_verification_prompt'"),

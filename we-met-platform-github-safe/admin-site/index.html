@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#fff8fb">
+  <meta name="theme-color" content="#0b0b0f">
   <meta name="description" content="Secure We Met operations dashboard for accounts, listener activity, calls, wallet records and support.">
   <title>We Met Operations</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.3">
-  <link rel="stylesheet" href="style.css?v=8.9.3">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.4">
+  <link rel="stylesheet" href="style.css?v=8.9.4">
 </head>
 <body>
   <div id="loginView" class="login-screen">
@@ -33,6 +33,7 @@
         <button data-page="verifications"><b>✓</b><span>Verifications</span></button>
         <button data-page="payments"><b>₹</b><span>Payments</span></button>
         <button data-page="content"><b>▦</b><span>Listener posts</span></button>
+        <button data-page="showcase"><b>▧</b><span>Public images</span></button>
         <button data-page="wallets"><b>₹</b><span>Listener wallets</span></button>
         <button data-page="withdrawals"><b>↗</b><span>Withdrawals</span></button>
         <button data-page="plans"><b>◇</b><span>Plans</span></button>
@@ -103,6 +104,16 @@
           <div id="adminPostGallery" class="admin-post-gallery"></div>
         </section>
 
+
+        <section id="page-showcase" class="page">
+          <div class="toolbar"><div><span class="eyebrow">PUBLIC LISTENER VISUALS</span><h2>Daily shuffled images</h2><p>Add up to 12 portrait photos. They appear only as visual previews on public/customer/listener screens and shuffle each day.</p></div><button id="reloadShowcaseImages" class="ghost" type="button">Refresh</button></div>
+          <section class="panel showcase-admin-panel">
+            <div class="showcase-upload-row"><div><b>Add photos</b><small>JPG, PNG or WebP · compressed before upload</small></div><input id="showcaseImageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button id="chooseShowcaseImages" class="primary" type="button">Choose photos</button></div>
+            <div id="showcaseAdminGrid" class="showcase-admin-grid"></div>
+            <div class="showcase-save-row"><small id="showcaseImageCount">0 / 12 photos</small><button id="saveShowcaseImages" class="primary" type="button">Save image set</button></div>
+          </section>
+        </section>
+
         <section id="page-wallets" class="page">
           <div class="toolbar"><div><span class="eyebrow">ADMIN-MANAGED EARNINGS</span><h2>Listener balances and payment records</h2><p>Listeners only see their earnings ledger. Adjust balances here and record a payment after you pay a listener using your agreed offline method.</p></div><div class="toolbar-actions"><input id="walletSearch" placeholder="Search listener, phone or employee ID"><button id="reloadWallets" class="ghost">Refresh</button></div></div>
           <div class="customer-overview-strip wallet-overview-strip"><article><small>Listener wallets</small><strong id="listenerWalletCount">0</strong></article><article><small>Total unpaid balance</small><strong id="listenerWalletBalance">₹0.00</strong></article><article><small>Lifetime earnings</small><strong id="listenerWalletEarned">₹0.00</strong></article><article><small>Lifetime recorded paid</small><strong id="listenerWalletPaid">₹0.00</strong></article></div>
@@ -126,6 +137,6 @@
 
   <datalist id="listenerLanguages"><option value="Malayalam"><option value="English"><option value="Hindi"><option value="Tamil"><option value="Kannada"><option value="Telugu"></datalist>
   <div id="actionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-card profile-modal"><button id="closeModal" class="close" type="button" aria-label="Close">×</button><h2 id="modalTitle">Account details</h2><div id="modalBody"></div></div></div>
-  <script src="config.js?v=8.9.3"></script><script src="api.js?v=8.9.3"></script><script src="app.js?v=8.9.3"></script>
+  <script src="config.js?v=8.9.4"></script><script src="api.js?v=8.9.4"></script><script src="app.js?v=8.9.4"></script>
 </body>
 </html>

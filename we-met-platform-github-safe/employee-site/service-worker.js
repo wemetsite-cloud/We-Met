@@ -1,4 +1,4 @@
-const VERSION = '8.9.3';
+const VERSION = '8.9.4';
 const CACHE_PREFIX = 'we-met-listener-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = ['./','index.html','style.css','app.js','api.js','config.js','manifest.webmanifest','/shared/socket-loader.js','/shared/webrtc.js','/shared/logo.svg','/shared/favicon.png','/shared/icon-192.png','/shared/icon-512.png','/shared/default-listener-banner.png'];

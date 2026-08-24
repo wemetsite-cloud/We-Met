@@ -26,6 +26,7 @@
   let adminPayments = { subscriptions: [], payments: [], topups: [], summary: {} };
   let verificationAudioUrls = [];
   let adminPostUrls = [];
+  let showcaseImages = [];
   let activePage = 'overview';
   let liveRefreshTimer = null;
   const queueFilters = { verifications: 'new', withdrawals: 'new', reports: 'new', support: 'new' };
@@ -37,6 +38,7 @@
     verifications: ['Verifications', 'Review listener voice recordings and control the Malayalam prompt'],
     payments: ['Payments', 'Top-ups, listener memberships and subscription credits'],
     content: ['Listener posts', 'Review and moderate exclusive listener photos'],
+    showcase: ['Public images', 'Manage daily shuffled listener preview photos'],
     wallets: ['Listener wallets', 'Adjust earnings balances and record manual payments'],
     withdrawals: ['Withdrawals', 'Review UPI requests and record successful bank UTR references'],
     plans: ['Plans', 'Talk-time pricing available after customer sign-in'],
@@ -209,6 +211,10 @@
     $('#reloadVerifications').onclick = loadVerifications;
     $('#reloadPayments').onclick = loadPayments;
     $('#reloadAdminPosts').onclick = loadAdminPosts;
+    $('#reloadShowcaseImages').onclick = loadShowcaseImages;
+    $('#chooseShowcaseImages').onclick = () => $('#showcaseImageInput').click();
+    $('#showcaseImageInput').onchange = addShowcaseImages;
+    $('#saveShowcaseImages').onclick = saveShowcaseImages;
 
     $('#customerSearch').oninput = renderCustomers;
     $('#listenerSearch').oninput = renderEmployees;
@@ -253,6 +259,7 @@
     if (d.verificationReject) return reviewVerification(d.verificationReject, 'reject');
     if (d.listenerVerification) return setListenerVerification(d.listenerVerification, d.required === 'true');
     if (d.adminPostDelete) return deleteAdminPost(d.adminPostDelete);
+    if (d.showcaseRemove !== undefined) return removeShowcaseImage(Number(d.showcaseRemove));
     if (d.userProfile) return showDetails(d.userProfile);
   }
 
@@ -334,6 +341,7 @@
       verifications: loadVerifications,
       payments: loadPayments,
       content: loadAdminPosts,
+      showcase: loadShowcaseImages,
       wallets: loadListenerWallets,
       withdrawals: loadWithdrawals,
       plans: loadPlans,
@@ -344,6 +352,75 @@
       audit: loadAudit,
     };
     loaders[name]?.();
+  }
+
+  function renderShowcaseImages() {
+    const grid = $('#showcaseAdminGrid');
+    if (!grid) return;
+    grid.innerHTML = showcaseImages.length
+      ? showcaseImages.map((src, index) => `<article class="showcase-admin-card"><img src="${P.esc(src)}" alt="Public listener preview ${index + 1}"><button class="danger" data-showcase-remove="${index}" type="button">Remove</button></article>`).join('')
+      : '<div class="showcase-empty"><b>No public images yet</b><span>Add portrait photos to create the daily shuffled preview.</span></div>';
+    $('#showcaseImageCount').textContent = `${showcaseImages.length} / 12 photos`;
+  }
+
+  async function loadShowcaseImages() {
+    try {
+      const response = await P.api('/api/admin/showcase-images');
+      showcaseImages = Array.isArray(response.images) ? response.images.slice(0, 12) : [];
+      renderShowcaseImages();
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function compressShowcaseImage(file) {
+    return new Promise((resolve, reject) => {
+      if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) return reject(new Error('Choose JPG, PNG or WebP photos.'));
+      if (file.size > 7 * 1024 * 1024) return reject(new Error('Choose photos smaller than 7 MB.'));
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const canvas = document.createElement('canvas'); canvas.width = 300; canvas.height = 400;
+          const ctx = canvas.getContext('2d');
+          const sourceRatio = image.naturalWidth / image.naturalHeight; const targetRatio = 300 / 400;
+          let sx=0,sy=0,sw=image.naturalWidth,sh=image.naturalHeight;
+          if (sourceRatio > targetRatio) { sw = image.naturalHeight * targetRatio; sx = (image.naturalWidth-sw)/2; }
+          else { sh = image.naturalWidth / targetRatio; sy = (image.naturalHeight-sh)/2; }
+          ctx.drawImage(image,sx,sy,sw,sh,0,0,300,400);
+          const result = canvas.toDataURL('image/jpeg', .62);
+          URL.revokeObjectURL(url);
+          if (result.length > 65000) return reject(new Error('One photo is still too large after compression. Choose a simpler image.'));
+          resolve(result);
+        } catch (error) { URL.revokeObjectURL(url); reject(error); }
+      };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That image could not be read.')); };
+      image.src = url;
+    });
+  }
+
+  async function addShowcaseImages(event) {
+    const files = [...(event.target.files || [])]; event.target.value = '';
+    if (!files.length) return;
+    const room = Math.max(0, 12 - showcaseImages.length);
+    if (!room) return P.toast('You already have 12 showcase photos.', 'error');
+    try {
+      for (const file of files.slice(0, room)) showcaseImages.push(await compressShowcaseImage(file));
+      renderShowcaseImages();
+      P.toast('Photos added. Press Save image set.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+  }
+
+  function removeShowcaseImage(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= showcaseImages.length) return;
+    showcaseImages.splice(index, 1); renderShowcaseImages();
+  }
+
+  async function saveShowcaseImages() {
+    const button = $('#saveShowcaseImages'); button.disabled = true;
+    try {
+      await P.api('/api/admin/showcase-images', { method: 'PATCH', body: JSON.stringify({ images: showcaseImages }) });
+      P.toast('Public image set saved. The order will shuffle daily.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
   }
 
   async function loadDashboard() {
