@@ -164,6 +164,12 @@
       return this.muted;
     }
 
+    isConnected() {
+      if (!this.peer || this.peer.signalingState === 'closed' || !this.localStream?.active) return false;
+      return this.peer.connectionState === 'connected'
+        || ['connected', 'completed'].includes(this.peer.iceConnectionState);
+    }
+
     stopPeerOnly() {
       if (this.peer) {
         this.peer.ontrack = null;
