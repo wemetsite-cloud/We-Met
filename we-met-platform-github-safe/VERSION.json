@@ -1,12 +1,13 @@
 {
-  "version": "8.5.0",
-  "name": "We Met v8.5.0 Profiles, Posts and Wallet Checkout",
+  "version": "8.6.0",
+  "name": "We Met v8.6.0 Dedicated Customer Checkout",
   "changes": [
     "Uses the supplied pink artwork as every listener's default banner while keeping custom banner uploads available",
     "Updates listener names, bios, profile photos and banners immediately without a manual refresh or stale media cache",
     "Adds listener-owned post details with like totals, liked-user lists and three-dot Edit or Delete actions",
     "Lets listeners replace a post photo, edit its caption or delete the post through owner-checked backend routes",
-    "Replaces the wallet payment modal with a branded checkout page inside the Wallet tab and restores Wallet after Razorpay back or cancel",
+    "Removes the old inline wallet payment section and opens every talk-time pack in a dedicated customer-only checkout page",
+    "Keeps the branded checkout page behind Razorpay so secure payment opens without a blank white intermediary page",
     "Loads Razorpay Checkout only when needed and permits its script and secure frames in static-deployment security headers",
     "Moves the customer profile-photo edit badge outside the circular crop so it remains fully visible",
     "Introduces phone-first OTP onboarding with password login for returning customers and listeners",

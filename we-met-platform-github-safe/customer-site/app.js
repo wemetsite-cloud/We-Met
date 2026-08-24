@@ -6,7 +6,7 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const show = (selector, visible = true) => $(selector)?.classList.toggle('hidden', !visible);
   const esc = P.esc;
-  const NAV_MARKER = 'we-met-customer-v85';
+  const NAV_MARKER = 'we-met-customer-v86';
   const VALID_TABS = new Set(['home', 'subscriptions', 'messages', 'wallet', 'profile', 'history', 'following', 'notifications', 'support']);
   const TAB_PARENT = { history: 'profile', following: 'profile', notifications: 'profile', support: 'profile' };
 
@@ -31,12 +31,10 @@
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
   let directPollTimer = null;
-  let pendingWalletCheckout = null;
   let pendingMembershipCheckout = null;
   let pendingCallRequest = null;
   let razorpayLoader = null;
   let activeListenerProfileId = null;
-  let activeWalletRazorpay = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
     P.toast(event.detail?.message || 'Your session expired. Please start again.', 'error');
@@ -115,27 +113,19 @@
   }
 
   function initNavigation() {
-    history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title);
+    const requestedTab = new URLSearchParams(location.search).get('tab');
+    activeTab = VALID_TABS.has(requestedTab) ? requestedTab : 'home';
+    history.replaceState({ marker: NAV_MARKER, tab: activeTab }, document.title);
     window.addEventListener('popstate', (event) => {
-      const wasRazorpayOpen = document.body.classList.contains('razorpay-open');
-      if (wasRazorpayOpen && activeWalletRazorpay) {
-        const checkout = activeWalletRazorpay;
-        activeWalletRazorpay = null;
-        try { checkout.close(); } catch {}
-      }
       const state = event.state?.marker === NAV_MARKER
         ? event.state
-        : { tab: wasRazorpayOpen && pendingWalletCheckout ? 'wallet' : (activeTab || 'home') };
+        : { tab: activeTab || 'home' };
       ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
       if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
       document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
-      if (pendingWalletCheckout && state.tab === 'wallet') {
-        show('#walletCheckoutSection');
-        $('#tab-wallet').classList.add('wallet-checkout-active');
-      }
       if (state.overlay !== 'listenerProfileModal') { activeListenerProfileId = null; releasePostUrls(); }
       syncBodyState();
     });
@@ -274,7 +264,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.5.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.6.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -309,8 +299,6 @@
     $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
-    $('#walletCheckoutPay').onclick = beginWalletCheckout;
-    $('#walletCheckoutBack').onclick = closeWalletCheckout;
     $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
     $('#couponForm').onsubmit = redeem;
     $('#supportForm').onsubmit = sendSupport;
@@ -413,8 +401,10 @@
     $('#profilePhoneText').textContent = me.phone || 'Private mobile';
     $('#profilePhone').textContent = me.phone || 'Private mobile';
     updateBalance(me.balanceSeconds);
+    const requestedTab = activeTab;
     await Promise.allSettled([loadSubscriptions(false), loadDirectory(), loadConversations(), loadPlans(), loadHistory(), loadFollowing(), loadNotifications(), loadSupport(), loadCustomerPhoto()]);
     renderSubscriptions(); renderDirectory(); connectSocket();
+    if (requestedTab !== 'home') selectTab(requestedTab, { historyMode: 'none' });
     clearInterval(directPollTimer);
     directPollTimer = window.setInterval(() => {
       if (activeTab !== 'messages') return;
@@ -426,15 +416,9 @@
 
   async function logout(clear = true) {
     if (clear) P.Store.clear();
-    if (activeWalletRazorpay) {
-      const checkout = activeWalletRazorpay;
-      activeWalletRazorpay = null;
-      try { checkout.close(); } catch {}
-    }
     clearInterval(directPollTimer);
     clearPendingCallRequest();
     currentCall = null;
-    pendingWalletCheckout = null;
     pendingMembershipCheckout = null;
     activeListenerProfileId = null;
     socket?.disconnect();
@@ -445,8 +429,6 @@
     if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
     customerPhotoObjectUrl = '';
     document.body.classList.remove('signed-in', 'razorpay-open');
-    $('#tab-wallet').classList.remove('wallet-checkout-active');
-    show('#walletCheckoutSection', false);
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
     activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
   }
@@ -688,114 +670,14 @@
 
   async function loadPlans() {
     if (!me) return;
-    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''} ${pendingWalletCheckout?.plan?.id === plan.id ? 'selected' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
+    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
     catch (error) { P.toast(error.message, 'error'); }
   }
 
-  function openPayment(planId, button) {
+  function openPayment(planId) {
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
-    pendingWalletCheckout?.button?.removeAttribute('disabled');
-    pendingWalletCheckout = { plan, button };
-    $('#walletCheckoutContent').innerHTML = `<div class="wallet-checkout-summary"><span class="wallet-checkout-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>minutes</small></span><div><small>Talk-time pack</small><h2 id="walletCheckoutTitle">${esc(plan.name)}</h2><p>Added after secure payment confirmation.</p></div><strong>${P.money(plan.price_paise)}</strong></div><div class="wallet-checkout-trust"><span>Secure payment</span><span>Connected-second billing</span><span>No card data stored by We Met</span></div>`;
-    $('#walletCheckoutStatus').className = 'wallet-checkout-status hidden';
-    $('#walletCheckoutStatus').textContent = '';
-    $('#walletCheckoutPay').textContent = `Pay ${P.money(plan.price_paise)}`;
-    $('#walletCheckoutPay').disabled = false;
-    show('#walletCheckoutPay');
-    show('#walletCheckoutSection');
-    $('#tab-wallet').classList.add('wallet-checkout-active');
-    $$('.wallet-plan-card').forEach((card) => card.classList.toggle('selected', card.contains(button)));
-    if (activeTab !== 'wallet') selectTab('wallet', { historyMode: 'none' });
-    history.replaceState({ marker: NAV_MARKER, tab: 'wallet', checkout: 'wallet' }, document.title);
-    window.setTimeout(() => $('#walletCheckoutSection').scrollIntoView({ behavior: 'smooth', block: 'center' }), 40);
-  }
-
-  function closeWalletCheckout() {
-    pendingWalletCheckout?.button?.removeAttribute('disabled');
-    pendingWalletCheckout = null;
-    $('#tab-wallet').classList.remove('wallet-checkout-active');
-    show('#walletCheckoutSection', false);
-    show('#walletCheckoutPay');
-    $('#walletCheckoutSection').removeAttribute('aria-busy');
-    $('#walletCheckoutStatus').className = 'wallet-checkout-status hidden';
-    $('#walletCheckoutStatus').textContent = '';
-    $$('.wallet-plan-card').forEach((card) => card.classList.remove('selected'));
-    if (me) {
-      if (activeTab !== 'wallet') selectTab('wallet', { historyMode: 'none' });
-      history.replaceState({ marker: NAV_MARKER, tab: 'wallet' }, document.title);
-      window.setTimeout(() => $('#plansGrid').scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
-    }
-  }
-
-  function showWalletCheckoutResult(message, type = 'info') {
-    const statusNode = $('#walletCheckoutStatus');
-    statusNode.className = `wallet-checkout-status ${type}`;
-    statusNode.textContent = message;
-    show('#walletCheckoutStatus');
-  }
-
-  async function beginWalletCheckout() {
-    if (!pendingWalletCheckout) return;
-    const { plan, button } = pendingWalletCheckout;
-    const payButton = $('#walletCheckoutPay');
-    payButton.disabled = true;
-    payButton.textContent = 'Opening secure checkout…';
-    button?.setAttribute('disabled', '');
-    showWalletCheckoutResult('Preparing Razorpay inside your We Met wallet.', 'loading');
-    try {
-      await loadRazorpayCheckout();
-      const order = await P.api('/api/create-order', { method: 'POST', body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }) });
-      document.body.classList.add('razorpay-open');
-      $('#walletCheckoutSection').setAttribute('aria-busy', 'true');
-      history.replaceState({ marker: NAV_MARKER, tab: 'wallet', checkout: 'razorpay' }, document.title);
-      let handled = false;
-      const restore = ({ settled = false, error = '', reference = '', message = '' } = {}) => {
-        activeWalletRazorpay = null;
-        button?.removeAttribute('disabled');
-        payButton.disabled = false;
-        payButton.textContent = `Pay ${P.money(plan.price_paise)}`;
-        document.body.classList.remove('razorpay-open');
-        $('#walletCheckoutSection').removeAttribute('aria-busy');
-        if (activeTab !== 'wallet') selectTab('wallet', { historyMode: 'none' });
-        show('#walletCheckoutSection');
-        history.replaceState({ marker: NAV_MARKER, tab: 'wallet', checkout: settled ? 'result' : 'wallet' }, document.title);
-        if (!settled) {
-          showWalletCheckoutResult('Payment window closed. You are still in your wallet and can continue when ready.', 'info');
-          return;
-        }
-        pendingWalletCheckout = null;
-        show('#walletCheckoutPay', false);
-        $$('.wallet-plan-card').forEach((card) => card.classList.remove('selected'));
-        showWalletCheckoutResult(error
-          ? `${error}${reference ? ` Reference: ${reference}. Do not pay again.` : ' Do not pay again until support checks it.'}`
-          : (message || 'Payment verified. Your talk-time is ready.'), error ? 'error' : 'success');
-      };
-      const checkout = new window.Razorpay({ key: order.key_id, amount: order.amount, currency: order.currency, order_id: order.order_id, name: 'We Met', description: `Wallet · ${plan.name} · ${Math.round(plan.seconds / 60)} minutes`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, retry: { enabled: true }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(); } }, handler: async (payment) => {
-        handled = true;
-        try {
-          const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
-          updateBalance(verified.balance_seconds);
-          await loadHistory();
-          restore({ settled: true, message: verified.message || 'Talk-time added.' });
-          P.toast(verified.message || 'Talk-time added.', 'success');
-        } catch (error) {
-          restore({ settled: true, error: error.message, reference: payment.razorpay_payment_id || '' });
-          P.toast('Payment needs verification. Do not pay again; use the reference shown in your wallet.', 'error');
-        }
-      } });
-      activeWalletRazorpay = checkout;
-      checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Payment failed.', 'error')); checkout.open();
-    } catch (error) {
-      activeWalletRazorpay = null;
-      button?.removeAttribute('disabled');
-      payButton.disabled = false;
-      payButton.textContent = `Pay ${P.money(plan.price_paise)}`;
-      $('#walletCheckoutSection').removeAttribute('aria-busy');
-      document.body.classList.remove('razorpay-open');
-      showWalletCheckoutResult(error.message, 'error');
-      P.toast(error.message, 'error');
-    }
+    window.location.assign(`checkout.html?plan=${encodeURIComponent(plan.id)}`);
   }
 
   async function redeem(event) {

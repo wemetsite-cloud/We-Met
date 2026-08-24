@@ -1,9 +1,12 @@
-const VERSION = '8.5.0';
+const VERSION = '8.6.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
   './',
   'index.html',
+  'checkout.html',
+  'checkout.css',
+  'checkout.js',
   'style.css',
   'app.js',
   'api.js',
