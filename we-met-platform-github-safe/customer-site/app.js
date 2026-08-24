@@ -34,7 +34,10 @@
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
   let directPollTimer = null;
+  let pendingMembershipCheckout = null;
   let pendingCallRequest = null;
+  let razorpayLoader = null;
+  let activeWalletCheckout = null;
   let activeListenerProfileId = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
@@ -86,7 +89,7 @@
   }
 
   function currentOverlay() {
-    return ['customerPostFeed', 'listenerProfileModal', 'authModal', 'customerRecoveryModal', 'preloginSupportModal', 'legalModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
+    return ['customerPostFeed', 'listenerProfileModal', 'authModal', 'customerRecoveryModal', 'preloginSupportModal', 'legalModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
   function syncBodyState() {
@@ -107,6 +110,7 @@
     if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
     document.getElementById(id)?.classList.add('hidden');
     if (id === 'listenerProfileModal') { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
+    if (id === 'membershipCheckoutModal') pendingMembershipCheckout = null;
     syncBodyState();
   }
 
@@ -128,7 +132,9 @@
       const state = event.state?.marker === NAV_MARKER
         ? event.state
         : { tab: activeTab || 'home' };
-      ['authModal', 'customerRecoveryModal', 'preloginSupportModal', 'listenerProfileModal', 'customerPostFeed', 'legalModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      ['authModal', 'customerRecoveryModal', 'preloginSupportModal', 'listenerProfileModal', 'customerPostFeed', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
+      document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
@@ -331,7 +337,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.1', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -370,6 +376,7 @@
     $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
+    $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
     $('#couponForm').onsubmit = redeem;
     $('#supportForm').onsubmit = sendSupport;
     $('#passwordForm').onsubmit = changePassword;
@@ -496,6 +503,7 @@
     clearInterval(directPollTimer);
     clearPendingCallRequest();
     currentCall = null;
+    pendingMembershipCheckout = null;
     activeListenerProfileId = null;
     socket?.disconnect();
     audioCall?.stop();
@@ -504,7 +512,7 @@
     liveListeners = [];
     if (customerPhotoObjectUrl) URL.revokeObjectURL(customerPhotoObjectUrl);
     customerPhotoObjectUrl = '';
-    document.body.classList.remove('signed-in');
+    document.body.classList.remove('signed-in', 'razorpay-open');
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
     activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
   }
@@ -635,90 +643,87 @@
     node.innerHTML = subscriptions.length ? subscriptions.map((item) => `<article class="membership-card ${item.active ? 'active' : 'expired'}"><div class="membership-listener"><img src="${esc(listenerImage({ ...item, id: item.listenerId, profileImage: item.listenerImage }))}" alt=""><div><span>${item.active ? 'ACTIVE MEMBERSHIP' : esc(String(item.status).toUpperCase())}</span><h3>${esc(item.listenerName)}</h3><p>${esc(item.language)}</p></div></div><div class="membership-date"><small>${item.active ? 'Access until' : 'Last updated'}</small><strong>${P.date(item.currentPeriodEnd)}</strong></div><div class="membership-actions"><button class="button button-soft" data-listener-profile="${esc(item.listenerId)}" type="button">View profile</button>${item.active ? `<button class="button button-primary" data-listener-message="${esc(item.listenerId)}" type="button">Message${item.unreadCount ? ` · ${item.unreadCount}` : ''}</button>` : ''}${item.active && !item.cancelAtCycleEnd ? `<button class="text-action" data-cancel-subscription="${esc(item.id)}" type="button">Turn off renewal</button>` : item.cancelAtCycleEnd ? '<small>Renewal is off</small>' : ''}</div></article>`).join('') : emptyState('No listener memberships yet', 'Open a listener profile and subscribe to unlock their exclusive posts and messages.');
   }
 
-  function ensureRazorpayReady() {
-    if (typeof window.Razorpay !== 'function') {
-      P.toast('Secure checkout could not load. Check your connection and try again.', 'error');
-      return false;
-    }
-    return true;
+  function loadRazorpayCheckout() {
+    if (typeof window.Razorpay === 'function') return Promise.resolve(window.Razorpay);
+    if (razorpayLoader) return razorpayLoader;
+    razorpayLoader = new Promise((resolve, reject) => {
+      document.querySelector('script[data-we-met-razorpay]')?.remove();
+      const script = document.createElement('script');
+      let timeout = 0;
+      const cleanup = () => { clearTimeout(timeout); script.onload = null; script.onerror = null; };
+      script.onload = () => {
+        cleanup();
+        if (typeof window.Razorpay === 'function') resolve(window.Razorpay);
+        else reject(new Error('Secure checkout did not initialize. Please try again.'));
+      };
+      script.onerror = () => { cleanup(); script.remove(); reject(new Error('Secure checkout could not load. Check your connection and try again.')); };
+      timeout = window.setTimeout(() => {
+        cleanup();
+        script.remove();
+        reject(new Error('Secure checkout is taking too long to load. Please try again.'));
+      }, 15000);
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.dataset.weMetRazorpay = 'true';
+      document.head.appendChild(script);
+    }).catch((error) => {
+      razorpayLoader = null;
+      throw error;
+    });
+    return razorpayLoader;
   }
 
-  async function subscribeToListener(listenerId, button = null) {
-    if (!me) {
-      P.toast('Sign in before starting a subscription.', 'info');
-      return openAuth();
-    }
-    if (!ensureRazorpayReady()) return;
+  async function subscribeToListener(listenerId, button) {
+    const listener = directory.find((item) => item.id === listenerId) || { id: listenerId, name: 'this listener' };
+    pendingMembershipCheckout = { listenerId, listener, button };
+    $('#membershipCheckoutContent').innerHTML = `<div class="wallet-checkout-summary membership-summary"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="" draggable="false"><div><small>Exclusive membership</small><h2 id="membershipCheckoutTitle">${esc(listener.name)}</h2><p>Posts and direct messages for this listener.</p></div><strong>₹399</strong></div><div class="wallet-checkout-trust"><span>Listener-specific access</span><span>Renews monthly</span><span>Calls still use wallet minutes</span></div>`;
+    $('#membershipCheckoutPay').textContent = 'Subscribe securely · ₹399';
+    openOverlay('membershipCheckoutModal');
+  }
 
-    const listener = directory.find((item) => item.id === listenerId) || { id: listenerId, name: 'Listener' };
-    const originalLabel = button?.textContent || 'Subscribe';
-    button?.setAttribute('disabled', '');
-
+  async function beginMembershipCheckout() {
+    if (!pendingMembershipCheckout) return;
+    const { listenerId, button } = pendingMembershipCheckout;
+    const payButton = $('#membershipCheckoutPay');
+    payButton.disabled = true; button?.setAttribute('disabled', '');
     try {
-      const order = await P.api('/api/subscriptions/create', {
-        method: 'POST',
-        body: JSON.stringify({ employeeId: listenerId }),
-      });
-      if (!order?.subscription_id || !order?.key_id) {
-        throw new Error('Secure subscription checkout could not start. Please try again.');
-      }
-
+      await loadRazorpayCheckout();
+      const order = await P.api('/api/subscriptions/create', { method: 'POST', body: JSON.stringify({ employeeId: listenerId }) });
+      document.body.classList.add('razorpay-open');
+      $('#membershipCheckoutModal').setAttribute('aria-busy', 'true');
       let handled = false;
-      let paymentFailureShown = false;
-      const checkout = new window.Razorpay({
-        key: order.key_id,
-        subscription_id: order.subscription_id,
-        name: publicConfig?.appName || 'We Met',
-        description: `${order.listener?.name || listener.name} · Exclusive ₹399/month`,
-        image: new URL('/shared/icon-192.png', window.location.origin).href,
-        prefill: {
-          name: me.name || '',
-          contact: me.phone || '',
-        },
-        readonly: { contact: true },
-        remember_customer: false,
-        theme: { color: '#e62d7d' },
-        modal: {
-          ondismiss: () => {
-            button?.removeAttribute('disabled');
-            if (button) button.textContent = originalLabel;
-            if (!handled && !paymentFailureShown) {
-              P.toast('Subscription checkout closed. No membership was activated.', 'info');
-            }
-          },
-        },
-        handler: async (payment) => {
-          handled = true;
-          try {
-            const verified = await P.api('/api/subscriptions/verify', {
-              method: 'POST',
-              timeout: 30000,
-              body: JSON.stringify(payment),
-            });
-            await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]);
-            P.toast(verified.message || 'Exclusive membership is active.', 'success');
-            if (activeListenerProfileId === listenerId) openListenerProfile(listenerId);
-          } catch (error) {
-            const reference = payment?.razorpay_payment_id || 'unavailable';
-            P.toast(`${error.message || 'Subscription verification failed.'} · Ref ${reference}`, 'error');
-          } finally {
-            button?.removeAttribute('disabled');
-            if (button) button.textContent = originalLabel;
+      const restore = (settled = false) => {
+        document.body.classList.remove('razorpay-open');
+        $('#membershipCheckoutModal').removeAttribute('aria-busy');
+        button?.removeAttribute('disabled');
+        payButton.disabled = false;
+        if (!settled) return;
+        pendingMembershipCheckout = null;
+        closeOverlay('membershipCheckoutModal', false);
+      };
+      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('/shared/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+        handled = true;
+        let verifiedSuccessfully = false;
+        try {
+          const verified = await P.api('/api/subscriptions/verify', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
+          await Promise.all([loadSubscriptions(), loadDirectory(), loadConversations()]);
+          verifiedSuccessfully = true;
+          P.toast(verified.message || 'Exclusive membership is active.', 'success');
+        } catch (error) {
+          P.toast(`${error.message}${payment.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error');
+        } finally {
+          restore(true);
+          if (verifiedSuccessfully) {
+            closeOverlay('listenerProfileModal', false);
+            replaceOverlayHistory();
+            openListenerProfile(listenerId);
+          } else {
+            replaceOverlayHistory($('#listenerProfileModal').classList.contains('hidden') ? null : 'listenerProfileModal');
           }
-        },
-      });
-
-      checkout.on('payment.failed', (response) => {
-        paymentFailureShown = true;
-        const reason = response?.error?.description || response?.error?.reason || 'Subscription payment failed. Try again.';
-        P.toast(reason, 'error');
-      });
-      checkout.open();
-    } catch (error) {
-      button?.removeAttribute('disabled');
-      if (button) button.textContent = originalLabel;
-      P.toast(error.message || 'The Razorpay subscription checkout could not be prepared.', 'error');
-    }
+        }
+      } });
+      checkout.on('payment.failed', (response) => P.toast(response?.error?.description || 'Membership payment failed.', 'error')); checkout.open();
+    } catch (error) { button?.removeAttribute('disabled'); payButton.disabled = false; $('#membershipCheckoutModal').removeAttribute('aria-busy'); document.body.classList.remove('razorpay-open'); P.toast(error.message, 'error'); }
   }
 
   async function cancelSubscription(id) {
@@ -780,105 +785,70 @@
     catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function verifyRazorpayCheckout(payment) {
-    const body = JSON.stringify({
-      razorpay_payment_id: payment.razorpay_payment_id,
-      razorpay_order_id: payment.razorpay_order_id,
-      razorpay_signature: payment.razorpay_signature,
-    });
-    let lastError;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        return await P.api('/api/verify-payment', { method: 'POST', body, timeout: 30000 });
-      } catch (error) {
-        lastError = error;
-        if (error.status !== 425 || attempt === 2) throw error;
-        await new Promise((resolve) => window.setTimeout(resolve, 1200 * (attempt + 1)));
-      }
-    }
-    throw lastError;
-  }
-
-  async function openPayment(planId, button = null) {
-    if (!me) {
-      P.toast('Sign in before starting a payment.', 'info');
-      return openAuth();
-    }
+  async function openPayment(planId, button) {
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
-    if (!ensureRazorpayReady()) return;
-
+    if (activeWalletCheckout) return;
     const originalLabel = button?.textContent || `Pay ${P.money(plan.price_paise)}`;
-    button?.setAttribute('disabled', '');
+    if (button) { button.disabled = true; button.textContent = 'Opening…'; }
+    let completed = false;
+    let failureMessage = '';
+    const restore = () => {
+      activeWalletCheckout = null;
+      document.body.classList.remove('razorpay-open');
+      if (button) { button.disabled = false; button.textContent = originalLabel; }
+    };
     try {
+      await loadRazorpayCheckout();
       const order = await P.api('/api/create-order', {
         method: 'POST',
-        body: JSON.stringify({
-          planId: plan.id,
-          amount: Number(plan.price_paise),
-          currency: 'INR',
-          receipt: `checkout_${Date.now()}`,
-        }),
+        body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }),
       });
-      if (!order?.order_id || !order?.key_id) {
-        throw new Error('Secure payment could not start. Please try again.');
-      }
-
-      let paymentHandled = false;
-      let paymentFailureShown = false;
+      if (!order?.order_id || !order?.key_id) throw new Error('Secure payment could not start. Please try again.');
       const checkout = new window.Razorpay({
         key: order.key_id,
         amount: order.amount,
         currency: order.currency,
-        name: publicConfig?.appName || 'We Met',
-        description: `${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
-        image: new URL('/shared/icon-192.png', window.location.origin).href,
         order_id: order.order_id,
-        prefill: {
-          name: me.name || '',
-          contact: me.phone || '',
-        },
+        name: 'We Met',
+        description: `${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
+        image: new URL('/shared/icon-192.png', location.origin).href,
+        prefill: { name: me.name || '', contact: me.phone || '' },
         readonly: { contact: true },
         remember_customer: false,
-        notes: { plan_id: plan.id },
-        theme: { color: '#e62d7d' },
+        redirect: false,
         retry: { enabled: true },
+        theme: { color: '#e62d7d', backdrop_color: '#0c0d10' },
         modal: {
+          backdropclose: false,
+          confirm_close: false,
+          handleback: true,
+          escape: true,
+          animation: false,
           ondismiss: () => {
-            button?.removeAttribute('disabled');
-            if (button) button.textContent = originalLabel;
-            if (!paymentHandled && !paymentFailureShown) {
-              P.toast('Payment cancelled. No talk-time was added.', 'info');
-            }
+            restore();
+            if (!completed) P.toast(failureMessage || 'Payment closed. You are still on your wallet.', 'info');
           },
         },
         handler: async (payment) => {
-          paymentHandled = true;
+          completed = true;
           try {
-            const verified = await verifyRazorpayCheckout(payment);
+            const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
             updateBalance(verified.balance_seconds);
             await loadHistory();
-            P.toast(verified.message || 'Payment verified and talk-time added.', 'success');
+            P.toast(verified.message || 'Talk-time added to your wallet.', 'success');
           } catch (error) {
-            const reference = payment?.razorpay_payment_id || 'unavailable';
-            P.toast(`${error.message || 'Payment verification failed.'} · Ref ${reference}`, 'error');
-          } finally {
-            button?.removeAttribute('disabled');
-            if (button) button.textContent = originalLabel;
-          }
+            P.toast(`${error.message}${payment?.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error');
+          } finally { restore(); }
         },
       });
-
-      checkout.on('payment.failed', (response) => {
-        paymentFailureShown = true;
-        const reason = response?.error?.description || response?.error?.reason || 'Payment failed. Try again.';
-        P.toast(reason, 'error');
-      });
+      checkout.on('payment.failed', (response) => { failureMessage = response?.error?.description || 'Payment was not completed.'; });
+      activeWalletCheckout = checkout;
+      document.body.classList.add('razorpay-open');
       checkout.open();
     } catch (error) {
-      button?.removeAttribute('disabled');
-      if (button) button.textContent = originalLabel;
-      P.toast(error.message || 'The Razorpay checkout could not be prepared.', 'error');
+      restore();
+      P.toast(error.message || 'Secure payment could not start. Please try again.', 'error');
     }
   }
 

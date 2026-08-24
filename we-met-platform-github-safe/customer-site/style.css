@@ -514,6 +514,7 @@ body.signed-in{padding-bottom:110px}
 
 .customer-profile-editor{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:18px;padding:25px;background:linear-gradient(145deg,#22242a,#181a1f)}.customer-photo{width:100px;height:100px;border-radius:50%;overflow:hidden;border:5px solid #32343b}.customer-photo img{width:100%;height:100%;object-fit:cover}.customer-profile-editor h2{margin:4px 0}.customer-profile-editor p{margin:3px 0;color:var(--muted);font-size:11px}.customer-profile-editor>form{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;align-items:end}.profile-photo-actions{margin-top:10px}#loginChangeForm{display:none}.mini-listener{display:grid;grid-template-columns:58px 1fr auto;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}.mini-listener img{width:58px;height:58px;border-radius:50%;object-fit:cover}.mini-listener div{display:grid;gap:3px}.mini-listener small{color:var(--muted)}
 
+body.razorpay-open:before{content:"";position:fixed;inset:0;z-index:9998;background:radial-gradient(circle at 50% 30%,rgba(255,47,141,.22),transparent 38%),rgba(12,6,10,.82);backdrop-filter:blur(10px);pointer-events:none}
 .verified-phone-card{display:flex;gap:13px;align-items:flex-start;padding:17px;border:1px solid rgba(255,47,141,.18);border-radius:18px;background:linear-gradient(145deg,rgba(255,47,141,.11),rgba(255,255,255,.025))}.verified-phone-card>span{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:12px;background:var(--pink);color:#fff;font-weight:900}.verified-phone-card h2{font-size:15px;margin:0 0 5px}.verified-phone-card strong{display:block;color:#fff;font-size:14px}.verified-phone-card p{margin:6px 0 0;color:var(--muted);font-size:10px;line-height:1.55}
 
 @media(max-width:920px){.plans-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.membership-grid{grid-template-columns:1fr}}
@@ -541,12 +542,17 @@ body.signed-in .page-glow{opacity:.22}
 .wallet-plan-minutes{grid-column:1/-1;display:flex;align-items:baseline;gap:4px;color:#fff}.wallet-plan-minutes b{font-size:34px;line-height:1;letter-spacing:-.055em}.wallet-plan-minutes small{color:#aaa8b0;font-size:9px;font-weight:800;text-transform:uppercase}
 .wallet-plan-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aaa8b0;font-size:10px}.wallet-plan-price{color:#fff;font-size:17px;white-space:nowrap}.wallet-plan-card>.button{grid-column:1/-1;align-self:end;width:100%;min-height:40px;padding:9px 10px;box-shadow:none}.wallet-plan-card .popular-label{top:9px;right:9px;background:#e62d7d}
 
+.wallet-checkout-overlay{z-index:250;background:radial-gradient(circle at 50% 22%,rgba(230,45,125,.18),transparent 34%),rgba(7,8,10,.9);backdrop-filter:blur(14px)}
+.wallet-checkout-card{width:min(500px,100%);padding:25px;background:linear-gradient(155deg,#24252a,#151619);box-shadow:0 36px 100px rgba(0,0,0,.58)}
+.wallet-checkout-brand{display:flex;align-items:center;gap:11px;padding-right:42px;margin-bottom:20px}.wallet-checkout-brand img{width:46px;height:46px}.wallet-checkout-brand span{display:grid;gap:2px}.wallet-checkout-brand b{color:#fff;font-size:16px}.wallet-checkout-brand small,.wallet-checkout-provider{color:#99979f;font-size:9px}
+.wallet-checkout-summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:17px;border:1px solid var(--line);border-radius:19px;background:#1d1e23}.wallet-checkout-minutes{width:70px;height:70px;display:grid;place-content:center;text-align:center;border-radius:17px;background:rgba(230,45,125,.12);border:1px solid rgba(230,45,125,.17)}.wallet-checkout-minutes b{color:#fff;font-size:28px;line-height:1}.wallet-checkout-minutes small{color:#ff9ac5;font-size:8px;text-transform:uppercase}.wallet-checkout-summary>div>small{color:#99979f;font-size:8px;text-transform:uppercase;letter-spacing:.09em}.wallet-checkout-summary h2{margin:3px 0;color:#fff;font-size:20px}.wallet-checkout-summary p{margin:0;color:#99979f;font-size:9px}.wallet-checkout-summary>strong{color:#fff;font-size:20px}.wallet-checkout-trust{display:flex;flex-wrap:wrap;gap:6px;margin:13px 0}.wallet-checkout-trust span{padding:6px 8px;border:1px solid var(--line);border-radius:999px;color:#aaa8b0;font-size:8px}.wallet-checkout-card>.button{width:100%;margin-top:3px}.wallet-checkout-provider{display:block;margin-top:10px;text-align:center}
+body.razorpay-open:before{background:radial-gradient(circle at 50% 24%,rgba(230,45,125,.18),transparent 36%),rgba(7,8,10,.9)}
 
 @media(max-width:760px){
   body.signed-in .dashboard{padding-top:10px}.random-connect-card{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:17px;border-radius:20px}.random-connect-mark{width:49px;height:49px;border-radius:15px}.random-connect-copy h1{font-size:22px}.random-connect-copy p{font-size:10px}.random-connect-card>.button{grid-column:1/-1;width:100%;min-width:0;min-height:47px}.listener-card-v8{min-height:350px}.other-language-grid{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(86vw,360px);gap:12px;overflow-x:auto;padding:3px 3px 15px}
   .wallet-plan-card{min-height:164px;padding:13px 10px;border-radius:17px}.wallet-plan-minutes b{font-size:29px}.wallet-plan-name{font-size:8px}.wallet-plan-price{font-size:15px}.wallet-plan-card>.button{min-height:38px;font-size:10px}.wallet-heading{align-items:center}.wallet-heading p{display:none}.minutes-balance{min-width:112px;padding:10px 12px}.minutes-balance strong{font-size:20px}
 }
-@media(max-width:420px){.phone-auth-step[data-phone-step="welcome"]{min-height:235px}.plans-grid{gap:7px!important}.wallet-plan-card{min-height:156px;padding:12px 7px;border-radius:15px}.wallet-plan-minutes b{font-size:25px}.wallet-plan-price{font-size:13px}.wallet-plan-name{font-size:7px}.wallet-plan-card .popular-label{top:6px;right:5px;font-size:6px;padding:3px 5px}}
+@media(max-width:420px){.phone-auth-step[data-phone-step="welcome"]{min-height:235px}.plans-grid{gap:7px!important}.wallet-plan-card{min-height:156px;padding:12px 7px;border-radius:15px}.wallet-plan-minutes b{font-size:25px}.wallet-plan-price{font-size:13px}.wallet-plan-name{font-size:7px}.wallet-plan-card .popular-label{top:6px;right:5px;font-size:6px;padding:3px 5px}.wallet-checkout-card{padding:21px 17px}.wallet-checkout-summary{grid-template-columns:auto 1fr;gap:11px}.wallet-checkout-summary>strong{grid-column:2}.wallet-checkout-minutes{width:62px;height:62px}.wallet-checkout-trust{display:grid}.wallet-checkout-trust span{text-align:center}}
 
 /* v8.3 — compact mobile-app polish */
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -655,6 +661,11 @@ body.signed-in{scroll-padding-bottom:calc(118px + env(safe-area-inset-bottom))}
 .chat-profile-avatar{width:44px;height:44px}
 .conversation-mobile-back{display:none;width:34px;height:34px;place-items:center;flex:0 0 auto;border:1px solid var(--line);border-radius:11px;background:#292a30;color:#fff;font-size:20px}
 
+body.razorpay-open:before{display:none!important}
+body.razorpay-open{background:#0c0d10!important}
+body.razorpay-open .wallet-checkout-overlay:not(.hidden){display:grid!important;background:radial-gradient(circle at 50% 22%,rgba(230,45,125,.2),transparent 36%),rgba(7,8,10,.94)}
+body.razorpay-open iframe.razorpay-checkout-frame,body.razorpay-open iframe[src*="razorpay"]{background:#0c0d10!important;color-scheme:dark}
+.wallet-checkout-card[aria-busy="true"],.wallet-checkout-overlay[aria-busy="true"] .wallet-checkout-card{box-shadow:0 36px 110px rgba(230,45,125,.12),0 36px 100px rgba(0,0,0,.64)}
 
 @media(max-width:760px){
   body.signed-in{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
