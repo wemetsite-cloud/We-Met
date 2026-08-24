@@ -295,6 +295,7 @@ CREATE TABLE IF NOT EXISTS otp_challenges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   phone text NOT NULL,
   role text NOT NULL CHECK (role IN ('customer','employee')),
+  purpose text NOT NULL DEFAULT 'registration' CHECK (purpose IN ('registration','login','password_reset','support')),
   code_hash text NOT NULL,
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   expires_at timestamptz NOT NULL,
@@ -458,6 +459,9 @@ ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS admin_message text;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '72 hours');
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE password_reset_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz;
+ALTER TABLE otp_challenges ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'registration';
+ALTER TABLE otp_challenges DROP CONSTRAINT IF EXISTS otp_challenges_purpose_check;
+ALTER TABLE otp_challenges ADD CONSTRAINT otp_challenges_purpose_check CHECK (purpose IN ('registration','login','password_reset','support'));
 ALTER TABLE payment_submissions ADD COLUMN IF NOT EXISTS manual_intent_id uuid REFERENCES manual_payment_intents(id) ON DELETE SET NULL;
 ALTER TABLE payment_submissions ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'upi';
 ALTER TABLE payment_submissions ALTER COLUMN payment_method SET DEFAULT 'upi';

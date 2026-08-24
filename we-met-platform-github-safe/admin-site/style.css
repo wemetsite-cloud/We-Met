@@ -214,3 +214,15 @@ aside nav button.active,aside nav button:hover{background:rgba(230,45,125,.13);b
   .payout-destination{grid-template-columns:1fr}.payout-destination b,.payout-destination span{display:block}.content>header{backdrop-filter:blur(18px)}
 }
 @media(max-width:470px){.login-screen{padding:0}.login-card{width:100%;height:100dvh;max-height:none;border:0;border-radius:0;padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;justify-content:center}.ticket .actions{grid-template-columns:1fr}.payout-confirm{grid-template-columns:1fr}.payout-confirm b,.payout-confirm strong{text-align:left}}
+/* One crisp focus ring across editable admin controls. */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  border-color: #ff4f9a !important;
+  outline: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}

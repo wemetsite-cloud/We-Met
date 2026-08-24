@@ -16,7 +16,8 @@
   let me = null;
   let profileImageDraft = '';
   let bannerImageDraft;
-  let listenerAuthState = { phone: '', challengeId: '', registrationToken: '' };
+  let listenerAuthState = { phone: '', challengeId: '', registrationToken: '', otpPurpose: 'registration' };
+  let listenerRecoveryState = { challengeId: '', resetToken: '' };
   let listenerSupportState = { phone: '', challengeId: '', verificationToken: '' };
   let verificationState = null;
   let voiceRecorder = null;
@@ -143,7 +144,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.5.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.7.0', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -179,7 +180,7 @@
     show('#listenerPostDetailModal', false);
     show('#listenerPostEditModal', false);
     show('#restoreListenerCall', false);
-    ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm','listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm'].forEach((id) => document.getElementById(id)?.reset());
+    ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm','listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm','recoveryRequestForm','employeeRecoveryOtpForm','employeeResetForm'].forEach((id) => document.getElementById(id)?.reset());
     showListenerAuthStep('welcome');
     activeTab = 'desk';
     history.replaceState(navigationState('desk', null), document.title);
@@ -188,11 +189,14 @@
 
   function profileImageSrc(value, name = 'Listener', userId = me?.id) {
     const image = String(value || '');
-    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(image)) return `assets/${image}`;
     if ((image === 'photo' || image === `photo:${userId}`) && userId) return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(userId)}?v=${encodeURIComponent(profileMediaVersion)}`;
     if (/^data:image\/(?:jpeg|png|webp);base64,/.test(image)) return image;
-    let total = 0; for (const char of String(name || 'Listener')) total += char.charCodeAt(0);
-    return `assets/avatar-${String((total % 20) + 1).padStart(2, '0')}.svg`;
+    const palettes = [['#ff4f9a','#6d1748'],['#8b5cf6','#3b1f75'],['#23b5a9','#135b60'],['#f59e5b','#963b52'],['#51a7f9','#294678']];
+    let total = 0; for (const char of `${image}:${userId || name}`) total = (total * 31 + char.charCodeAt(0)) >>> 0;
+    const [start, end] = palettes[total % palettes.length];
+    const letters = String(name || 'Listener').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'WM';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="320" height="320" rx="160" fill="url(#g)"/><circle cx="240" cy="72" r="52" fill="#fff" opacity=".12"/><text x="160" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="104" font-weight="700" fill="#fff">${letters}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }
 
   function renderProfileImageEditor() {
@@ -205,7 +209,7 @@
       const banner = bannerImageDraft === undefined ? me?.bannerImage : bannerImageDraft;
       const url = String(banner || '').startsWith('photo:')
         ? `${P.base}/api/public/listener-banner-image/${encodeURIComponent(me.id)}?v=${encodeURIComponent(profileMediaVersion)}`
-        : /^data:image\//.test(String(banner || '')) ? banner : 'assets/default-listener-banner.png';
+        : /^data:image\//.test(String(banner || '')) ? banner : '/shared/default-listener-banner.png';
       $('#profileBannerPreview').style.backgroundImage = `linear-gradient(180deg,rgba(16,11,14,.03),rgba(16,11,14,.52)),url("${url}")`;
     }
   }
@@ -302,6 +306,7 @@
     $('#listenerAuthBegin').addEventListener('click', () => showListenerAuthStep('phone'));
     $('#listenerPhoneForm').addEventListener('submit', startListenerPhone);
     $('#listenerPasswordForm').addEventListener('submit', listenerPasswordLogin);
+    $('#listenerOtpLogin').addEventListener('click', startListenerOtpLogin);
     $('#listenerForgotPassword').addEventListener('click', openRecovery);
     $('#listenerOtpForm').addEventListener('submit', verifyListenerOtp);
     $('#listenerDetailsForm').addEventListener('submit', registerListener);
@@ -315,8 +320,7 @@
     $('#closeRecovery').addEventListener('click', () => closeManagedOverlay('recoveryModal'));
     $('#listenerRecoveryBack').addEventListener('click', goBackInListener);
     $('#recoveryRequestForm').addEventListener('submit', requestRecovery);
-    $('#employeeCheckRecovery').addEventListener('click', checkRecovery);
-    $('#employeeCopyRecovery').addEventListener('click', () => copyValue($('#employeeRecoveryKey').value));
+    $('#employeeRecoveryOtpForm').addEventListener('submit', verifyEmployeeRecovery);
     $('#employeeResetForm').addEventListener('submit', completeRecovery);
     $('#logoutBtn').addEventListener('click', logout);
     $('#listenerBackButton').addEventListener('click', goBackInListener);
@@ -354,6 +358,7 @@
     $('#postForm').addEventListener('submit', publishPost);
     $('#listenerMessageForm').addEventListener('submit', sendListenerMessage);
     $('#closeListenerPostDetail').addEventListener('click', () => closeManagedOverlay('listenerPostDetailModal'));
+    $('#closeListenerPostLikes').addEventListener('click', closePostLikers);
     $('#closeListenerPostEdit').addEventListener('click', () => closeManagedOverlay('listenerPostEditModal'));
     $('#chooseListenerPostEditPhoto').addEventListener('click', () => $('#listenerPostEditPhoto').click());
     $('#listenerPostEditPhoto').addEventListener('change', previewPostEditPhoto);
@@ -417,6 +422,7 @@
       $('#listenerOtpPhone').textContent = response.phone;
       if (response.mode === 'password') showListenerAuthStep('password');
       else {
+        listenerAuthState.otpPurpose = 'registration';
         listenerAuthState.challengeId = response.challengeId;
         if (response.developmentOtp) { $('#listenerDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#listenerDevelopmentOtp'); }
         showListenerAuthStep('otp');
@@ -435,11 +441,39 @@
     finally { button.disabled = false; }
   }
 
+  async function startListenerOtpLogin() {
+    const button = $('#listenerOtpLogin');
+    button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/login/start', {
+        method: 'POST',
+        body: JSON.stringify({ phone: listenerAuthState.phone, role: 'employee' }),
+      });
+      listenerAuthState.challengeId = response.challengeId;
+      listenerAuthState.otpPurpose = 'login';
+      $('#listenerOtpPhone').textContent = response.phone;
+      if (response.developmentOtp) {
+        $('#listenerDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`;
+        show('#listenerDevelopmentOtp');
+      } else show('#listenerDevelopmentOtp', false);
+      showListenerAuthStep('otp');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
   async function verifyListenerOtp(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
       const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: listenerAuthState.challengeId, otp: $('#listenerOtp').value }) });
-      listenerAuthState.registrationToken = response.registrationToken; showListenerAuthStep('details');
+      if (response.mode === 'login') {
+        if (response.user?.role !== 'employee') throw new Error('This is not a listener account.');
+        P.Store.token = response.token;
+        me = response.user;
+        await enter();
+      } else {
+        listenerAuthState.registrationToken = response.registrationToken;
+        showListenerAuthStep('details');
+      }
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
@@ -488,30 +522,14 @@
     finally { button.disabled = false; }
   }
 
-  function recoveryStorage(value) {
-    if (value === undefined) {
-      try { return JSON.parse(localStorage.getItem('we_met_employee_password_recovery') || 'null'); } catch { return null; }
-    }
-    try {
-      if (value) localStorage.setItem('we_met_employee_password_recovery', JSON.stringify(value));
-      else localStorage.removeItem('we_met_employee_password_recovery');
-    } catch {}
-    return value;
-  }
-
   function openRecovery() {
-    const saved = recoveryStorage();
-    if (saved?.recoveryKey) {
-      $('#employeeRecoveryId').value = saved.requestId;
-      $('#employeeRecoveryKey').value = saved.recoveryKey;
-      show('#employeeRecoveryPanel');
-    } else {
-      $('#employeeRecoveryId').value = '';
-      $('#employeeRecoveryKey').value = '';
-      $('#employeeRecoveryStatus').textContent = 'Already have a recovery key? Paste it below to check the request.';
-      show('#employeeResetForm', false);
-      show('#employeeRecoveryPanel');
-    }
+    listenerRecoveryState = { challengeId: '', resetToken: '' };
+    ['recoveryRequestForm','employeeRecoveryOtpForm','employeeResetForm'].forEach((id) => document.getElementById(id)?.reset());
+    $('#recoveryPhone').value = listenerAuthState.phone || '';
+    show('#recoveryRequestForm');
+    show('#employeeRecoveryOtpForm', false);
+    show('#employeeResetForm', false);
+    show('#employeeRecoveryDevelopmentOtp', false);
     openManagedOverlay('#recoveryModal', 'recoveryModal');
   }
 
@@ -525,76 +543,59 @@
 
   async function requestRecovery(event) {
     event.preventDefault();
+    const button = event.submitter; button.disabled = true;
     try {
       const response = await P.api('/api/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ identifier: $('#recoveryPhone').value }),
+        body: JSON.stringify({ identifier: $('#recoveryPhone').value, role: 'employee' }),
       });
-      if (response.requestId && response.recoveryKey) {
-        recoveryStorage({ requestId: response.requestId, recoveryKey: response.recoveryKey });
-        $('#employeeRecoveryId').value = response.requestId;
-        $('#employeeRecoveryKey').value = response.recoveryKey;
-        $('#employeeRecoveryStatus').textContent = 'Request sent. Save this key and check again after administrator review.';
-        show('#employeeRecoveryPanel');
-        show('#employeeResetForm', false);
+      listenerRecoveryState.challengeId = response.challengeId;
+      $('#employeeRecoveryPhonePreview').textContent = response.phone;
+      if (response.developmentOtp) {
+        $('#employeeRecoveryDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`;
+        show('#employeeRecoveryDevelopmentOtp');
       }
-      P.toast(response.message || 'Recovery request sent.', 'success');
+      show('#recoveryRequestForm', false);
+      show('#employeeRecoveryOtpForm');
+      P.toast(response.message || 'OTP sent by SMS.', 'success');
     } catch (error) {
       P.toast(error.message, 'error');
-    }
+    } finally { button.disabled = false; }
   }
 
-  async function copyValue(value) {
-    if (!value) return;
+  async function verifyEmployeeRecovery(event) {
+    event.preventDefault();
+    const button = event.submitter; button.disabled = true;
     try {
-      if (navigator.clipboard?.writeText && window.isSecureContext) await navigator.clipboard.writeText(value);
-      else {
-        const area = document.createElement('textarea');
-        area.value = value;
-        area.style.position = 'fixed';
-        area.style.opacity = '0';
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand('copy');
-        area.remove();
-      }
-      P.toast('Recovery key copied.', 'success');
-    } catch {
-      P.toast('Copy failed. Select and copy the key manually.', 'error');
-    }
-  }
-
-  async function checkRecovery() {
-    try {
-      const response = await P.api('/api/auth/password-reset/status', {
+      const response = await P.api('/api/auth/phone/verify', {
         method: 'POST',
-        body: JSON.stringify({ requestId: $('#employeeRecoveryId').value, recoveryKey: $('#employeeRecoveryKey').value.trim() }),
+        body: JSON.stringify({ challengeId: listenerRecoveryState.challengeId, otp: $('#employeeRecoveryOtp').value }),
       });
-      const request = response.request;
-      const labels = { open: 'Waiting for administrator review.', approved: 'Approved. Enter a new password below.', declined: 'Declined. Contact the administrator or submit a new request.', completed: 'This recovery request was already used.' };
-      $('#employeeRecoveryStatus').textContent = `${labels[request.status] || request.status}${request.adminMessage ? ` Admin message: ${request.adminMessage}` : ''}`;
-      show('#employeeResetForm', request.status === 'approved');
-      recoveryStorage({ requestId: request.id, recoveryKey: $('#employeeRecoveryKey').value.trim() });
+      listenerRecoveryState.resetToken = response.resetToken;
+      show('#employeeRecoveryOtpForm', false);
+      show('#employeeResetForm');
+      setTimeout(() => $('#employeeRecoveryPassword')?.focus(), 50);
     } catch (error) {
       P.toast(error.message, 'error');
-    }
+    } finally { button.disabled = false; }
   }
 
   async function completeRecovery(event) {
     event.preventDefault();
+    const button = event.submitter;
     const password = $('#employeeRecoveryPassword').value;
     if (password !== $('#employeeRecoveryConfirm').value) return P.toast('The two passwords do not match.', 'error');
+    button.disabled = true;
     try {
       const response = await P.api('/api/auth/password-reset/complete', {
         method: 'POST',
-        body: JSON.stringify({ requestId: $('#employeeRecoveryId').value, recoveryKey: $('#employeeRecoveryKey').value.trim(), newPassword: password }),
+        body: JSON.stringify({ resetToken: listenerRecoveryState.resetToken, role: 'employee', newPassword: password }),
       });
-      recoveryStorage(null);
       closeManagedOverlay('recoveryModal');
       P.toast(response.message, 'success');
     } catch (error) {
       P.toast(error.message, 'error');
-    }
+    } finally { button.disabled = false; }
   }
 
   async function loadMe() {
@@ -663,7 +664,7 @@
     const content = $('#verificationContent');
     if (!content || !verificationState) return;
     if (verificationState.status === 'pending') {
-      content.innerHTML = `<div class="verification-wait-art"><div class="wait-orbit one"></div><div class="wait-orbit two"></div><img src="assets/logo.svg" alt=""></div><span class="eyebrow">RECORDING RECEIVED</span><h1>We’re checking your voice.</h1><p>Review normally takes up to 24 hours. This page opens automatically as soon as the admin approves your recording.</p><div class="verification-status-line"><i></i><span>Review in progress</span></div><small class="verification-submitted">Submitted <span>${P.date(verificationState.submission?.created_at)}</span></small>`;
+      content.innerHTML = `<div class="verification-wait-art"><div class="wait-orbit one"></div><div class="wait-orbit two"></div><img src="/shared/logo.svg" alt=""></div><span class="eyebrow">RECORDING RECEIVED</span><h1>We’re checking your voice.</h1><p>Review normally takes up to 24 hours. This page opens automatically as soon as the admin approves your recording.</p><div class="verification-status-line"><i></i><span>Review in progress</span></div><small class="verification-submitted">Submitted <span>${P.date(verificationState.submission?.created_at)}</span></small>`;
       window.setTimeout(checkVerificationApproval, 15000);
       return;
     }
@@ -1025,17 +1026,21 @@
     const nextUrls = [];
     try {
       const response = await P.api('/api/employee/posts');
-      listenerPosts = response.posts || [];
-      const markup = await Promise.all(listenerPosts.map(async (post) => {
+      const posts = response.posts || [];
+      const rendered = await Promise.all(posts.map(async (post) => {
         try {
           const blob = await P.apiBlob(post.imageUrl, { cache: 'no-store' });
           const url = URL.createObjectURL(blob);
           nextUrls.push(url);
-          return `<article class="listener-post"><button class="listener-post-open" data-open-post="${P.esc(post.id)}" type="button" aria-label="Open post details"><img src="${url}" alt="Your exclusive post" draggable="false"><span class="listener-post-like-count">♥ ${Number(post.likeCount || 0).toLocaleString('en-IN')}</span><span class="listener-post-caption"><b>${P.esc(post.caption || 'No caption')}</b><small>${P.date(post.updated_at || post.created_at)}</small></span></button><details class="listener-post-options"><summary aria-label="Post options"><span></span><span></span><span></span></summary><div role="menu"><button data-edit-post="${P.esc(post.id)}" type="button" role="menuitem">Edit</button><button class="danger" data-delete-post="${P.esc(post.id)}" type="button" role="menuitem">Delete</button></div></details></article>`;
+          return {
+            post: { ...post, previewUrl: url },
+            markup: `<article class="listener-post"><button class="listener-post-open" data-open-post="${P.esc(post.id)}" type="button" aria-label="Open post feed"><img src="${url}" alt="Your exclusive post" draggable="false"><span class="listener-post-like-count">♥ ${Number(post.likeCount || 0).toLocaleString('en-IN')}</span><span class="listener-post-caption"><b>${P.esc(post.caption || 'No caption')}</b><small>${P.date(post.updated_at || post.created_at)}</small></span></button><details class="listener-post-options"><summary aria-label="Post options"><span></span><span></span><span></span></summary><div role="menu"><button data-edit-post="${P.esc(post.id)}" type="button" role="menuitem">Edit</button><button class="danger" data-delete-post="${P.esc(post.id)}" type="button" role="menuitem">Delete</button></div></details></article>`,
+          };
         }
-        catch { return ''; }
+        catch { return null; }
       }));
-      $('#listenerPosts').innerHTML = markup.filter(Boolean).join('') || emptyState('No exclusive posts', 'Publish your first member-only photo from the form.');
+      listenerPosts = rendered.filter(Boolean).map((item) => item.post);
+      $('#listenerPosts').innerHTML = rendered.filter(Boolean).map((item) => item.markup).join('') || emptyState('No exclusive posts', 'Publish your first member-only photo from the form.');
       renderedPostUrls.forEach((url) => URL.revokeObjectURL(url));
       renderedPostUrls = nextUrls;
     } catch (error) { nextUrls.forEach((url) => URL.revokeObjectURL(url)); P.toast(error.message, 'error'); }
@@ -1128,21 +1133,49 @@
     postDetailRequestId += 1;
     postDetailUrls.forEach((url) => URL.revokeObjectURL(url));
     postDetailUrls = [];
+    closePostLikers();
   }
 
-  async function openPostInsights(postId) {
+  function listenerPostFeedMarkup(post) {
+    const count = Number(post.likeCount || 0);
+    return `<article class="listener-feed-post" data-listener-feed-post="${P.esc(post.id)}"><div class="listener-feed-media"><img src="${P.esc(post.previewUrl)}" alt="Your exclusive post" draggable="false"><details class="listener-post-options listener-feed-options"><summary aria-label="Post options"><span></span><span></span><span></span></summary><div role="menu"><button data-edit-post="${P.esc(post.id)}" type="button" role="menuitem">Edit post</button><button class="danger" data-delete-post="${P.esc(post.id)}" type="button" role="menuitem">Delete post</button></div></details></div><footer><p>${P.esc(post.caption || '')}</p><div><small>${P.date(post.updated_at || post.created_at)}</small><button data-show-post-likes="${P.esc(post.id)}" type="button">♥ ${count.toLocaleString('en-IN')} ${count === 1 ? 'like' : 'likes'}</button></div></footer></article>`;
+  }
+
+  function renderListenerPostFeed(postId) {
+    $('#listenerPostDetailContent').innerHTML = listenerPosts.map(listenerPostFeedMarkup).join('') || '<div class="post-insights-error"><h2>No posts yet</h2><p>Create your first post to open the feed.</p></div>';
+    requestAnimationFrame(() => document.querySelector(`[data-listener-feed-post="${CSS.escape(postId)}"]`)?.scrollIntoView({ block: 'start' }));
+  }
+
+  function openPostInsights(postId) {
+    if (!listenerPosts.some((post) => post.id === postId)) return P.toast('This post is no longer available.', 'error');
     releasePostDetailUrls();
-    const requestId = postDetailRequestId;
-    const createdUrls = [];
-    const isCurrentRequest = () => requestId === postDetailRequestId && !$('#listenerPostDetailModal').classList.contains('hidden');
     openManagedOverlay('#listenerPostDetailModal', 'listenerPostDetailModal');
-    $('#listenerPostDetailContent').innerHTML = '<div class="post-insights-loading"><span></span><p>Loading post…</p></div>';
+    renderListenerPostFeed(postId);
+  }
+
+  function closePostLikers() {
+    show('#listenerPostLikesSheet', false);
+    if ($('#listenerPostLikesList')) $('#listenerPostLikesList').innerHTML = '';
+  }
+
+  async function openPostLikers(postId) {
+    postDetailRequestId += 1;
+    const requestId = postDetailRequestId;
+    postDetailUrls.forEach((url) => URL.revokeObjectURL(url));
+    postDetailUrls = [];
+    show('#listenerPostLikesSheet');
+    $('#listenerPostLikesList').innerHTML = '<div class="post-insights-loading"><span></span><p>Loading likes…</p></div>';
     try {
       const response = await P.api(`/api/employee/posts/${encodeURIComponent(postId)}/insights`);
-      if (!isCurrentRequest()) return;
-      const imageBlob = await P.apiBlob(response.post.imageUrl);
-      const postImage = URL.createObjectURL(imageBlob);
-      createdUrls.push(postImage);
+      if (requestId !== postDetailRequestId || $('#listenerPostDetailModal').classList.contains('hidden')) return;
+      const likeCount = Number(response.post?.likeCount || 0);
+      $('#listenerPostLikesTitle').textContent = `${likeCount.toLocaleString('en-IN')} ${likeCount === 1 ? 'like' : 'likes'}`;
+      const savedPost = listenerPosts.find((post) => post.id === postId);
+      if (savedPost) savedPost.likeCount = likeCount;
+      $$(`[data-show-post-likes="${CSS.escape(postId)}"]`).forEach((button) => {
+        button.textContent = `♥ ${likeCount.toLocaleString('en-IN')} ${likeCount === 1 ? 'like' : 'likes'}`;
+      });
+      const createdUrls = [];
       const likerMarkup = await Promise.all((response.likes || []).map(async (like) => {
         let photo = '';
         if (like.imageUrl) {
@@ -1154,16 +1187,16 @@
         }
         return `<li>${photo ? `<img src="${P.esc(photo)}" alt="" draggable="false">` : `<span>${initials(like.name)}</span>`}<div><b>${P.esc(like.name)}</b><small>${like.username ? `@${P.esc(like.username)} · ` : ''}${P.date(like.likedAt)}</small></div></li>`;
       }));
-      if (!isCurrentRequest()) {
+      if (requestId !== postDetailRequestId || $('#listenerPostDetailModal').classList.contains('hidden')) {
         createdUrls.forEach((url) => URL.revokeObjectURL(url));
         return;
       }
       postDetailUrls.push(...createdUrls);
       const count = Number(response.post.likeCount || 0);
-      $('#listenerPostDetailContent').innerHTML = `<div class="post-insights-head"><div><span class="eyebrow">YOUR POST</span><h2 id="listenerPostDetailTitle">Post insights</h2></div><details class="listener-post-options post-insights-options"><summary aria-label="Post options"><span></span><span></span><span></span></summary><div role="menu"><button data-edit-post="${P.esc(response.post.id)}" type="button" role="menuitem">Edit</button><button class="danger" data-delete-post="${P.esc(response.post.id)}" type="button" role="menuitem">Delete</button></div></details></div><img class="post-insights-image" src="${P.esc(postImage)}" alt="Your exclusive post" draggable="false"><div class="post-insights-copy"><p>${P.esc(response.post.caption || 'No caption')}</p><small>${P.date(response.post.updatedAt || response.post.createdAt)}</small><strong>♥ ${count.toLocaleString('en-IN')} ${count === 1 ? 'like' : 'likes'}</strong></div><div class="post-likers"><h3>Liked by</h3>${likerMarkup.length ? `<ul>${likerMarkup.join('')}</ul>` : '<p>No likes yet.</p>'}</div>`;
+      $('#listenerPostLikesTitle').textContent = `${count.toLocaleString('en-IN')} ${count === 1 ? 'like' : 'likes'}`;
+      $('#listenerPostLikesList').innerHTML = likerMarkup.length ? `<ul>${likerMarkup.join('')}</ul>` : '<p class="post-likes-empty">No likes yet.</p>';
     } catch (error) {
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
-      if (isCurrentRequest()) $('#listenerPostDetailContent').innerHTML = `<div class="post-insights-error"><h2 id="listenerPostDetailTitle">Post unavailable</h2><p>${P.esc(error.message)}</p></div>`;
+      if (requestId === postDetailRequestId) $('#listenerPostLikesList').innerHTML = `<p class="post-likes-empty">${P.esc(error.message)}</p>`;
     }
   }
 
@@ -1237,6 +1270,7 @@
     }
     const editPost = event.target.closest('[data-edit-post]'); if (editPost) return openPostEditor(editPost.dataset.editPost);
     const post = event.target.closest('[data-delete-post]'); if (post) return deletePost(post.dataset.deletePost);
+    const postLikes = event.target.closest('[data-show-post-likes]'); if (postLikes) return openPostLikers(postLikes.dataset.showPostLikes);
     const openPost = event.target.closest('[data-open-post]'); if (openPost) return openPostInsights(openPost.dataset.openPost);
     const conversation = event.target.closest('[data-inbox-customer]'); if (conversation) return openListenerConversation(conversation.dataset.inboxCustomer);
   }
@@ -1339,7 +1373,7 @@
   }
 
   function emptyState(title, message) {
-    return `<div class="panel empty-state"><img src="assets/logo.svg" alt=""><h3>${P.esc(title)}</h3><p>${P.esc(message)}</p></div>`;
+    return `<div class="panel empty-state"><img src="/shared/logo.svg" alt=""><h3>${P.esc(title)}</h3><p>${P.esc(message)}</p></div>`;
   }
 
   async function loadHistory() {

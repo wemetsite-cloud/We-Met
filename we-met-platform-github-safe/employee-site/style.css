@@ -327,3 +327,36 @@ html,body{max-width:100%;overflow-x:clip}
   .listener-post-detail-card,.listener-post-edit-card{padding:18px 15px}
   .listener-profile-editor{gap:17px!important;padding:21px 17px!important}
 }
+
+/* v8.7 — full-screen listener post feed and liker list */
+.listener-post-feed{position:fixed;inset:0;z-index:120000;display:grid;grid-template-rows:58px minmax(0,1fr);background:#09090b;color:#fff}
+.listener-post-feed>header{position:relative;z-index:3;display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;padding:8px max(12px,env(safe-area-inset-left));border-bottom:1px solid rgba(255,255,255,.09);background:rgba(10,10,12,.96);backdrop-filter:blur(16px)}
+.listener-post-feed>header>button{width:42px;height:42px;display:grid;place-items:center;padding:0;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:#1a1b20;color:#fff;cursor:pointer}
+.listener-post-feed>header>button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.listener-post-feed>header h2{margin:0;text-align:center;font-size:15px;letter-spacing:-.015em}
+.listener-post-feed-list{height:100%;overflow-y:auto;overscroll-behavior:contain;scroll-snap-type:y mandatory;scrollbar-width:none}
+.listener-post-feed-list::-webkit-scrollbar{display:none}
+.listener-feed-post{width:min(760px,100%);height:100%;min-height:calc(100dvh - 58px);display:grid;grid-template-rows:minmax(0,1fr) auto;margin:0 auto;scroll-snap-align:start;scroll-snap-stop:always;background:#09090b}
+.listener-feed-media{position:relative;min-height:0;display:grid;place-items:center;overflow:hidden;background:#050506}
+.listener-feed-media>img{width:100%;height:100%;display:block;object-fit:contain;user-select:none;-webkit-user-select:none}
+.listener-feed-options{right:max(14px,env(safe-area-inset-right));top:14px}.listener-feed-options>div{z-index:9}
+.listener-feed-post>footer{display:grid;gap:8px;padding:14px max(17px,env(safe-area-inset-right)) calc(15px + env(safe-area-inset-bottom)) max(17px,env(safe-area-inset-left));border-top:1px solid rgba(255,255,255,.08);background:#101115}
+.listener-feed-post>footer p{margin:0;color:#f1edf0;font-size:13px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}
+.listener-feed-post>footer>div{display:flex;align-items:center;justify-content:space-between;gap:12px}.listener-feed-post>footer small{color:#85838b;font-size:9px}
+.listener-feed-post>footer button{min-height:38px;padding:0 12px;border:1px solid rgba(255,79,154,.3);border-radius:12px;background:rgba(255,79,154,.11);color:#ff9bc7;font:inherit;font-size:10px;font-weight:850;cursor:pointer}
+.listener-post-likes-sheet{position:absolute;z-index:8;right:16px;top:74px;bottom:16px;width:min(390px,calc(100% - 32px));display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:22px;background:#18191e;box-shadow:0 25px 80px rgba(0,0,0,.55)}
+.listener-post-likes-sheet>header{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px;border-bottom:1px solid rgba(255,255,255,.09)}
+.listener-post-likes-sheet>header small{display:block;color:#ff8fbd;font-size:8px;font-weight:900;letter-spacing:.13em}.listener-post-likes-sheet>header h3{margin:4px 0 0;font-size:18px}
+.listener-post-likes-sheet>header button{width:36px;height:36px;padding:0;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:#282a31;color:#fff;font-size:22px;cursor:pointer}
+.listener-post-likes-sheet>.post-likers{min-height:0;overflow-y:auto;padding:7px 17px 17px}.listener-post-likes-sheet .post-likers li{border-color:rgba(255,255,255,.08)}
+.post-likes-empty{margin:18px 0;color:#9b98a1;font-size:12px;text-align:center}
+
+/* One sharp focus border; no second glow or shadow on form fields. */
+input:focus,input:focus-visible,textarea:focus,textarea:focus-visible,select:focus,select:focus-visible{border-color:#ff4f9a!important;outline:none!important;box-shadow:none!important;filter:none!important}
+
+@media(max-width:520px){
+  .listener-post-feed{grid-template-rows:54px minmax(0,1fr)}
+  .listener-feed-post{min-height:calc(100dvh - 54px)}
+  .listener-post-likes-sheet{inset:auto 10px 10px;width:auto;max-height:min(68dvh,600px);border-radius:22px}
+  .listener-feed-post>footer p{font-size:12px}
+}

@@ -6,16 +6,16 @@
   <meta name="theme-color" content="#12070f">
   <meta name="description" content="Secure We Met operations dashboard for accounts, listener activity, calls, wallet records and support.">
   <title>We Met Operations</title>
-  <link rel="icon" type="image/png" href="assets/favicon.png">
-  <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.5.0">
-  <link rel="stylesheet" href="style.css?v=8.5.0">
+  <link rel="icon" type="image/png" href="/shared/favicon.png">
+  <link rel="apple-touch-icon" href="/shared/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest?v=8.7.0">
+  <link rel="stylesheet" href="style.css?v=8.7.0">
 </head>
 <body>
   <div id="loginView" class="login-screen">
     <div class="login-decoration decoration-one"></div><div class="login-decoration decoration-two"></div>
     <section class="login-card">
-      <div class="login-logo"><img src="assets/logo.svg" alt=""><span>WM</span></div>
+      <div class="login-logo"><img src="/shared/logo.svg" alt=""><span>WM</span></div>
       <span class="eyebrow">WE MET OPERATIONS</span><h1>Admin sign in</h1>
       <p>Your secure We Met control centre.</p>
       <form id="loginForm" class="stack"><label>Username<input id="username" autocomplete="username" required placeholder="Admin username"></label><label>Password<input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password"></label><button class="primary big">Sign in securely</button></form>
@@ -25,7 +25,7 @@
 
   <div id="appView" class="layout hidden">
     <aside>
-      <div class="side-brand"><img src="assets/logo.svg" alt=""><div><strong>We Met</strong><small>Operations</small></div></div>
+      <div class="side-brand"><img src="/shared/logo.svg" alt=""><div><strong>We Met</strong><small>Operations</small></div></div>
       <nav id="nav" aria-label="Admin navigation">
         <button class="active" data-page="overview"><b>◫</b><span>Overview</span></button>
         <button data-page="customers"><b>◎</b><span>Customers</span></button>
@@ -40,7 +40,6 @@
         <button data-page="calls"><b>☎</b><span>Calls</span></button>
         <button data-page="reports"><b>⚑</b><span>Reports</span></button>
         <button data-page="support"><b>✉</b><span>Support</span></button>
-        <button data-page="resets"><b>↻</b><span>Password resets</span></button>
         <button data-page="broadcast"><b>✦</b><span>Notifications</span></button>
         <button data-page="audit"><b>◉</b><span>Audit log</span></button>
         <button data-page="security"><b>⚙</b><span>Security</span></button>
@@ -118,7 +117,6 @@
         <section id="page-calls" class="page"><div class="toolbar"><div><span class="eyebrow">CALL AUDIT</span><h2>Every call and duration</h2></div><div class="toolbar-actions"><input id="callSearch" placeholder="Search customer or listener"><button id="reloadCalls" class="ghost">Refresh</button></div></div><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Listener</th><th>Status</th><th>Duration</th><th>Rate/min</th><th>Listener earning</th><th>Started</th><th>End reason</th></tr></thead><tbody id="callsTable"></tbody></table></div></section>
         <section id="page-reports" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">SAFETY</span><h2>Reports</h2></div><button id="reloadReports" class="ghost">Refresh</button></div><div class="queue-tabs" data-queue-group="reports"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="reportsList" class="ticket-list"></div></section></section>
         <section id="page-support" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">SUPPORT</span><h2>Support inbox</h2><p>Includes signed-in messages and OTP-verified login issues.</p></div><button id="reloadSupport" class="ghost">Refresh</button></div><div class="queue-tabs" data-queue-group="support"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="supportList" class="ticket-list"></div></section></section>
-        <section id="page-resets" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">ACCOUNT RECOVERY</span><h2>Password reset requests</h2><p>Verify the account owner through contact information already on record.</p></div><button id="reloadResets" class="ghost">Refresh</button></div><div class="queue-tabs" data-queue-group="resets"><button class="active" data-queue-filter="new" type="button">New</button><button data-queue-filter="history" type="button">History</button></div><div id="resetList" class="ticket-list"></div></section></section>
         <section id="page-broadcast" class="page"><form id="broadcastForm" class="panel stack narrow"><span class="eyebrow">IN-APP + BROWSER NOTIFICATION</span><h2>Send a service message</h2><label>Recipient<select id="broadcastUser"><option value="">All customers and listeners</option></select></label><label>Title<input id="broadcastTitle" value="We Met"></label><label>Message<textarea id="broadcastBody" required placeholder="Write a clear platform update"></textarea></label><button class="primary">Send notification</button></form></section>
         <section id="page-audit" class="page"><section class="panel"><div class="panel-head"><div><span class="eyebrow">ADMINISTRATOR ACTIVITY</span><h2>Audit log</h2><p>Successful account, wallet, plan and safety changes are recorded without sensitive request content.</p></div><button id="reloadAudit" class="ghost">Refresh</button></div><div id="auditList" class="audit-list"></div></section></section>
         <section id="page-security" class="page"><div class="grid-two"><section class="panel"><form id="adminUsernameForm" class="stack"><span class="eyebrow">ADMIN LOGIN</span><h2>Change username</h2><label>New username<input id="adminNewUsername" required></label><label>Current password<input id="adminUsernamePassword" type="password" required></label><button class="ghost">Change username</button></form><hr><form id="adminPasswordForm" class="stack"><span class="eyebrow">ADMIN SECURITY</span><h2>Change password</h2><label>Current password<input id="adminCurrent" type="password" required></label><label>New password<input id="adminNew" type="password" minlength="8" required></label><button class="primary">Change password</button></form></section><section class="panel"><span class="eyebrow">PRODUCTION CONTROLS</span><h2>Operational safeguards</h2><ul class="checklist"><li>Use HTTPS for every customer, listener, admin and API domain.</li><li>Configure a production TURN server for reliable WebRTC calls.</li><li>Rotate privileged credentials and database secrets regularly.</li><li>Maintain encrypted database backups and uptime monitoring.</li><li>Review reports, support tickets and administrator audit records.</li><li>Keep legal and privacy policies aligned with operations.</li></ul></section></div></section>
@@ -128,6 +126,6 @@
 
   <datalist id="listenerLanguages"><option value="Malayalam"><option value="English"><option value="Hindi"><option value="Tamil"><option value="Kannada"><option value="Telugu"></datalist>
   <div id="actionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-card profile-modal"><button id="closeModal" class="close" type="button" aria-label="Close">×</button><h2 id="modalTitle">Account details</h2><div id="modalBody"></div></div></div>
-  <script src="config.js?v=8.5.0"></script><script src="api.js?v=8.5.0"></script><script src="app.js?v=8.5.0"></script>
+  <script src="config.js?v=8.7.0"></script><script src="api.js?v=8.7.0"></script><script src="app.js?v=8.7.0"></script>
 </body>
 </html>

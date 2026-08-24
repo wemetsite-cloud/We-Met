@@ -725,3 +725,34 @@ body.razorpay-open iframe.razorpay-checkout-frame,body.razorpay-open iframe[src*
   .phone-field.international{grid-template-columns:100px minmax(0,1fr);gap:8px}
   .phone-field.international select,.phone-field.international input{padding-inline:10px}
 }
+
+/* v8.7 — full-screen subscribed post feed */
+.exclusive-post{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:14px;overflow:hidden;background:#15161a;color:inherit;cursor:pointer}
+.exclusive-post>img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .2s ease}
+.exclusive-post:hover>img{transform:scale(1.015)}
+.customer-post-feed{position:fixed;inset:0;z-index:120000;display:grid;grid-template-rows:58px minmax(0,1fr);background:#09090b;color:#fff}
+.customer-post-feed>header{position:relative;z-index:2;display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;padding:8px max(12px,env(safe-area-inset-left));border-bottom:1px solid rgba(255,255,255,.09);background:rgba(10,10,12,.96);backdrop-filter:blur(16px)}
+.customer-post-feed>header button{width:42px;height:42px;display:grid;place-items:center;padding:0;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:#1a1b20;color:#fff;cursor:pointer}
+.customer-post-feed>header button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.customer-post-feed>header h2{margin:0;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:15px;letter-spacing:-.015em}
+.customer-post-feed-list{height:100%;overflow-y:auto;overscroll-behavior:contain;scroll-snap-type:y mandatory;scrollbar-width:none}
+.customer-post-feed-list::-webkit-scrollbar{display:none}
+.customer-feed-post{width:min(760px,100%);height:100%;min-height:calc(100dvh - 58px);display:grid;grid-template-rows:minmax(0,1fr) auto;margin:0 auto;scroll-snap-align:start;scroll-snap-stop:always;background:#09090b}
+.customer-feed-media{min-height:0;display:grid;place-items:center;overflow:hidden;background:#050506}
+.customer-feed-media img{width:100%;height:100%;display:block;object-fit:contain;user-select:none;-webkit-user-select:none}
+.customer-feed-post footer{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;padding:15px max(17px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(17px,env(safe-area-inset-left));border-top:1px solid rgba(255,255,255,.08);background:#101115}
+.customer-feed-post footer p{margin:0;color:#f1edf0;font-size:13px;line-height:1.55;overflow-wrap:anywhere;white-space:pre-wrap}
+.customer-feed-like{min-width:74px;height:42px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 12px;border:1px solid rgba(255,255,255,.13);border-radius:13px;background:#1c1d22;color:#fff;font:inherit;font-size:11px;font-weight:850;cursor:pointer}
+.customer-feed-like svg{width:19px;height:19px;fill:transparent;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.customer-feed-like.liked{border-color:#ff4f9a;background:#d71e70}.customer-feed-like.liked svg{fill:currentColor}
+.customer-feed-like:disabled{opacity:.55}
+
+/* One sharp focus border; no second glow or shadow on form fields. */
+input:focus,input:focus-visible,textarea:focus,textarea:focus-visible,select:focus,select:focus-visible{border-color:#ff4f9a!important;outline:none!important;box-shadow:none!important;filter:none!important}
+
+@media(max-width:520px){
+  .customer-post-feed{grid-template-rows:54px minmax(0,1fr)}
+  .customer-feed-post{min-height:calc(100dvh - 54px)}
+  .customer-feed-post footer{padding-top:13px;gap:12px}
+  .customer-feed-post footer p{font-size:12px}
+}

@@ -50,7 +50,7 @@ services:
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
       - key: SMS_ENABLED
-        value: "false"
+        value: "true"
       - key: SMS_PROVIDER
         value: "fast2sms"
       - key: FAST2SMS_API_KEY

@@ -386,33 +386,6 @@ router.post('/users/:id/adjust-minutes', asyncHandler(async (req, res) => {
   res.json({ balanceSeconds: output.balance_seconds });
 }));
 
-router.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
-  const password = String(req.body.newPassword || '');
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'The password must contain at least 8 characters.' });
-  }
-
-  const result = await db.query(`
-    UPDATE users SET password_hash = $2, auth_version=auth_version+1, updated_at = now()
-    WHERE id = $1 AND role <> 'admin'
-    RETURNING id
-  `, [req.params.id, await hashPassword(password)]);
-
-  if (!result.rows[0]) {
-    return res.status(404).json({ error: 'User not found.' });
-  }
-
-  await db.query(`
-    UPDATE password_reset_requests
-    SET status = 'completed', resolved_at = now()
-    WHERE user_id = $1 AND status IN ('open','approved')
-  `, [req.params.id]);
-
-  await req.app.locals.socketRuntime?.restrictUser(req.params.id, 'Password reset by administrator. Sign in again.');
-
-  res.json({ ok: true });
-}));
-
 router.get('/users/:id/details', asyncHandler(async (req, res) => {
   const [
     user,
@@ -1061,47 +1034,6 @@ router.patch('/support/:id', asyncHandler(async (req, res) => {
   await req.app.locals.notifyUser?.(ticket.customer_id, { title, body, url: './', tag: `we-met-support-${ticket.id}` });
 
   res.json({ ticket });
-}));
-
-router.get('/password-resets', asyncHandler(async (_req, res) => {
-  await db.query(`
-    UPDATE password_reset_requests
-    SET status='declined',admin_message='This recovery request expired.',resolved_at=now()
-    WHERE status IN ('open','approved') AND expires_at<=now()
-  `);
-  const result = await db.query(`
-    SELECT request.*, user_account.name, user_account.email, user_account.username,
-           user_account.role
-    FROM password_reset_requests request
-    JOIN users user_account ON user_account.id = request.user_id
-    ORDER BY CASE request.status WHEN 'open' THEN 0 ELSE 1 END,
-             request.created_at DESC
-  `);
-  res.json({ requests: result.rows });
-}));
-
-router.patch('/password-resets/:id', asyncHandler(async (req, res) => {
-  const action = String(req.body.action || '');
-  if (!['approved', 'declined'].includes(action)) {
-    return res.status(400).json({ error: 'Choose approve or decline.' });
-  }
-  const adminMessage = text(req.body.adminMessage, 1000) || null;
-  const result = await db.query(`
-    UPDATE password_reset_requests
-    SET status=$2,admin_message=$3,reviewed_by=$4,reviewed_at=now(),
-        resolved_at=CASE WHEN $2='declined' THEN now() ELSE NULL END
-    WHERE id=$1 AND status='open' AND expires_at>now()
-    RETURNING *
-  `, [req.params.id, action, adminMessage, req.user.id]);
-  const request = result.rows[0];
-  if (!request) return res.status(409).json({ error: 'This request is no longer open or has expired.' });
-  const title = action === 'approved' ? 'Password recovery approved' : 'Password recovery declined';
-  const body = action === 'approved'
-    ? `Your recovery request was approved. Return to the recovery screen and use your saved key.${adminMessage ? ` ${adminMessage}` : ''}`
-    : `Your recovery request was declined.${adminMessage ? ` ${adminMessage}` : ' Contact support if you still need help.'}`;
-  await db.query('INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)', [request.user_id, title, body]);
-  await req.app.locals.notifyUser?.(request.user_id, { title, body, url: './', tag: `we-met-recovery-${request.id}` });
-  res.json({ request });
 }));
 
 router.post('/notifications', asyncHandler(async (req, res) => {

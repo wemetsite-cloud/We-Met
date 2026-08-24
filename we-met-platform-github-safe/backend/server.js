@@ -113,6 +113,8 @@ if (config.serveFrontends) {
   const customer = path.join(root, 'customer-site');
   const employee = path.join(root, 'employee-site');
   const admin = path.join(root, 'admin-site');
+  const shared = path.join(root, 'shared');
+  app.use('/shared', express.static(shared, staticOptions));
   const portalStatic = {
     customer: express.static(customer, staticOptions),
     employee: express.static(employee, staticOptions),

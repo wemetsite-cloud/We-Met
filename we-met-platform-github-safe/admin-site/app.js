@@ -19,7 +19,6 @@
   let calls = [];
   let reports = [];
   let tickets = [];
-  let resets = [];
   let withdrawals = [];
   let listenerWallets = [];
   let auditEntries = [];
@@ -30,7 +29,7 @@
   const PROFILE_AVATARS = Array.from({ length: 20 }, (_, index) => `avatar-${String(index + 1).padStart(2, '0')}.svg`);
   let activePage = 'overview';
   let liveRefreshTimer = null;
-  const queueFilters = { verifications: 'new', withdrawals: 'new', reports: 'new', support: 'new', resets: 'new' };
+  const queueFilters = { verifications: 'new', withdrawals: 'new', reports: 'new', support: 'new' };
 
   const pageMeta = {
     overview: ['Overview', 'Live service health and operational summary'],
@@ -46,7 +45,6 @@
     calls: ['Calls', 'Every call, participant and connected duration'],
     reports: ['Reports', 'Safety review and account actions'],
     support: ['Support', 'Customer messages and replies'],
-    resets: ['Password resets', 'Review secure account recovery requests'],
     broadcast: ['Notifications', 'Send in-app and browser service messages'],
     audit: ['Audit log', 'Successful administrator changes across the platform'],
     security: ['Security', 'Administrator credentials and operational safeguards'],
@@ -63,11 +61,14 @@
 
   function profileImageSrc(value, name = 'Listener', userId = '') {
     const image = String(value || '');
-    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(image)) return `assets/${image}`;
     if ((image === 'photo' || image === `photo:${userId}`) && userId) return `${P.base}/api/public/listener-profile-image/${encodeURIComponent(userId)}`;
     if (/^data:image\/(?:jpeg|png|webp);base64,/.test(image)) return image;
-    let total = 0; for (const char of String(name || 'Listener')) total += char.charCodeAt(0);
-    return `assets/avatar-${String((total % 20) + 1).padStart(2, '0')}.svg`;
+    const palettes = [['#ff4f9a','#6d1748'],['#8b5cf6','#3b1f75'],['#23b5a9','#135b60'],['#f59e5b','#963b52'],['#51a7f9','#294678']];
+    let total = 0; for (const char of `${image}:${userId || name}`) total = (total * 31 + char.charCodeAt(0)) >>> 0;
+    const [start, end] = palettes[total % palettes.length];
+    const letters = String(name || 'Listener').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'WM';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="320" height="320" rx="160" fill="url(#g)"/><circle cx="240" cy="72" r="52" fill="#fff" opacity=".12"/><text x="160" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="104" font-weight="700" fill="#fff">${letters}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }
 
   function listenerAvatarMarkup(user, className = '') {
@@ -110,7 +111,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.5.0', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.7.0', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -179,7 +180,6 @@
     $('#reloadCalls').onclick = loadCalls;
     $('#reloadReports').onclick = loadReports;
     $('#reloadSupport').onclick = loadSupport;
-    $('#reloadResets').onclick = loadResets;
     $('#reloadAudit').onclick = loadAudit;
     $('#reloadVerifications').onclick = loadVerifications;
     $('#reloadPayments').onclick = loadPayments;
@@ -215,7 +215,6 @@
     if (d.minutes) return minutesModal(d.minutes);
     if (d.suspend) return suspendModal(d.suspend);
     if (d.block) return setUserStatus(d.block, d.status === 'blocked' ? 'active' : 'blocked');
-    if (d.reset) return resetPassword(d.reset);
     if (d.planEdit) return editPlan(d.planEdit);
     if (d.planToggle) return updatePlan(d.planToggle, { active: d.active !== 'true' });
     if (d.coupon) return toggleCoupon(d.coupon, d.active !== 'true');
@@ -225,8 +224,6 @@
     if (d.target) return suspendModal(d.target);
     if (d.reply) return replySupport(d.reply);
     if (d.loginSupportReply) return replySupport(d.loginSupportReply, 'login');
-    if (d.resetApprove) return reviewReset(d.resetApprove, 'approved');
-    if (d.resetDecline) return reviewReset(d.resetDecline, 'declined');
     if (d.verificationApprove) return reviewVerification(d.verificationApprove, 'approve');
     if (d.verificationReject) return reviewVerification(d.verificationReject, 'reject');
     if (d.listenerVerification) return setListenerVerification(d.listenerVerification, d.required === 'true');
@@ -319,7 +316,6 @@
       calls: loadCalls,
       reports: loadReports,
       support: loadSupport,
-      resets: loadResets,
       audit: loadAudit,
     };
     loaders[name]?.();
@@ -367,7 +363,7 @@
     $('#customerActiveCount').textContent = all.filter(user => user.status === 'active').length;
     $('#customerPhoneCount').textContent = all.filter(user => user.phone).length;
     $('#customerWalletTotal').textContent = P.duration(all.reduce((total, user) => total + Number(user.balance_seconds || 0), 0));
-    $('#customersTable').innerHTML = list.length ? list.map(user => `<article class="customer-card clickable-card" role="listitem" tabindex="0" data-user-profile="${user.id}"><header><span class="customer-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, user.phone || 'Phone not available')}</div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></header><div class="customer-contact-grid"><div><small>Phone</small>${user.phone ? `<a class="phone-link" href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : '<span class="contact-missing">Not provided</span>'}</div><div><small>Wallet balance</small><strong>${P.duration(user.balance_seconds)}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div></div><div class="customer-card-actions"><button class="ghost" data-user-profile="${user.id}">Full profile</button><button class="primary" data-minutes="${user.id}">Minutes</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div></article>`).join('') : `<div class="customer-empty"><b>${query ? 'No matching customers' : 'No customers yet'}</b><p>${query ? 'Try a different name or phone number.' : 'New customer accounts will appear here automatically.'}</p></div>`;
+    $('#customersTable').innerHTML = list.length ? list.map(user => `<article class="customer-card clickable-card" role="listitem" tabindex="0" data-user-profile="${user.id}"><header><span class="customer-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, user.phone || 'Phone not available')}</div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></header><div class="customer-contact-grid"><div><small>Phone</small>${user.phone ? `<a class="phone-link" href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : '<span class="contact-missing">Not provided</span>'}</div><div><small>Wallet balance</small><strong>${P.duration(user.balance_seconds)}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div></div><div class="customer-card-actions"><button class="ghost" data-user-profile="${user.id}">Full profile</button><button class="primary" data-minutes="${user.id}">Minutes</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button></div></article>`).join('') : `<div class="customer-empty"><b>${query ? 'No matching customers' : 'No customers yet'}</b><p>${query ? 'Try a different name or phone number.' : 'New customer accounts will appear here automatically.'}</p></div>`;
   }
 
   function renderEmployees() {
@@ -384,7 +380,7 @@
         <header>${listenerAvatarMarkup(user)}<div>${profileLink(user.id, user.username ? `@${user.username}` : user.name, `${user.employee_code || 'No ID'} • ${user.listener_language || 'Malayalam'}`)}</div><div class="listener-statuses"><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span><span class="pill ${user.listener_availability === 'online' ? 'available' : P.esc(user.listener_availability || 'offline')}">${P.esc(user.listener_availability || 'offline')}</span><span class="pill verification-${P.esc(user.listener_verification_status || 'approved')}">${P.esc(user.listener_verification_status || 'approved')}</span></div></header>
         <div class="listener-performance"><div><small>Work today</small><strong>${P.duration(user.today_work_seconds)}</strong></div><div><small>Talk today</small><strong>${P.duration(user.today_talk_seconds)}</strong></div><div><small>Break today</small><strong>${P.duration(user.today_break_seconds)}</strong></div><div><small>Calls today</small><strong>${Number(user.today_calls || 0)}</strong></div><div><small>Rate / min</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div><div><small>Unpaid wallet</small><strong>${P.moneyExact(user.listener_wallet_balance_paise)}</strong></div></div>
         <p class="listener-contact">${P.esc(user.phone || 'Private phone not available')} • Last seen ${user.last_seen_at ? P.date(user.last_seen_at) : 'not recorded'}</p>
-        <div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="ghost" data-wallet-rate="${user.id}">Set rate</button><button class="ghost" data-listener-verification="${user.id}" data-required="${user.listener_verification_status === 'approved'}">${user.listener_verification_status === 'approved' ? 'Require voice check' : 'Approve without voice'}</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button><button class="ghost" data-reset="${user.id}">Reset password</button></div>
+        <div class="customer-card-actions"><button class="primary" data-user-profile="${user.id}">Full profile</button><button class="ghost" data-edit-listener="${user.id}">Edit</button><button class="ghost" data-wallet-rate="${user.id}">Set rate</button><button class="ghost" data-listener-verification="${user.id}" data-required="${user.listener_verification_status === 'approved'}">${user.listener_verification_status === 'approved' ? 'Require voice check' : 'Approve without voice'}</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button></div>
       </article>`).join('') : '<p class="empty-copy">No listeners match this filter.</p>';
   }
 
@@ -410,7 +406,7 @@
     const user = users.find(item => item.id === id && item.role === 'employee');
     if (!user) return;
     let profileImageDraft = user.profile_image || '';
-    const avatarOptions = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-admin-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="assets/${avatar}" alt=""></button>`).join('');
+    const avatarOptions = PROFILE_AVATARS.map((avatar) => `<button type="button" class="avatar-choice ${profileImageDraft === avatar ? 'selected' : ''}" data-admin-avatar="${avatar}" aria-label="Choose ${avatar}"><img src="${P.esc(profileImageSrc(avatar, user.name, user.id))}" alt=""></button>`).join('');
     modal(`Edit listener — ${user.name}`, `<form id="editListenerForm" class="stack"><div class="admin-profile-photo-editor"><div class="admin-profile-photo-head"><span class="admin-profile-photo-preview"><img id="editListenerPhotoPreview" src="${P.esc(profileImageSrc(profileImageDraft,user.name,user.id))}" alt="Listener profile photo"></span><div><strong>Customer-facing profile photo</strong><p>Upload a photo or choose one of the built-in We Met avatars.</p><div class="profile-photo-actions"><button id="adminUploadListenerPhoto" class="ghost" type="button">Upload photo</button><button id="adminAutoListenerAvatar" class="ghost" type="button">Automatic avatar</button><input id="adminListenerPhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></div></div></div><div id="adminAvatarGrid" class="avatar-picker">${avatarOptions}</div></div><label>Private original name<input id="editListenerName" value="${P.esc(user.name || '')}" required></label><label>Public username<input id="editListenerUsername" pattern="[a-zA-Z0-9._-]{3,80}" value="${P.esc(user.username || '')}" required></label><label>Verified private phone<input id="editListenerPhone" type="tel" value="${P.esc(user.phone || '')}" required></label><label>Language<input id="editListenerLanguage" list="listenerLanguages" maxlength="60" value="${P.esc(user.listener_language || 'Malayalam')}" required></label><label>Rate per connected minute (₹)<input id="editListenerRate" type="number" min="0" max="100000" step="0.01" value="${Number(user.listener_rate_paise || 0) / 100}" required></label><label>Short public bio<textarea id="editListenerBio" maxlength="500">${P.esc(user.bio || '')}</textarea></label><button class="primary">Save listener</button></form>`);
     const renderAvatarState = () => {
       $('#editListenerPhotoPreview').src = profileImageSrc(profileImageDraft, $('#editListenerName').value || user.name, user.id);
@@ -556,15 +552,6 @@
     } catch (error) { P.toast(error.message, 'error'); }
   }
 
-  async function resetPassword(id) {
-    const password = prompt('New temporary password (at least 8 characters):');
-    if (!password) return;
-    try {
-      await P.api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: password }) });
-      P.toast('Password reset completed. Existing sessions were revoked.', 'success'); loadResets(); loadAudit();
-    } catch (error) { P.toast(error.message, 'error'); }
-  }
-
   async function createEmployee(event) {
     event.preventDefault();
     try {
@@ -653,7 +640,6 @@
     $$(`[data-queue-group="${group}"] [data-queue-filter]`).forEach(button => button.classList.toggle('active', button.dataset.queueFilter === filter));
     if (group === 'reports') renderReports();
     if (group === 'support') renderSupport();
-    if (group === 'resets') renderResets();
     if (group === 'withdrawals') renderWithdrawals();
     if (group === 'verifications') loadVerifications();
   }
@@ -788,24 +774,6 @@
       try { await P.api(endpoint, { method: 'PATCH', body: JSON.stringify({ adminReply: $('#replyText').value, status: $('#replyStatus').value }) }); closeAdminModal(); P.toast('Reply saved.', 'success'); loadSupport(); }
       catch (error) { P.toast(error.message, 'error'); }
     };
-  }
-
-  async function loadResets() {
-    try {
-      resets = (await P.api('/api/admin/password-resets')).requests || [];
-      renderResets();
-    } catch (error) { P.toast(error.message, 'error'); }
-  }
-
-  function renderResets() {
-    const list = visibleQueue(resets, 'resets', item => item.status === 'open');
-    $('#resetList').innerHTML = list.map(request => `<article class="ticket"><div><span class="pill ${P.esc(request.status)}">${P.esc(request.status)}</span><strong>${profileLink(request.user_id, request.name, request.email || request.username)}</strong><p>${P.esc(request.role)} • requested ${P.date(request.created_at)} • expires ${P.date(request.expires_at)}</p>${request.admin_message ? `<p><b>Admin message:</b> ${P.esc(request.admin_message)}</p>` : ''}</div>${request.status === 'open' ? `<div class="actions"><button class="primary" data-reset-approve="${request.id}">Approve</button><button class="danger" data-reset-decline="${request.id}">Decline</button></div>` : ''}</article>`).join('') || `<p class="empty-copy">No ${queueFilters.resets === 'new' ? 'new password reset requests' : 'password reset history'}.</p>`;
-  }
-
-  async function reviewReset(id, action) {
-    const message = prompt(`Optional message for the user (${action}):`) || '';
-    try { await P.api(`/api/admin/password-resets/${id}`, { method: 'PATCH', body: JSON.stringify({ action, adminMessage: message }) }); P.toast(`Recovery request ${action}.`, 'success'); loadResets(); }
-    catch (error) { P.toast(error.message, 'error'); }
   }
 
   async function loadWithdrawals() {

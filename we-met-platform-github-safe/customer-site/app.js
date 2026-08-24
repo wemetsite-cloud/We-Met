@@ -24,9 +24,12 @@
   let activeTab = 'home';
   let paymentPlans = [];
   let followingListeners = [];
-  let authState = { phone: '', challengeId: '', registrationToken: '' };
+  let authState = { phone: '', challengeId: '', registrationToken: '', otpPurpose: 'registration' };
+  let customerRecoveryState = { challengeId: '', resetToken: '' };
   let supportAuthState = { challengeId: '', registrationToken: '' };
   let postObjectUrls = [];
+  let activeProfilePosts = [];
+  let activeProfileListener = null;
   let customerPhotoObjectUrl = '';
   let customerPhotoDraft;
   let deferredInstallPrompt = null;
@@ -34,6 +37,7 @@
   let pendingMembershipCheckout = null;
   let pendingCallRequest = null;
   let razorpayLoader = null;
+  let activeWalletCheckout = null;
   let activeListenerProfileId = null;
 
   window.addEventListener('portal:session-invalid', (event) => {
@@ -42,7 +46,17 @@
   });
 
   function emptyState(title, message) {
-    return `<div class="panel empty-state"><img src="assets/logo.svg" alt=""><h3>${esc(title)}</h3><p>${esc(message)}</p></div>`;
+    return `<div class="panel empty-state"><img src="/shared/logo.svg" alt=""><h3>${esc(title)}</h3><p>${esc(message)}</p></div>`;
+  }
+
+  function generatedAvatar(seed, name = 'Listener') {
+    const palettes = [['#ff4f9a','#6d1748'],['#8b5cf6','#3b1f75'],['#23b5a9','#135b60'],['#f59e5b','#963b52'],['#51a7f9','#294678']];
+    let total = 0;
+    for (const char of String(seed || name)) total = (total * 31 + char.charCodeAt(0)) >>> 0;
+    const [start, end] = palettes[total % palettes.length];
+    const letters = String(name || 'Listener').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'WM';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="320" height="320" rx="160" fill="url(#g)"/><circle cx="240" cy="72" r="52" fill="#fff" opacity=".12"/><text x="160" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="104" font-weight="700" fill="#fff">${letters}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }
 
   function listenerImage(listener, kind = 'profile') {
@@ -54,12 +68,9 @@
       return `${P.base}/api/public/${endpoint}/${encodeURIComponent(listenerId)}?v=${encodeURIComponent(mediaVersion)}`;
     }
     if (/^data:image\/(?:jpeg|png|webp);base64,/.test(reference)) return reference;
-    if (kind === 'banner') return 'assets/default-listener-banner.png';
-    if (/^avatar-(0[1-9]|1[0-9]|20)\.svg$/.test(reference)) return `assets/${reference}`;
+    if (kind === 'banner') return '/shared/default-listener-banner.png';
     const seed = String(listenerId || listener.name || 'listener');
-    let total = 0;
-    for (const char of seed) total += char.charCodeAt(0);
-    return `assets/avatar-${String((total % 20) + 1).padStart(2, '0')}.svg`;
+    return generatedAvatar(`${reference}:${seed}`, listener.name || listener.username || 'Listener');
   }
 
   function liveStatus(listener) {
@@ -78,7 +89,7 @@
   }
 
   function currentOverlay() {
-    return ['listenerProfileModal', 'authModal', 'preloginSupportModal', 'legalModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
+    return ['customerPostFeed', 'listenerProfileModal', 'authModal', 'customerRecoveryModal', 'preloginSupportModal', 'legalModal', 'membershipCheckoutModal', 'callModal'].find((id) => !document.getElementById(id)?.classList.contains('hidden')) || null;
   }
 
   function syncBodyState() {
@@ -98,7 +109,7 @@
   function closeOverlay(id, useHistory = true) {
     if (useHistory && history.state?.marker === NAV_MARKER && history.state.overlay === id) return history.back();
     document.getElementById(id)?.classList.add('hidden');
-    if (id === 'listenerProfileModal') { activeListenerProfileId = null; releasePostUrls(); }
+    if (id === 'listenerProfileModal') { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
     if (id === 'membershipCheckoutModal') pendingMembershipCheckout = null;
     syncBodyState();
   }
@@ -110,6 +121,7 @@
   function releasePostUrls() {
     postObjectUrls.forEach((url) => URL.revokeObjectURL(url));
     postObjectUrls = [];
+    activeProfilePosts = [];
   }
 
   function initNavigation() {
@@ -120,13 +132,13 @@
       const state = event.state?.marker === NAV_MARKER
         ? event.state
         : { tab: activeTab || 'home' };
-      ['authModal', 'preloginSupportModal', 'listenerProfileModal', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
+      ['authModal', 'customerRecoveryModal', 'preloginSupportModal', 'listenerProfileModal', 'customerPostFeed', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
       if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
       document.body.classList.remove('razorpay-open');
       if (!$('#callModal')?.classList.contains('hidden') && currentCall) minimizeCall(false);
       if (me) selectTab(state.tab || 'home', { historyMode: 'none' });
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
-      if (state.overlay !== 'listenerProfileModal') { activeListenerProfileId = null; releasePostUrls(); }
+      if (!['listenerProfileModal', 'customerPostFeed'].includes(state.overlay)) { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
       syncBodyState();
     });
   }
@@ -139,7 +151,7 @@
   }
 
   function openAuth() {
-    authState = { phone: '', challengeId: '', registrationToken: '' };
+    authState = { phone: '', challengeId: '', registrationToken: '', otpPurpose: 'registration' };
     ['phoneStartForm', 'phonePasswordForm', 'phoneOtpForm', 'phoneDetailsForm'].forEach((id) => document.getElementById(id)?.reset());
     show('#developmentOtp', false);
     showPhoneStep('welcome');
@@ -166,6 +178,7 @@
       if (response.mode === 'password') showPhoneStep('password');
       else {
         authState.challengeId = response.challengeId;
+        authState.otpPurpose = 'registration';
         if (response.developmentOtp) { $('#developmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#developmentOtp'); }
         showPhoneStep('otp');
       }
@@ -184,16 +197,76 @@
     finally { submit.disabled = false; }
   }
 
+  async function startCustomerOtpLogin() {
+    const button = $('#customerOtpLogin');
+    button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/login/start', { method: 'POST', body: JSON.stringify({ phone: authState.phone, role: 'customer' }) });
+      authState.challengeId = response.challengeId;
+      authState.otpPurpose = 'login';
+      $('#otpPhonePreview').textContent = response.phone;
+      if (response.developmentOtp) { $('#developmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#developmentOtp'); }
+      showPhoneStep('otp');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
   async function verifyOtp(event) {
     event.preventDefault();
     const submit = event.submitter;
     submit.disabled = true;
     try {
       const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: authState.challengeId, otp: $('#authOtp').value }) });
+      if (response.mode === 'login' && response.token) return completeAuthentication(response);
       authState.registrationToken = response.registrationToken;
       showPhoneStep('details');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { submit.disabled = false; }
+  }
+
+  function openCustomerRecovery() {
+    customerRecoveryState = { challengeId: '', resetToken: '' };
+    ['customerRecoveryPhoneForm', 'customerRecoveryOtpForm', 'customerRecoveryPasswordForm'].forEach((id) => document.getElementById(id)?.reset());
+    show('#customerRecoveryPhoneForm'); show('#customerRecoveryOtpForm', false); show('#customerRecoveryPasswordForm', false); show('#customerRecoveryDevelopmentOtp', false);
+    if (authState.phone) $('#customerRecoveryPhone').value = authState.phone;
+    openOverlay('customerRecoveryModal');
+    setTimeout(() => $('#customerRecoveryPhone').focus(), 60);
+  }
+
+  async function startCustomerRecovery(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier: $('#customerRecoveryPhone').value, role: 'customer' }) });
+      customerRecoveryState.challengeId = response.challengeId;
+      $('#customerRecoveryPhonePreview').textContent = response.phone;
+      if (response.developmentOtp) { $('#customerRecoveryDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#customerRecoveryDevelopmentOtp'); }
+      show('#customerRecoveryPhoneForm', false); show('#customerRecoveryOtpForm'); $('#customerRecoveryOtp').focus();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function verifyCustomerRecovery(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: customerRecoveryState.challengeId, otp: $('#customerRecoveryOtp').value }) });
+      if (!response.resetToken) throw new Error('Password reset verification failed. Request a new OTP.');
+      customerRecoveryState.resetToken = response.resetToken;
+      show('#customerRecoveryOtpForm', false); show('#customerRecoveryPasswordForm'); $('#customerRecoveryPassword').focus();
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function completeCustomerRecovery(event) {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    const password = $('#customerRecoveryPassword').value;
+    if (password !== $('#customerRecoveryConfirm').value) { button.disabled = false; return P.toast('The new passwords do not match.', 'error'); }
+    try {
+      const response = await P.api('/api/auth/password-reset/complete', { method: 'POST', body: JSON.stringify({ resetToken: customerRecoveryState.resetToken, role: 'customer', newPassword: password }) });
+      closeOverlay('customerRecoveryModal');
+      showPhoneStep('password');
+      P.toast(response.message || 'Password changed. Sign in now.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
   }
 
   async function registerCustomer(event) {
@@ -264,7 +337,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.6.0', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.7.0', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -286,8 +359,13 @@
     $('#authBegin').onclick = () => showPhoneStep('phone');
     $('#phoneStartForm').onsubmit = startPhone;
     $('#phonePasswordForm').onsubmit = passwordLogin;
+    $('#customerOtpLogin').onclick = startCustomerOtpLogin;
+    $('#customerForgotPassword').onclick = openCustomerRecovery;
     $('#phoneOtpForm').onsubmit = verifyOtp;
     $('#phoneDetailsForm').onsubmit = registerCustomer;
+    $('#customerRecoveryPhoneForm').onsubmit = startCustomerRecovery;
+    $('#customerRecoveryOtpForm').onsubmit = verifyCustomerRecovery;
+    $('#customerRecoveryPasswordForm').onsubmit = completeCustomerRecovery;
     $$('[data-auth-phone-back]').forEach((button) => { button.onclick = () => showPhoneStep('phone'); });
     $$('[data-password-toggle]').forEach((button) => { button.onclick = () => togglePassword(button); });
     $$('[data-close]').forEach((button) => { button.onclick = () => closeOverlay(button.dataset.close); });
@@ -345,6 +423,8 @@
     }
     const postLike = event.target.closest('button[data-post-like]');
     if (postLike) return togglePostLike(postLike);
+    const openPost = event.target.closest('button[data-open-customer-post]');
+    if (openPost) return openCustomerPostFeed(openPost.dataset.openCustomerPost);
     const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
     if (!target) return;
     const d = target.dataset;
@@ -370,9 +450,14 @@
         body: '{}',
       });
       button.dataset.liked = String(response.liked);
-      button.classList.toggle('liked', response.liked);
-      button.setAttribute('aria-pressed', String(response.liked));
-      button.setAttribute('aria-label', `${response.liked ? 'Unlike' : 'Like'} this post`);
+      const saved = activeProfilePosts.find((post) => post.id === postId);
+      if (saved) saved.liked = response.liked;
+      $$(`button[data-post-like="${CSS.escape(postId)}"]`).forEach((control) => {
+        control.dataset.liked = String(response.liked);
+        control.classList.toggle('liked', response.liked);
+        control.setAttribute('aria-pressed', String(response.liked));
+        control.setAttribute('aria-label', `${response.liked ? 'Unlike' : 'Like'} this post`);
+      });
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
@@ -485,11 +570,13 @@
 
   async function openListenerProfile(listenerId) {
     activeListenerProfileId = listenerId;
+    activeProfileListener = null;
     releasePostUrls(); openOverlay('listenerProfileModal');
     $('#listenerProfileContent').innerHTML = '<div class="profile-loading"><span></span><p>Opening listener profile…</p></div>';
     try {
       const response = await P.api(`/api/customer/listeners/${encodeURIComponent(listenerId)}/profile`);
       const listener = response.listener;
+      activeProfileListener = listener;
       const status = liveStatus(listener);
       const subscribed = Boolean(listener.subscribed || isActiveMember(listener.id));
       const postsMarkup = subscribed ? await renderPrivatePosts(response.posts || []) : response.postsLocked ? `<button class="locked-posts" data-subscribe="${esc(listener.id)}" type="button"><span class="lock-art">✦</span><b>See exclusive posts</b><small>Subscribe to ${esc(listener.name)} for ₹399/month</small></button>` : '<div class="profile-no-posts">No exclusive posts yet.</div>';
@@ -501,12 +588,37 @@
   }
 
   async function renderPrivatePosts(posts) {
+    activeProfilePosts = [];
     if (!posts.length) return '<div class="profile-no-posts">No exclusive posts yet.</div>';
     const items = await Promise.all(posts.map(async (post) => {
-      try { const blob = await P.apiBlob(post.imageUrl); const url = URL.createObjectURL(blob); postObjectUrls.push(url); return `<figure class="exclusive-post protected-media"><img src="${esc(url)}" alt="Exclusive listener post" draggable="false"><button class="exclusive-post-like ${post.liked ? 'liked' : ''}" data-post-like="${esc(post.id)}" data-liked="${Boolean(post.liked)}" type="button" aria-label="${post.liked ? 'Unlike' : 'Like'} this post" aria-pressed="${Boolean(post.liked)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg></button><figcaption>${esc(post.caption || '')}<small>${P.date(post.created_at)}</small></figcaption></figure>`; }
-      catch { return ''; }
+      try {
+        const blob = await P.apiBlob(post.imageUrl);
+        const url = URL.createObjectURL(blob);
+        postObjectUrls.push(url);
+        return {
+          post: { ...post, image: url },
+          markup: `<button class="exclusive-post protected-media" data-open-customer-post="${esc(post.id)}" type="button" aria-label="Open post"><img src="${esc(url)}" alt="Exclusive listener post" draggable="false"></button>`,
+        };
+      } catch { return null; }
     }));
-    return items.join('') || '<div class="profile-no-posts">Posts could not be loaded.</div>';
+    activeProfilePosts = items.filter(Boolean).map((item) => item.post);
+    return items.filter(Boolean).map((item) => item.markup).join('') || '<div class="profile-no-posts">Posts could not be loaded.</div>';
+  }
+
+  function renderCustomerPostFeed() {
+    const feed = $('#customerPostFeedList');
+    if (!feed) return;
+    feed.innerHTML = activeProfilePosts.map((post) => `<article class="customer-feed-post" data-customer-feed-post="${esc(post.id)}"><div class="customer-feed-media protected-media"><img src="${esc(post.image)}" alt="Exclusive listener post" draggable="false"></div><footer><p>${esc(post.caption || '')}</p><button class="customer-feed-like ${post.liked ? 'liked' : ''}" data-post-like="${esc(post.id)}" data-liked="${Boolean(post.liked)}" type="button" aria-label="${post.liked ? 'Unlike' : 'Like'} this post" aria-pressed="${Boolean(post.liked)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg><span>${post.liked ? 'Liked' : 'Like'}</span></button></footer></article>`).join('');
+    $('#customerPostFeedTitle').textContent = activeProfileListener?.name ? `${activeProfileListener.name}'s posts` : 'Posts';
+  }
+
+  function openCustomerPostFeed(postId) {
+    if (!activeProfilePosts.some((post) => post.id === postId)) return;
+    renderCustomerPostFeed();
+    openOverlay('customerPostFeed');
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-customer-feed-post="${CSS.escape(postId)}"]`)?.scrollIntoView({ block: 'start' });
+    });
   }
 
   async function toggleFollow(listenerId, following) {
@@ -590,7 +702,7 @@
         pendingMembershipCheckout = null;
         closeOverlay('membershipCheckoutModal', false);
       };
-      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('assets/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
+      const checkout = new window.Razorpay({ key: order.key_id, subscription_id: order.subscription_id, name: 'We Met', description: `${order.listener.name} · Exclusive ₹399/month`, image: new URL('/shared/icon-192.png', location.href).href, prefill: { name: me.name || '', contact: me.phone || '' }, readonly: { contact: true }, remember_customer: false, redirect: false, theme: { color: '#e62d7d', backdrop_color: '#0c0d10' }, modal: { backdropclose: false, confirm_close: true, handleback: true, escape: true, animation: false, ondismiss: () => { if (!handled) restore(false); } }, handler: async (payment) => {
         handled = true;
         let verifiedSuccessfully = false;
         try {
@@ -670,14 +782,75 @@
 
   async function loadPlans() {
     if (!me) return;
-    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Buy</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
+    try { const response = await P.api('/api/customer/plans', { cache: 'no-store' }); paymentPlans = response.plans || []; $('#walletPaymentIntro').textContent = 'Choose a talk-time pack.'; $('#plansGrid').innerHTML = paymentPlans.length ? paymentPlans.map((plan) => `<article class="wallet-plan-card ${plan.popular ? 'popular' : ''}">${plan.popular ? '<span class="popular-label">POPULAR</span>' : ''}<span class="wallet-plan-minutes"><b>${Math.round(plan.seconds / 60)}</b><small>min</small></span><span class="wallet-plan-name">${esc(plan.name)}</span><strong class="wallet-plan-price">${P.money(plan.price_paise)}</strong><button class="button button-primary" data-buy-plan="${esc(plan.id)}" type="button">Pay ${P.money(plan.price_paise)}</button></article>`).join('') : emptyState('No talk-time packs', 'Talk-time packs will appear here.'); }
     catch (error) { P.toast(error.message, 'error'); }
   }
 
-  function openPayment(planId) {
+  async function openPayment(planId, button) {
     const plan = paymentPlans.find((item) => item.id === planId);
     if (!plan) return P.toast('This talk-time pack is unavailable.', 'error');
-    window.location.assign(`checkout.html?plan=${encodeURIComponent(plan.id)}`);
+    if (activeWalletCheckout) return;
+    const originalLabel = button?.textContent || `Pay ${P.money(plan.price_paise)}`;
+    if (button) { button.disabled = true; button.textContent = 'Opening…'; }
+    let completed = false;
+    let failureMessage = '';
+    const restore = () => {
+      activeWalletCheckout = null;
+      document.body.classList.remove('razorpay-open');
+      if (button) { button.disabled = false; button.textContent = originalLabel; }
+    };
+    try {
+      await loadRazorpayCheckout();
+      const order = await P.api('/api/create-order', {
+        method: 'POST',
+        body: JSON.stringify({ planId: plan.id, amount: Number(plan.price_paise), currency: 'INR', receipt: `wallet_${Date.now()}` }),
+      });
+      if (!order?.order_id || !order?.key_id) throw new Error('Secure payment could not start. Please try again.');
+      const checkout = new window.Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: 'We Met',
+        description: `${plan.name} · ${Math.round(Number(plan.seconds) / 60)} minutes`,
+        image: new URL('/shared/icon-192.png', location.origin).href,
+        prefill: { name: me.name || '', contact: me.phone || '' },
+        readonly: { contact: true },
+        remember_customer: false,
+        redirect: false,
+        retry: { enabled: true },
+        theme: { color: '#e62d7d', backdrop_color: '#0c0d10' },
+        modal: {
+          backdropclose: false,
+          confirm_close: false,
+          handleback: true,
+          escape: true,
+          animation: false,
+          ondismiss: () => {
+            restore();
+            if (!completed) P.toast(failureMessage || 'Payment closed. You are still on your wallet.', 'info');
+          },
+        },
+        handler: async (payment) => {
+          completed = true;
+          try {
+            const verified = await P.api('/api/verify-payment', { method: 'POST', timeout: 30000, body: JSON.stringify(payment) });
+            updateBalance(verified.balance_seconds);
+            await loadHistory();
+            P.toast(verified.message || 'Talk-time added to your wallet.', 'success');
+          } catch (error) {
+            P.toast(`${error.message}${payment?.razorpay_payment_id ? ` · Ref ${payment.razorpay_payment_id}` : ''}`, 'error');
+          } finally { restore(); }
+        },
+      });
+      checkout.on('payment.failed', (response) => { failureMessage = response?.error?.description || 'Payment was not completed.'; });
+      activeWalletCheckout = checkout;
+      document.body.classList.add('razorpay-open');
+      checkout.open();
+    } catch (error) {
+      restore();
+      P.toast(error.message || 'Secure payment could not start. Please try again.', 'error');
+    }
   }
 
   async function redeem(event) {
@@ -821,7 +994,7 @@
     openOverlay('callModal'); show('#restoreCall', false); $('#callPerson').textContent = currentCall.employee?.name || 'Listener'; $('#callBio').textContent = currentCall.employee?.bio || 'A private conversation'; $('#callTimer').textContent = '0:00'; $('#restoreTimer').textContent = '0:00'; $('#chatMessages').innerHTML = '<div class="bubble">Private call chat starts here.</div>';
     const employee = directory.find((item) => item.id === currentCall.employee?.id) || currentCall.employee;
     if (employee?.id) currentCall.employee = { ...employee, ...currentCall.employee, following: Boolean(employee.following) };
-    $('#callAvatarImage').src = employee?.id ? listenerImage(employee) : 'assets/logo.svg';
+    $('#callAvatarImage').src = employee?.id ? listenerImage(employee) : '/shared/logo.svg';
     show('#callProfileButton', Boolean(employee?.id)); show('#callFollowButton', Boolean(employee?.id)); show('#callSubscribeButton', Boolean(employee?.id) && !isActiveMember(employee.id) && !employee.subscribed);
     if (employee?.id) $('#callFollowButton').textContent = employee.following ? 'Following' : 'Follow';
   }

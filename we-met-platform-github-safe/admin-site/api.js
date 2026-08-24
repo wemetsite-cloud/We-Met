@@ -145,7 +145,7 @@
 
   function notify(title, body) {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: 'assets/icon-192.png' });
+      new Notification(title, { body, icon: '/shared/icon-192.png' });
     }
     toast(body);
   }

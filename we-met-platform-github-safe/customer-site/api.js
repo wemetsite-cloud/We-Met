@@ -141,8 +141,8 @@
         if (registration) {
           await registration.showNotification(title, {
             body,
-            icon: 'assets/icon-192.png',
-            badge: 'assets/favicon.png',
+            icon: '/shared/icon-192.png',
+            badge: '/shared/favicon.png',
             tag: options.tag || 'we-met-update',
             renotify: options.renotify === true,
             requireInteraction: options.requireInteraction === true,

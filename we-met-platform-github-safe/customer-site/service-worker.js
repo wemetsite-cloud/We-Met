@@ -1,17 +1,14 @@
-const VERSION = '8.6.0';
+const VERSION = '8.7.0';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
   './',
   'index.html',
-  'checkout.html',
-  'checkout.css',
-  'checkout.js',
   'style.css',
   'app.js',
   'api.js',
-  'socket-loader.js',
-  'webrtc.js',
+  '/shared/socket-loader.js',
+  '/shared/webrtc.js',
   'config.js',
   'manifest.webmanifest',
   'legal.css',
@@ -27,32 +24,12 @@ const STATIC = [
   'child-safety.html',
   'delete-account.html',
   'delete-account.js',
-  'assets/logo.svg',
-  'assets/favicon.png',
-  'assets/icon-192.png',
-  'assets/icon-512.png',
+  '/shared/logo.svg',
+  '/shared/favicon.png',
+  '/shared/icon-192.png',
+  '/shared/icon-512.png',
   'assets/profile-placeholder.svg',
-  'assets/default-listener-banner.png',
-  'assets/avatar-01.svg',
-  'assets/avatar-02.svg',
-  'assets/avatar-03.svg',
-  'assets/avatar-04.svg',
-  'assets/avatar-05.svg',
-  'assets/avatar-06.svg',
-  'assets/avatar-07.svg',
-  'assets/avatar-08.svg',
-  'assets/avatar-09.svg',
-  'assets/avatar-10.svg',
-  'assets/avatar-11.svg',
-  'assets/avatar-12.svg',
-  'assets/avatar-13.svg',
-  'assets/avatar-14.svg',
-  'assets/avatar-15.svg',
-  'assets/avatar-16.svg',
-  'assets/avatar-17.svg',
-  'assets/avatar-18.svg',
-  'assets/avatar-19.svg',
-  'assets/avatar-20.svg',
+  '/shared/default-listener-banner.png',
 
 ];
 
@@ -104,8 +81,8 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data?.json() || {}; } catch { data = { body: event.data?.text() || '' }; }
-  const icon = new URL(data.icon || 'assets/icon-192.png', self.registration.scope).href;
-  const badge = new URL(data.badge || 'assets/favicon.png', self.registration.scope).href;
+  const icon = new URL(data.icon || '/shared/icon-192.png', self.registration.scope).href;
+  const badge = new URL(data.badge || '/shared/favicon.png', self.registration.scope).href;
   event.waitUntil(self.registration.showNotification(data.title || 'We Met', {
     body: data.body || 'You have a new update.',
     icon,
