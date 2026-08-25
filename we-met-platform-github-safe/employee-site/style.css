@@ -1178,6 +1178,10 @@ body.signed-in .listener-main,body.signed-in .tab,
   .login-view{height:100dvh!important;overflow-y:auto!important}
   .listener-auth-shell{min-height:100dvh!important;height:auto!important;padding-bottom:calc(100px + env(safe-area-inset-bottom))!important}
   .listener-auth-step.active{max-height:none!important;overflow:visible!important}
-  .recovery-modal{display:block!important;padding:0!important;overflow-y:auto!important}
+  .recovery-modal:not(.hidden){display:block!important;padding:0!important;overflow-y:auto!important}
   .recovery-card{min-height:100dvh!important;height:auto!important;max-height:none!important;padding-bottom:calc(38px + env(safe-area-inset-bottom))!important}
 }
+
+
+/* ===== v8.9.21 listener page visibility hotfix ===== */
+#recoveryModal.hidden{display:none!important}
