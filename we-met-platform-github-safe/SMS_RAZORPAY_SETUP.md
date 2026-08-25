@@ -1,30 +1,22 @@
 # SMS OTP and Razorpay setup
 
-## 1. Where to paste the SMS API key
+## 1. MSG91 OTP authentication
 
-Do not paste an SMS secret into HTML, JavaScript, `config.js`, or GitHub. The included `render.yaml` already declares secret placeholders.
+This build uses the MSG91 OTP Widget. Returning customer/listener accounts sign in with **password only**. OTP is used for **new registration** and **Forgot password** recovery.
 
-For Fast2SMS, open **Render Dashboard → we-met-platform → Environment**, then set:
+In **Render Dashboard → we-met-platform → Environment**, set the private server credential:
 
-- `SMS_ENABLED=true`
-- `SMS_PROVIDER=fast2sms`
-- `FAST2SMS_API_KEY=YOUR_FAST2SMS_AUTHORIZATION_KEY`
-- `FAST2SMS_OTP_TEMPLATE_ID=YOUR_APPROVED_OTP_TEMPLATE_ID`
-- `SMS_OTP_EXPIRY_MINUTES=10`
+- `MSG91_AUTH_KEY=YOUR_PRIVATE_MSG91_ACCOUNT_AUTHKEY`
+- keep `SMS_ENABLED=false`
 
-Save the environment and redeploy. The project intentionally sends Fast2SMS messages only to `+91` numbers. Complete Fast2SMS KYC and approve the OTP/DLT template before live testing.
+Do not put the account Authkey in HTML, `config.js`, or GitHub. The browser-side Widget ID and `WEMETWEB` token are already configured, and the server verifies each successful MSG91 access token before creating a registration/reset token.
 
-For Twilio instead, set `SMS_ENABLED=true`, `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID` in the same Render Environment screen.
+### Authentication flows included
 
-`SMS_TEST_OTP` is for local development only and is ignored when `NODE_ENV=production`.
-
-### SMS flows included
-
-- OTP registration for customers and listeners.
-- Optional SMS OTP sign-in for returning customers and listeners.
-- SMS OTP password reset for customers and listeners.
-- OTP-verified pre-login support.
-- No administrator approval or recovery key is used for password reset.
+- New customer/listener: SMS OTP verification, then create profile + password.
+- Existing customer/listener: password sign-in only; no OTP-login bypass.
+- Forgot password: SMS OTP verification, then choose a new password.
+- OTP-verified pre-login support remains separate from account sign-in.
 
 ## 2. Razorpay live credentials
 
@@ -61,7 +53,7 @@ Paste the identical webhook secret into `RAZORPAY_WEBHOOK_SECRET`. The server va
 - Test wallet amounts such as ₹49 and ₹99: open, cancel, retry, successful capture, and browser Back.
 - Confirm the URL stays on the wallet page while Standard Checkout is open and after it closes.
 - Confirm talk time changes only after `/api/verify-payment` succeeds.
-- Test SMS signup, SMS OTP login, and SMS password reset for both customer and listener accounts.
+- Test new-account OTP signup, password-only returning-user login, and MSG91 OTP password reset for both customer and listener accounts.
 - Confirm the admin navigation has no password-reset approval queue.
 - Test one membership, renewal, cancellation, failed payment, exclusive post access, and direct messaging.
 - Add a production TURN service for reliable calls across restrictive mobile networks.
@@ -72,5 +64,5 @@ Official references:
 - Razorpay Standard Checkout: https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/
 - Razorpay Checkout Styling: https://razorpay.com/docs/payments/dashboard/account-settings/checkout-styling/
 - Razorpay payment webhooks: https://razorpay.com/docs/webhooks/payments/
-- Twilio Messaging API: https://www.twilio.com/docs/messaging/api
+- MSG91 OTP Widget: https://docs.msg91.com/otp-widget
 

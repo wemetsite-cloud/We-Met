@@ -1,20 +1,20 @@
-# SMS OTP setup
+# SMS OTP setup — MSG91 OTP Widget
 
-The server generates each OTP, stores only a hash, limits attempts and expires the challenge. Keep SMS credentials in the deployment environment, never in frontend files or source control.
+We Met v8.9.11 uses the MSG91 OTP Widget for SMS verification. Returning users **do not have OTP login**: they sign in with their password. OTP is used for new-account phone verification and Forgot password recovery.
 
-## Fast2SMS for Indian numbers
+## Required deployment secret
 
-1. Complete Fast2SMS KYC and create an approved OTP template.
-2. Set `SMS_ENABLED=true`, `SMS_PROVIDER=fast2sms`, `FAST2SMS_API_KEY` and `FAST2SMS_OTP_TEMPLATE_ID`.
-3. Keep `SMS_OTP_EXPIRY_MINUTES=10`, save and redeploy.
+In **Render Dashboard → we-met-platform → Environment**, set:
 
-Fast2SMS is limited to `+91` numbers in this project.
+- `MSG91_AUTH_KEY=YOUR_PRIVATE_MSG91_ACCOUNT_AUTHKEY`
+- keep `SMS_ENABLED=false`
 
-## Twilio for international numbers
+The browser Widget ID and `WEMETWEB` OTP Widget token are already configured in the customer/listener site config. The private account Authkey is different from the Widget token and must remain backend-only.
 
-1. Configure an SMS-capable sender and complete any required country registration.
-2. Set `SMS_ENABLED=true`, `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`.
-3. Set either `TWILIO_FROM_NUMBER` in E.164 format or `TWILIO_MESSAGING_SERVICE_SID`.
-4. Save, redeploy and test every supported country.
+## Flow
 
-`SMS_TEST_OTP` works only during local development and is ignored in production.
+- New customer/listener → MSG91 sends OTP → browser verifies OTP → backend verifies the returned MSG91 access token → account creation is unlocked.
+- Existing customer/listener → password only.
+- Forgot password → MSG91 sends OTP → backend verifies the returned access token → one-time password reset is unlocked.
+
+The old Fast2SMS/Twilio sender code remains only as inactive legacy code; the Render blueprint disables it.

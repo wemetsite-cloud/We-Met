@@ -50,22 +50,10 @@ services:
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
       - key: SMS_ENABLED
-        value: "true"
-      - key: SMS_PROVIDER
-        value: "fast2sms"
-      - key: FAST2SMS_API_KEY
-        sync: false
-      - key: FAST2SMS_OTP_TEMPLATE_ID
-        sync: false
+        value: "false"
       - key: SMS_OTP_EXPIRY_MINUTES
         value: "10"
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_FROM_NUMBER
-        sync: false
-      - key: TWILIO_MESSAGING_SERVICE_SID
+      - key: MSG91_AUTH_KEY
         sync: false
       - key: INITIAL_LISTENER_NAME
         value: "First Listener"

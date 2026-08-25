@@ -1,13 +1,16 @@
 {
-  "version": "8.9.10",
-  "name": "listener-directory-random-order",
+  "version": "8.9.11",
+  "name": "msg91-otp-password-login",
   "changes": [
-    "Randomizes the Choose a listener directory on each fresh site load instead of A-Z order",
-    "Keeps live/online listeners first, listeners on break second, and offline listeners last",
-    "Keeps the random order stable during the same page session so cards do not jump unnecessarily"
+    "Existing customer and listener accounts now sign in with password only; SMS OTP login for existing accounts is disabled",
+    "New customer and listener registrations use the MSG91 OTP Widget custom Web SDK with the configured default SMS template",
+    "Forgot-password recovery uses MSG91 OTP and server-side access-token verification before allowing a password reset",
+    "MSG91 OTP Widget helper is shared by customer and listener PWAs and cached in the new v8.9.11 service-worker caches",
+    "Legacy Fast2SMS/Twilio OTP sending is disabled in the Render blueprint for the active authentication flow"
   ],
   "notes": [
-    "This is a focused customer listener-directory ordering change only",
-    "Razorpay Buy and Subscribe function bodies were not edited"
+    "Set MSG91_AUTH_KEY on the backend/Render service before production OTP verification will complete",
+    "MSG91_AUTH_KEY is the private account Authkey and is different from the OTP Widget WEMETWEB client token",
+    "Current UI accepts 4 to 6 OTP digits so it works with the current 4-digit widget and remains compatible if the widget is changed to 6 digits later"
   ]
 }
