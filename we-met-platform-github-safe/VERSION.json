@@ -1,17 +1,13 @@
 {
-  "version": "8.9.19",
-  "name": "broadcast-call-webrtc-responsive-final",
+  "version": "8.9.20",
+  "name": "focused-ui-scroll-seo-patch",
   "changes": [
-    "Random customer calls ring every eligible online listener in the selected language pool; direct profile calls ring only the selected listener.",
-    "First listener acceptance wins atomically; all other ringing listeners are released immediately for the next customer.",
-    "Calling signaling is bound to the exact winning customer/listener browser sockets to avoid duplicate-tab WebRTC negotiations.",
-    "Listener microphone permission is acquired before accepting a broadcast call so a listener cannot win and immediately break the call.",
-    "WebRTC queues early ICE candidates, supports ICE restart/recovery, and tolerates short signaling reconnects instead of ending immediately.",
-    "Customer mobile bottom navigation uses icons only; root navigation is hidden on nested pages such as listener profiles.",
-    "Customer desktop listener profile opens as a responsive full inner page rather than a small popup.",
-    "Listener settings, followers and profile surfaces use the light page background instead of large plain white panels.",
-    "Listener desktop/tablet spacing and bottom navigation remain responsive while mobile behavior stays compact.",
-    "Temporary backup files and redundant local patch artifacts are excluded from the distributable ZIP."
+    "Listener profile Follow/Following is a compact action beside the profile name/status area.",
+    "Listener settings/profile/followers use one soft light page surface without large pure-white slabs, with responsive spacing on phones, tablets and desktops.",
+    "Customer bottom navigation is hidden during active or minimized calls and in every nested/subsection view; it remains visible only on the five root tabs.",
+    "Listener signup/account-creation and password-recovery screens scroll safely whenever their content is taller than the viewport.",
+    "Customer public metadata, sitemap freshness and crawl directives are strengthened for Google discovery without changing the visible public layout.",
+    "No backend source files or live call-routing logic were modified in this focused patch."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
@@ -22,7 +18,7 @@
     "TURN_CREDENTIAL"
   ],
   "notes": [
-    "v8.9.19 is based on the full v8.9.18 project and contains the final call-routing/signaling and requested UI cleanup pass.",
-    "TURN_URL, TURN_USERNAME and TURN_CREDENTIAL are strongly recommended for reliable calls across restrictive NAT/mobile networks."
+    "This patch is intentionally limited to the requested customer/listener frontend behavior, responsive surfaces, scroll handling and public SEO metadata.",
+    "Google indexing still requires Google to crawl the deployed site; Search Console URL Inspection and sitemap submission are the supported ways to request discovery."
   ]
 }

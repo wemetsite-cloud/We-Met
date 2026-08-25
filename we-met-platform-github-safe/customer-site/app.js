@@ -127,8 +127,11 @@
 
   function syncBodyState() {
     const overlay = currentOverlay();
+    const rootTab = ['home', 'subscriptions', 'messages', 'wallet', 'profile'].includes(activeTab);
+    const nestedCustomerView = Boolean(me && (overlay || !rootTab || currentCall || pendingCallRequest));
     document.body.classList.toggle('modal-open', Boolean(overlay));
-    document.body.classList.toggle('nested-view-open', Boolean(me && overlay));
+    document.body.classList.toggle('nested-view-open', nestedCustomerView);
+    document.body.classList.toggle('call-active', Boolean(me && (currentCall || pendingCallRequest)));
     $('#appBackButton')?.classList.toggle('hidden', !(overlay || (me && activeTab !== 'home')));
   }
 
@@ -462,7 +465,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.19', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.20', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -1217,11 +1220,13 @@
     pendingCallRequest = null;
     if (!currentCall) audioCall?.stop?.();
     syncCallRequestControls();
+    syncBodyState();
   }
 
   function beginCallRequest(payload) {
     const request = { employeeId: payload.employeeId || null, timer: null };
     pendingCallRequest = request;
+    syncBodyState();
     request.timer = setTimeout(() => {
       if (pendingCallRequest !== request || currentCall) return;
       clearPendingCallRequest();

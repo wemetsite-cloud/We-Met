@@ -1139,3 +1139,45 @@ body.signed-in #verificationView{display:none!important}
   .follower-grid{grid-template-columns:1fr!important;gap:0!important}
   .listener-settings-item{border-radius:16px!important;box-shadow:none!important}
 }
+
+
+/* ===== v8.9.20 focused listener surface + scroll patch ===== */
+/* The workspace uses one continuous soft page surface; large pure-white slabs are removed. */
+body.signed-in #appView{background:linear-gradient(180deg,#fffafc 0%,#fff8fb 58%,#f9f6ff 100%)!important}
+body.signed-in .listener-main,body.signed-in .tab,
+#tab-settings,#tab-profile,#tab-followers{background:transparent!important;box-shadow:none!important}
+.app-profile,.profile-menu,.listener-settings-list,.follower-grid{background:transparent!important}
+.listener-settings-item,.settings-action-row{
+  background:linear-gradient(145deg,rgba(255,247,251,.82),rgba(247,243,255,.78))!important;
+  border:1px solid #eadde5!important;box-shadow:0 8px 24px rgba(79,48,65,.04)!important
+}
+.listener-settings-body{background:rgba(255,250,252,.42)!important}
+.profile-menu>button,.follower-card,.settings-notification{background:transparent!important;box-shadow:none!important}
+
+/* Settings spacing is intentional on phone, tablet and desktop. */
+.listener-settings-list{width:min(1040px,100%)!important;max-width:1040px!important;margin:0 auto!important;padding:0 2px 22px!important;gap:14px!important}
+.listener-settings-item>summary,.settings-static-head{min-height:70px!important;padding:15px 18px!important;gap:14px!important}
+.listener-settings-body{padding:18px 20px 20px!important}
+.settings-notification{padding:14px 18px!important}
+#tab-settings .compact-page-title,#tab-followers .compact-page-title{width:min(1040px,100%)!important;margin:0 auto 18px!important;padding-inline:4px!important}
+#tab-profile,#tab-followers,#tab-settings{padding-bottom:28px!important}
+
+/* Long signup/account-creation and password-recovery content must scroll instead of clipping. */
+.login-view{height:100dvh!important;min-height:100dvh!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important}
+.listener-auth-shell{min-height:100dvh!important;height:auto!important;max-height:none!important;overflow:visible!important}
+.listener-auth-step.active{max-height:none!important;overflow:visible!important}
+.recovery-modal{overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important}
+.recovery-card{max-height:calc(100dvh - 32px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important}
+@media(max-width:700px){
+  #tab-settings,#tab-profile,#tab-followers{padding-inline:2px!important;padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+  .listener-settings-list{width:100%!important;margin:0!important;padding:0 0 18px!important;gap:10px!important}
+  .listener-settings-item{border-radius:16px!important}
+  .listener-settings-item>summary,.settings-static-head{min-height:60px!important;padding:12px 12px!important;gap:11px!important}
+  .listener-settings-body{padding:14px 12px 16px!important}
+  .settings-notification{padding:12px!important}
+  .login-view{height:100dvh!important;overflow-y:auto!important}
+  .listener-auth-shell{min-height:100dvh!important;height:auto!important;padding-bottom:calc(100px + env(safe-area-inset-bottom))!important}
+  .listener-auth-step.active{max-height:none!important;overflow:visible!important}
+  .recovery-modal{display:block!important;padding:0!important;overflow-y:auto!important}
+  .recovery-card{min-height:100dvh!important;height:auto!important;max-height:none!important;padding-bottom:calc(38px + env(safe-area-inset-bottom))!important}
+}
