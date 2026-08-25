@@ -152,6 +152,12 @@
     history.replaceState({ marker: NAV_MARKER, tab: activeTab, ...(overlay ? { overlay } : {}) }, document.title);
   }
 
+  function sealCustomerAuthenticatedHistory() {
+    const root = { marker: NAV_MARKER, tab: activeTab || 'home', authRoot: true };
+    history.replaceState(root, document.title);
+    history.pushState({ ...root, authRoot: false, authGuard: true }, document.title);
+  }
+
   function releasePostUrls() {
     postObjectUrls.forEach((url) => URL.revokeObjectURL(url));
     postObjectUrls = [];
@@ -200,6 +206,13 @@
       const state = event.state?.marker === NAV_MARKER
         ? event.state
         : { tab: activeTab || 'home' };
+      if (me && (event.state?.authRoot || event.state?.marker !== NAV_MARKER)) {
+        history.pushState({ marker: NAV_MARKER, tab: activeTab || 'home', authGuard: true }, document.title);
+        selectTab(activeTab || 'home', { historyMode: 'none' });
+        syncBodyState();
+        resetViewportTop();
+        return;
+      }
       ['authModal', 'customerRecoveryModal', 'preloginSupportModal', 'listenerProfileModal', 'customerPostFeed', 'legalModal', 'membershipCheckoutModal'].forEach((id) => document.getElementById(id)?.classList.add('hidden'));
       if (state.overlay !== 'membershipCheckoutModal') pendingMembershipCheckout = null;
       document.body.classList.remove('razorpay-open');
@@ -447,7 +460,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.17', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.18', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -610,7 +623,9 @@
   }
 
   async function enterApp() {
+    const wasSignedIn = document.body.classList.contains('signed-in');
     document.body.classList.add('signed-in');
+    if (!wasSignedIn) sealCustomerAuthenticatedHistory();
     show('#landing', false); show('#dashboard'); show('#openAuth', false); show('#logoutBtn');
     $('#profileName').textContent = me.name || 'Customer';
     $('#customerProfileName').value = me.name || '';

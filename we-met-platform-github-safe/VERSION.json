@@ -1,6 +1,6 @@
 {
-  "version": "8.9.17",
-  "name": "full-live-responsive-stability-fix",
+  "version": "8.9.18",
+  "name": "bottom-nav-listener-desktop-history-fix",
   "changes": [
     "Customer Home/Exclusive/Messages/Wallet/Profile navigation is fixed to the bottom on desktop, tablet and mobile with page padding so it never cuts through content.",
     "Customer listener cards use improved margins, padding, avatar/copy hierarchy and responsive desktop/tablet/mobile grids.",
@@ -14,7 +14,7 @@
     "Listener online mode now checks microphone permission before advertising availability; customer call requests also preflight microphone permission.",
     "WebRTC uses multiple STUN servers, pooled ICE candidates and remote-audio resume handling; TURN environment support remains available for restrictive networks.",
     "Listener inbox, wallet, profile, settings, posts, full-screen post feed and calling surfaces are normalized to the light theme with responsive containment.",
-    "Report, support, verification, availability and calling routes were statically traced end-to-end and cache/version identifiers are bumped to 8.9.17."
+    "Report, support, verification, availability and calling routes were statically traced end-to-end and cache/version identifiers are bumped to 8.9.18."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
@@ -23,5 +23,8 @@
     "TURN_URL",
     "TURN_USERNAME",
     "TURN_CREDENTIAL"
+  ],
+  "notes": [
+    "v8.9.18 locks customer and listener navigation to the bottom, removes bordered How It Works cards, makes listener pre-login/verification true full pages, hides pre-login after authentication, improves desktop/tablet listener status spacing, and seals authenticated browser history so Back cannot expose login screens."
   ]
 }

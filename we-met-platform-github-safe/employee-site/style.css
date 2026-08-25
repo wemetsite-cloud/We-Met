@@ -512,8 +512,8 @@ body:after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;opac
 .listener-settings-body{background:#fffafc!important;border-color:#eadfe5!important}.listener-post,.listener-post-open,.post-edit-preview,.post-insights-image{background:#fff7fa!important;color:var(--ink)!important;border-color:#eadfe5!important}.listener-post-caption{background:linear-gradient(transparent,rgba(255,250,252,.95))!important;color:var(--ink)!important}.listener-post-caption b,.listener-post-caption small{color:var(--ink)!important;text-shadow:none!important}.listener-post-like-count{background:rgba(255,255,255,.92)!important;color:#9d2c63!important;border-color:#e5d7df!important}.listener-post-options summary{background:rgba(255,255,255,.94)!important;border-color:#e5d7df!important;box-shadow:0 7px 18px rgba(103,67,86,.1)!important}.listener-post-options summary i{background:#8f7783!important}.listener-post-options>div{background:#fff!important;border-color:#e5d8df!important;box-shadow:0 16px 42px rgba(100,64,83,.14)!important}.listener-post-options>div button{color:var(--ink)!important}.listener-post-options>div button:hover{background:#fff2f7!important}.listener-post-options>div button.danger{color:#c54663!important}
 .listener-post-likes-sheet>header button{background:#fff!important;color:#91295e!important;border-color:#e5d7df!important}.post-likers>article{background:#fff9fc!important;color:var(--ink)!important;border-color:#eadfe5!important}
 
-/* ===== merged v8.9.17 theme layer (file-count cleanup) ===== */
-/* We Met v8.9.17 — listener porcelain workspace */
+/* ===== merged v8.9.18 theme layer (file-count cleanup) ===== */
+/* We Met v8.9.18 — listener porcelain workspace */
 :root{--wm-bg:#fffaf8;--wm-bg2:#faf7ff;--wm-card:#fffdfc;--wm-ink:#332831;--wm-muted:#83747d;--wm-line:#eadde4;--wm-pink:#d94383;--wm-pink-deep:#a52d65;--wm-green:#278a69;--wm-shadow:0 14px 38px rgba(103,68,87,.08);color-scheme:light!important}
 html{background:var(--wm-bg)!important;scroll-behavior:auto!important}body{color:var(--wm-ink)!important;background:radial-gradient(circle at 7% 5%,rgba(255,211,230,.62),transparent 25%),radial-gradient(circle at 94% 18%,rgba(220,214,255,.58),transparent 25%),radial-gradient(circle at 22% 85%,rgba(207,241,232,.42),transparent 23%),linear-gradient(180deg,#fffdfb,#fff8fb 55%,#fbfaff)!important;background-attachment:fixed!important}body:after{content:"";position:fixed;inset:0;z-index:-3;pointer-events:none;opacity:.25;background-image:radial-gradient(circle,rgba(187,142,167,.25) 1px,transparent 1.2px);background-size:28px 28px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.4),transparent 82%)}
 *{scrollbar-width:none!important}*::-webkit-scrollbar{display:none!important}.tab,.listener-auth-step{animation:none!important}
@@ -568,7 +568,7 @@ input,textarea,select,.stack input,.stack textarea,.stack select,.listener-phone
 .listener-post-options summary,.listener-post-likes-sheet>header button{background:linear-gradient(145deg,#fffdfb,#fff3f8)!important;color:#92295d!important;border-color:#e4d6de!important}.listener-post-options>div{background:linear-gradient(145deg,#fffdfb,#faf6ff)!important;color:var(--wm-ink)!important;border-color:#e5d8df!important}
 .post-likers h3,.post-likers li b{color:var(--wm-ink)!important}.post-likers li small{color:var(--wm-muted)!important}
 
-/* ===== v8.9.17 requested UI fixes only ===== */
+/* ===== v8.9.18 requested UI fixes only ===== */
 .listener-public-showcase{position:relative!important;display:block!important;min-height:190px!important;margin:10px 0 18px!important;overflow:visible!important}.listener-public-showcase span{position:absolute!important;width:37%!important;height:auto!important;aspect-ratio:.86!important;overflow:hidden!important;border-radius:22px!important}.listener-public-showcase span img{width:100%!important;height:100%!important;object-fit:cover!important}.listener-public-showcase span:nth-child(1){left:5%!important;top:34px!important;transform:rotate(-7deg)!important;z-index:1!important}.listener-public-showcase span:nth-child(2){left:31.5%!important;top:2px!important;transform:rotate(2deg)!important;z-index:3!important}.listener-public-showcase span:nth-child(3){right:5%!important;top:34px!important;transform:rotate(7deg)!important;z-index:2!important}
 .listener-home-hero{grid-template-columns:1fr!important;gap:18px!important;padding:20px!important;min-height:0!important}.listener-home-showcase{order:-1!important;min-height:300px!important;border-radius:24px!important}.listener-home-showcase>span{width:82px!important;height:100px!important;right:14px!important;bottom:14px!important;border-radius:20px!important}.listener-home-copy>p{max-width:620px!important}.listener-home-state{margin-top:19px!important}.listener-availability-console{margin-top:18px!important}.listener-home-stats,.activity-drawer{display:none!important}
 .settings-action-row{display:grid!important;grid-template-columns:46px minmax(0,1fr) 24px!important;align-items:center!important;gap:13px!important;min-height:78px!important;padding:15px 18px!important;text-align:left!important}.settings-action-row>span:nth-child(2){display:grid!important;gap:4px!important;min-width:0!important}.settings-action-row>span:nth-child(2) b{display:block!important;line-height:1.2!important}.settings-action-row>span:nth-child(2) small{display:block!important;line-height:1.35!important;color:#8b7b84!important}.settings-action-row .settings-chevron{justify-self:end!important;width:20px!important;height:20px!important}
@@ -580,7 +580,7 @@ input,textarea,select,.stack input,.stack textarea,.stack select,.listener-phone
 
 
 
-/* ===== v8.9.17 final requested polish ===== */
+/* ===== v8.9.18 final requested polish ===== */
 html,body{background:#fff8fb!important;color-scheme:light!important;overscroll-behavior-y:none}
 .login-view,.verification-view{background:radial-gradient(circle at 12% 8%,rgba(255,214,232,.68),transparent 28%),radial-gradient(circle at 90% 18%,rgba(222,216,255,.58),transparent 27%),linear-gradient(180deg,#fffafc,#fff8fb)!important}
 .listener-auth-shell{background:transparent!important;border:0!important;box-shadow:none!important}
@@ -645,7 +645,7 @@ html,body{background:#fff8fb!important;color-scheme:light!important;overscroll-b
 }
 
 
-/* ===== v8.9.17 focused bug-fix pass ===== */
+/* ===== v8.9.18 focused bug-fix pass ===== */
 /* Keep normal browser refresh/pull-to-refresh; zoom stays disabled through the viewport meta. */
 html,body{overscroll-behavior-y:auto!important}
 
@@ -707,7 +707,7 @@ html,body{overscroll-behavior-y:auto!important}
   .listener-availability-console .shift-buttons .button{min-height:38px!important}
 }
 
-/* v8.9.17 listener-home sizing correction: compact content, no stretched empty hero card. */
+/* v8.9.18 listener-home sizing correction: compact content, no stretched empty hero card. */
 @media(max-width:700px){
   #tab-desk.tab.active{grid-template-rows:auto auto!important;align-content:start!important}
   .listener-home-hero{height:auto!important}
@@ -716,14 +716,14 @@ html,body{overscroll-behavior-y:auto!important}
 /* MSG91 OTP Widget custom-UI captcha host. Empty when CAPTCHA is not required. */
 .wm-msg91-captcha{display:none}.wm-msg91-active .wm-msg91-captcha{display:block;min-width:1px;min-height:1px;position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483000;padding:8px;border-radius:14px;background:#fff;box-shadow:0 14px 45px rgba(45,31,39,.18);max-width:calc(100vw - 24px);overflow:hidden}
 
-/* ===== v8.9.17 OTP verification + desktop/tablet listener polish ===== */
+/* ===== v8.9.18 OTP verification + desktop/tablet listener polish ===== */
 /* Secondary auth actions are links, not a stack of competing buttons. */
 .auth-link-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:-2px}
 .auth-link-row>span{color:#c9bac2;font-size:10px;line-height:1}
 .auth-link-row .auth-back{width:auto!important;min-height:0!important;padding:5px 3px!important;margin:0!important;color:#98667e!important;font-size:11px!important;font-weight:800!important;text-decoration:none!important;background:transparent!important;border:0!important;box-shadow:none!important}
 .auth-link-row .auth-back:hover{color:#b82f70!important;text-decoration:underline!important}
 
-/* Mobile (<=700px) intentionally remains governed by the existing v8.9.17 rules. */
+/* Mobile (<=700px) intentionally remains governed by the existing v8.9.18 rules. */
 @media(min-width:701px){
   /* Login / registration: use the available desktop space instead of a narrow phone card. */
   .login-view{min-height:100vh!important;display:grid!important;place-items:center!important;padding:32px!important;background:radial-gradient(circle at 12% 10%,rgba(255,214,232,.68),transparent 30%),radial-gradient(circle at 90% 16%,rgba(222,216,255,.58),transparent 28%),linear-gradient(180deg,#fffafc,#fff8fb)!important}
@@ -789,7 +789,7 @@ html,body{overscroll-behavior-y:auto!important}
   .listener-availability-console .shift-buttons{justify-content:flex-start!important}
 }
 
-/* ===== v8.9.17 final responsive / light-surface stabilization ===== */
+/* ===== v8.9.18 final responsive / light-surface stabilization ===== */
 :root{color-scheme:light!important}
 html,body{background:#fffafc!important;color:#392b35!important}
 .listener-glow{display:none!important}
@@ -873,7 +873,7 @@ html,body{background:#fffafc!important;color:#392b35!important}
 @media(max-width:700px){.listener-verification-hint{display:none!important}}
 
 
-/* ===== v8.9.17 requested listener page + verification containment ===== */
+/* ===== v8.9.18 requested listener page + verification containment ===== */
 /* The pre-login listener experience is the website page itself, not a floating card. */
 @media(min-width:701px){
   .login-view{width:100%!important;min-height:100dvh!important;padding:0!important;margin:0!important;display:block!important;background:#fffafc!important;overflow-x:hidden!important}
@@ -912,7 +912,7 @@ html,body{background:#fffafc!important;color:#392b35!important}
 /* Light controls everywhere, including all checkbox/radio surfaces. */
 input[type="checkbox"],input[type="radio"]{color-scheme:light!important;accent-color:#df4d8e!important}.listener-auth-step .check,.listener-settings-body,.settings-panel{color:#4c3b45!important}.listener-auth-step .check{background:#fff7fb!important;border-color:#eadce4!important}.automatic-terms{background:#fff9fb!important;color:#4d3c46!important}
 
-/* ===== v8.9.17 final light-workspace normalization ===== */
+/* ===== v8.9.18 final light-workspace normalization ===== */
 /* Remove leftover dark-theme surfaces from the listener workspace/calling/social flows. */
 #appView,.listener-main,.tab,.settings-panel,.listener-settings-item,.listener-settings-body,
 .stats article,.panel,.availability-card,.guide-card,.list-item,.wallet-metrics article,
@@ -969,4 +969,133 @@ img,video,audio,canvas{max-width:100%}
 @media(min-width:701px){
   .grid-two,.wallet-grid{gap:20px!important}.panel,.settings-panel,.listener-settings-item{border-radius:22px!important}
   .listener-inbox-layout{min-height:min(650px,calc(100dvh - 190px))!important}
+}
+
+
+/* ===== v8.9.18 listener desktop/tablet containment + fixed navigation ===== */
+html,body{width:100%;max-width:100%;overflow-x:clip!important}
+body.listener-authenticated #loginView{display:none!important}
+body.signed-in #verificationView{display:none!important}
+#loginView,#verificationView,#appView{max-width:100vw!important}
+
+@media(min-width:701px){
+  /* Pre-login is the page itself, not a floating panel inside another page. */
+  .login-view{
+    width:100%!important;
+    min-height:100dvh!important;
+    height:auto!important;
+    padding:0!important;
+    display:block!important;
+    background:#fffafc!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+  }
+  .listener-auth-shell{
+    width:100%!important;
+    max-width:none!important;
+    min-height:100dvh!important;
+    height:auto!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:30px max(42px,calc((100vw - 1180px)/2)) 56px!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    background:linear-gradient(145deg,#fffafc,#fff7fb 62%,#f8f5ff)!important;
+    display:grid!important;
+    grid-template-columns:minmax(320px,.9fr) minmax(390px,1.1fr)!important;
+    grid-template-rows:auto minmax(520px,1fr)!important;
+    column-gap:clamp(38px,6vw,88px)!important;
+    row-gap:14px!important;
+    align-items:center!important;
+    overflow:hidden!important;
+  }
+  .listener-auth-progress{grid-column:1/-1!important;grid-row:1!important;position:absolute!important;top:0!important;left:0!important;right:0!important;margin:0!important;height:3px!important}
+  .listener-auth-brand{grid-column:1/-1!important;grid-row:1!important;align-self:end!important;margin:12px 0 0!important;padding:0!important;background:transparent!important;border:0!important}
+  .listener-public-showcase{grid-column:1!important;grid-row:2!important;align-self:center!important;justify-self:center!important;width:100%!important;max-width:510px!important;min-height:390px!important;margin:0!important;overflow:visible!important}
+  .listener-auth-step{grid-column:2!important;grid-row:2!important;align-self:center!important;justify-self:center!important;width:min(100%,500px)!important;max-height:calc(100dvh - 130px)!important;margin:0!important;padding:12px 4px 20px!important;overflow-y:auto!important}
+  .listener-auth-step[data-listener-auth="welcome"]{min-height:0!important;justify-content:center!important}
+  .prelogin-support{right:22px!important;bottom:20px!important}
+
+  /* Verification is a true next page, not something under the login page. */
+  .verification-view{position:relative!important;inset:auto!important;width:100%!important;min-height:100dvh!important;padding:38px max(30px,calc((100vw - 980px)/2)) 60px!important;background:#fffafc!important;overflow-x:hidden!important;overflow-y:auto!important;z-index:1!important}
+  .verification-card{width:100%!important;max-width:880px!important;min-height:calc(100dvh - 98px)!important;margin:0 auto!important;padding:32px clamp(24px,4vw,56px)!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;display:flex!important;flex-direction:column!important;justify-content:center!important}
+
+  /* Signed-in home is the first visible page; no full-width decorative header strip. */
+  body.signed-in #appView{width:100%!important;min-height:100dvh!important;background:#fffafc!important;overflow-x:hidden!important}
+  body.signed-in.listener-home-active #appView .topbar{display:none!important}
+  body.signed-in:not(.listener-home-active) #appView .topbar{
+    position:sticky!important;top:0!important;height:58px!important;
+    padding:8px max(24px,calc((100% - 1180px)/2))!important;
+    background:rgba(255,250,252,.94)!important;border:0!important;box-shadow:none!important;
+    backdrop-filter:blur(14px)!important;-webkit-backdrop-filter:blur(14px)!important;
+  }
+  body.signed-in .listener-main{
+    width:min(1180px,calc(100% - 48px))!important;
+    max-width:1180px!important;
+    margin:0 auto!important;
+    padding:28px 0 calc(118px + env(safe-area-inset-bottom))!important;
+    overflow:visible!important;
+  }
+
+  /* Listener Home / Inbox / Create / Earnings / Profile is locked to the bottom. */
+  body.signed-in .listener-bottom-nav{
+    position:fixed!important;
+    top:auto!important;
+    bottom:max(14px,env(safe-area-inset-bottom))!important;
+    left:50%!important;
+    right:auto!important;
+    transform:translateX(-50%)!important;
+    width:min(760px,calc(100vw - 30px))!important;
+    max-width:760px!important;
+    margin:0!important;
+    padding:7px!important;
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    gap:5px!important;
+    z-index:120!important;
+    border:1px solid #e8dbe2!important;
+    border-radius:20px!important;
+    background:rgba(255,253,252,.96)!important;
+    box-shadow:0 14px 42px rgba(79,48,65,.12)!important;
+    backdrop-filter:blur(18px)!important;
+    -webkit-backdrop-filter:blur(18px)!important;
+  }
+  body.signed-in .listener-bottom-nav button{min-height:50px!important;padding:7px 6px!important;border-radius:13px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:7px!important}
+  body.signed-in .listener-bottom-nav button.active{background:#fff0f6!important;color:#a52e67!important}
+
+  /* Desktop desk spacing: status should breathe instead of sticking to nearby text. */
+  .listener-home-hero{margin:0 0 22px!important;padding:30px!important;gap:32px!important;border-radius:26px!important}
+  .listener-home-copy{padding:4px 2px!important}
+  .listener-home-copy>p{max-width:520px!important;line-height:1.55!important}
+  .listener-home-state{
+    width:fit-content!important;min-width:220px!important;
+    margin:24px 0 0!important;padding:13px 16px!important;
+    gap:12px!important;border:1px solid #eadde4!important;border-radius:17px!important;
+    background:#fff8fb!important;
+  }
+  .listener-home-state>i{margin-left:1px!important}
+  .listener-home-state small{display:block!important;margin-bottom:2px!important}
+  .listener-home-state strong{display:block!important;line-height:1.05!important}
+  .listener-home-state .shift-since{display:block!important;margin-top:2px!important;color:#8b7782!important}
+  .listener-availability-console{margin:0 0 24px!important;padding:22px 24px!important;border-radius:22px!important}
+  #tab-desk.tab.active{padding-top:0!important}
+  .tab{min-width:0!important;max-width:100%!important}
+}
+
+@media(min-width:701px) and (max-width:980px){
+  .listener-auth-shell{grid-template-columns:minmax(250px,.8fr) minmax(360px,1.2fr)!important;padding-inline:28px!important;column-gap:28px!important}
+  .listener-public-showcase{min-height:310px!important}
+  body.signed-in .listener-main{width:min(100% - 32px,1040px)!important}
+  body.signed-in .listener-bottom-nav{width:min(720px,calc(100vw - 24px))!important}
+  .listener-home-hero{grid-template-columns:1fr!important;gap:20px!important}
+  .listener-home-showcase{min-height:260px!important}
+  .listener-availability-console{flex-direction:column!important;align-items:stretch!important;gap:16px!important}
+  .listener-availability-console .shift-buttons{justify-content:flex-start!important;flex-wrap:wrap!important}
+}
+
+@media(max-width:700px){
+  body.listener-authenticated #loginView{display:none!important}
+  body.signed-in .listener-main{padding-bottom:calc(86px + env(safe-area-inset-bottom))!important}
+  body.signed-in .listener-bottom-nav{position:fixed!important;top:auto!important;bottom:0!important;left:0!important;right:0!important;transform:none!important;width:100%!important;max-width:none!important;margin:0!important;z-index:120!important}
 }

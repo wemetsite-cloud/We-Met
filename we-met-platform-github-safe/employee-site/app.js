@@ -67,6 +67,12 @@
     return { marker: NAVIGATION_MARKER, tab: VALID_TABS.has(tab) ? tab : 'desk', overlay };
   }
 
+  function sealListenerAuthenticatedHistory() {
+    const root = { ...navigationState(activeTab || 'desk', null), authRoot: true };
+    history.replaceState(root, document.title);
+    history.pushState({ ...root, authRoot: false, authGuard: true }, document.title);
+  }
+
   function currentOverlay() {
     if (!$('#payoutDetailsModal')?.classList.contains('hidden')) return 'payoutDetailsModal';
     if (!$('#listenerPostEditModal')?.classList.contains('hidden')) return 'listenerPostEditModal';
@@ -138,6 +144,13 @@
       const state = event.state?.marker === NAVIGATION_MARKER
         ? event.state
         : navigationState('desk', null);
+      if (me && (event.state?.authRoot || event.state?.marker !== NAVIGATION_MARKER)) {
+        history.pushState({ ...navigationState(activeTab || 'desk', null), authGuard: true }, document.title);
+        selectTab(activeTab || 'desk', { historyMode: 'none' });
+        syncBackButton();
+        resetViewportTop();
+        return;
+      }
       if (previousOverlay === 'incomingModal' && currentCall) {
         socket?.emit('call:reject', { callId: currentCall.id });
         stopRing();
@@ -164,7 +177,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.17', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.18', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -202,7 +215,7 @@
     show('#restoreListenerCall', false);
     ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm','listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm','recoveryRequestForm','employeeRecoveryOtpForm','employeeResetForm'].forEach((id) => document.getElementById(id)?.reset());
     showListenerAuthStep('welcome');
-    document.body.classList.remove('signed-in');
+    document.body.classList.remove('signed-in', 'listener-authenticated', 'listener-home-active');
     document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
     resetViewportTop();
     loadListenerShowcase();
@@ -476,6 +489,7 @@
     if (!VALID_TABS.has(tab)) tab = 'desk';
     if (activeTab !== tab && historyMode === 'push') setNavigationState({ tab, overlay: null });
     activeTab = tab;
+    document.body.classList.toggle('listener-home-active', Boolean(me) && tab === 'desk');
     const button = $(`[data-tab="${tab}"]`);
     $$('[data-tab]').forEach((item) => item.classList.toggle('active', item === button));
     $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
@@ -732,18 +746,24 @@
 
   async function enter() {
     sessionResetPending = false;
+    const wasAuthenticatedView = document.body.classList.contains('listener-authenticated');
+    document.body.classList.add('listener-authenticated');
     show('#loginView', false);
     verificationState = await loadVerificationState();
     if (verificationState?.status !== 'approved') {
-      document.body.classList.remove('signed-in');
+      document.body.classList.remove('signed-in', 'listener-home-active');
       show('#appView', false);
       show('#verificationView');
       renderVerification();
+      if (!wasAuthenticatedView) sealListenerAuthenticatedHistory();
+      resetViewportTop();
       return;
     }
     show('#verificationView', false);
     show('#appView');
     document.body.classList.add('signed-in');
+    document.body.classList.toggle('listener-home-active', activeTab === 'desk');
+    if (!wasAuthenticatedView) sealListenerAuthenticatedHistory();
     document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
     resetViewportTop();
     $('#profileName').value = me.name || '';
