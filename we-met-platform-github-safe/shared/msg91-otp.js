@@ -99,13 +99,31 @@
         return;
       }
 
-      const script = document.createElement('script');
-      script.src = 'https://verify.msg91.com/otp-provider.js';
-      script.async = true;
-      script.dataset.msg91OtpProvider = 'true';
-      script.onload = initialize;
-      script.onerror = () => reject(new Error('MSG91 OTP could not be loaded. Check your internet connection.'));
-      document.head.appendChild(script);
+      const providerUrls = [
+        'https://verify.msg91.com/otp-provider.js',
+        'https://verify.phone91.com/otp-provider.js',
+      ];
+      let providerIndex = 0;
+
+      const loadProvider = () => {
+        const script = document.createElement('script');
+        script.src = providerUrls[providerIndex];
+        script.async = true;
+        script.dataset.msg91OtpProvider = 'true';
+        script.onload = initialize;
+        script.onerror = () => {
+          script.remove();
+          providerIndex += 1;
+          if (providerIndex < providerUrls.length) {
+            loadProvider();
+            return;
+          }
+          reject(new Error('MSG91 OTP provider could not be loaded. Please refresh and try again.'));
+        };
+        document.head.appendChild(script);
+      };
+
+      loadProvider();
     });
     return readyPromise;
   }
