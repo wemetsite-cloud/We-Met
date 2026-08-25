@@ -125,18 +125,34 @@
   }
 
   function initAutoHideHeader() {
-    let lastY = Math.max(0, window.scrollY); let ticking = false;
+    let lastY = Math.max(0, window.scrollY);
+    let downDistance = 0;
+    let upDistance = 0;
+    let ticking = false;
     window.addEventListener('scroll', () => {
-      if (ticking) return; ticking = true;
+      if (ticking) return;
+      ticking = true;
       requestAnimationFrame(() => {
         const y = Math.max(0, window.scrollY);
+        const delta = y - lastY;
         const topbar = document.querySelector('.topbar');
         if (topbar) {
-          const hide = y > 76 && y > lastY + 4 && !currentOverlay();
-          topbar.classList.toggle('topbar-hidden', hide);
-          if (y < 18 || y < lastY - 4 || currentOverlay()) topbar.classList.remove('topbar-hidden');
+          if (y < 28 || currentOverlay()) {
+            topbar.classList.remove('topbar-hidden');
+            downDistance = 0;
+            upDistance = 0;
+          } else if (delta > 0) {
+            downDistance += delta;
+            upDistance = 0;
+            if (y > 110 && downDistance > 30) topbar.classList.add('topbar-hidden');
+          } else if (delta < 0) {
+            upDistance += -delta;
+            downDistance = 0;
+            if (upDistance > 20) topbar.classList.remove('topbar-hidden');
+          }
         }
-        lastY = y; ticking = false;
+        lastY = y;
+        ticking = false;
       });
     }, { passive: true });
   }
@@ -358,7 +374,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.3', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.6', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -390,6 +406,7 @@
     $$('[data-auth-phone-back]').forEach((button) => { button.onclick = () => showPhoneStep('phone'); });
     $$('[data-password-toggle]').forEach((button) => { button.onclick = () => togglePassword(button); });
     $$('[data-close]').forEach((button) => { button.onclick = () => closeOverlay(button.dataset.close); });
+    $$('[data-app-back]').forEach((button) => button.onclick = () => history.back());
     $('#appBackButton').onclick = () => history.back();
     $('#logoutBtn').onclick = () => logout();
     $('#tabs').onclick = (event) => { const button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); };
@@ -538,7 +555,7 @@
       if (activeConversation) loadDirectMessages();
       else loadConversations(false);
     }, 8000);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   async function logout(clear = true) {
@@ -557,7 +574,7 @@
     customerPhotoObjectUrl = '';
     document.body.classList.remove('signed-in', 'razorpay-open');
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
-    activeTab = 'home'; history.replaceState({ marker: NAV_MARKER, tab: 'home' }, document.title); syncBodyState();
+    activeTab = 'home'; document.querySelector('.topbar')?.classList.remove('topbar-hidden'); window.scrollTo({ top: 0, behavior: 'auto' }); history.replaceState({ marker: NAV_MARKER, tab: 'home', root: true }, document.title); history.pushState({ marker: NAV_MARKER, tab: 'home', guard: true }, document.title); syncBodyState();
   }
 
   function selectTab(tab, { historyMode = 'push' } = {}) {
@@ -574,7 +591,7 @@
     if (tab === 'following') loadFollowing();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'support') loadSupport();
-    window.scrollTo({ top: Math.max(0, $('#dashboard').offsetTop - 70), behavior: 'smooth' }); syncBodyState();
+    window.scrollTo({ top: Math.max(0, $('#dashboard').offsetTop), behavior: 'auto' }); document.querySelector('.topbar')?.classList.remove('topbar-hidden'); syncBodyState();
   }
 
   function updateBalance(value) {

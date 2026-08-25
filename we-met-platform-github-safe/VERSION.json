@@ -1,14 +1,13 @@
 {
-  "version": "8.9.5",
-  "name": "premium-light-classic-razorpay",
+  "version": "8.9.6",
+  "name": "porcelain-light-full-cleanup",
   "changes": [
-    "Rebuilds customer, listener, admin, legal and calling surfaces in a premium artistic light theme with no active dark-theme presentation",
-    "Preserves the confirmed working Razorpay Standard Checkout popup flow from v8.9.3 without callback or redirect payment navigation",
-    "Uses transparent auto-hiding headers that return on upward scroll or at the top, with high-contrast back navigation",
-    "Simplifies the listener experience and wallet to balance, per-minute rate, saved UPI/phone, amount and withdrawal request, with payout details edited in an on-demand popup",
-    "Keeps the admin-managed daily shuffled public listener image pool for customer and listener preview areas",
-    "Refines the customer wallet with a more prominent balance and tall premium plan cards: two per row on phones and up to five on desktop",
-    "Hides visible page scrollbars and removes decorative scrolling/transition motion while preserving normal page scrolling",
-    "Bumps project, PWA cache and asset versions to 8.9.5"
+    "Complete artistic light-theme cleanup across customer, listener and admin portals",
+    "Preserves the confirmed working Razorpay Standard Checkout popup implementation",
+    "Fixes mobile header timing, internal back navigation and listener logout recovery",
+    "Improves customer full-screen listener/detail experiences, wallet layout and text contrast",
+    "Simplifies listener workspace while keeping the payout flow focused on balance, rate and withdrawal",
+    "Removes dark legacy operational cards and invisible text from admin pages",
+    "Adds final v8.9.6 service-worker cache isolation and responsive polish"
   ]
 }

@@ -138,7 +138,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.3', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.6', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -153,7 +153,9 @@
     $('.layout')?.classList.remove('menu-open');
     if ($('#password')) $('#password').value = '';
     activePage = 'overview';
-    history.replaceState({ marker: NAVIGATION_MARKER, page: 'overview' }, document.title);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    history.replaceState({ marker: NAVIGATION_MARKER, page: 'overview', root: true }, document.title);
+    history.pushState({ marker: NAVIGATION_MARKER, page: 'overview', guard: true }, document.title);
     sessionResetPending = false;
   }
 
@@ -264,11 +266,15 @@
   }
 
   async function init() {
-    history.replaceState({ marker: NAVIGATION_MARKER, page: 'overview' }, document.title);
+    history.replaceState({ marker: NAVIGATION_MARKER, page: 'overview', root: true }, document.title);
+    history.pushState({ marker: NAVIGATION_MARKER, page: 'overview', guard: true }, document.title);
     window.addEventListener('popstate', event => {
       const page = event.state?.marker === NAVIGATION_MARKER ? event.state.page : 'overview';
       closeAdminModal({ fromHistory: true });
       openPage(page, { historyMode: 'none' });
+      if (event.state?.marker === NAVIGATION_MARKER && event.state.root && activePage === 'overview') {
+        history.pushState({ marker: NAVIGATION_MARKER, page: 'overview', guard: true }, document.title);
+      }
     });
     bind();
     registerServiceWorker();
@@ -312,7 +318,7 @@
     show('#appView');
     $('.admin-chip b').textContent = me.name || 'Administrator';
     $('.admin-chip span').textContent = initials(me.name || 'Administrator');
-    openPage('overview', { historyMode: 'replace' });
+    openPage('overview', { historyMode: 'none' });
     loadDashboard();
     loadUsers();
     clearInterval(liveRefreshTimer);
@@ -332,7 +338,7 @@
     $$('.page').forEach(page => page.classList.toggle('active', page.id === `page-${name}`));
     $('#pageTitle').textContent = pageMeta[name][0];
     $('#pageDesc').textContent = pageMeta[name][1];
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     const loaders = {
       overview: () => { loadDashboard(); loadLive(); },

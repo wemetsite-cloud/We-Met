@@ -151,7 +151,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.3', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.6', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -189,8 +189,13 @@
     show('#restoreListenerCall', false);
     ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm','listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm','recoveryRequestForm','employeeRecoveryOtpForm','employeeResetForm'].forEach((id) => document.getElementById(id)?.reset());
     showListenerAuthStep('welcome');
+    document.body.classList.remove('signed-in');
+    document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    loadListenerShowcase();
     activeTab = 'desk';
-    history.replaceState(navigationState('desk', null), document.title);
+    history.replaceState({ ...navigationState('desk', null), root: true }, document.title);
+    history.pushState({ ...navigationState('desk', null), guard: true }, document.title);
     sessionResetPending = false;
   }
 
@@ -345,7 +350,7 @@
     $('#toggleListenerProfileEdit').addEventListener('click', () => {
       const opening = $('#profileForm').classList.contains('hidden');
       show('#profileForm', opening);
-      if (opening) setTimeout(() => $('#profileForm').scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+      if (opening) setTimeout(() => $('#profileForm').scrollIntoView({ behavior: 'auto', block: 'start' }), 40);
     });
     $('#closeListenerProfileEdit').addEventListener('click', () => show('#profileForm', false));
     $('#profilePhotoMenu').addEventListener('click', () => $('#profilePhotoFile').click());
@@ -400,18 +405,34 @@
   }
 
   function initAutoHideHeader() {
-    let lastY = window.scrollY; let ticking = false;
+    let lastY = Math.max(0, window.scrollY);
+    let downDistance = 0;
+    let upDistance = 0;
+    let ticking = false;
     window.addEventListener('scroll', () => {
-      if (ticking) return; ticking = true;
+      if (ticking) return;
+      ticking = true;
       requestAnimationFrame(() => {
         const y = Math.max(0, window.scrollY);
+        const delta = y - lastY;
         const topbar = document.querySelector('#appView .topbar');
         if (topbar) {
-          const hide = y > 90 && y > lastY + 4;
-          topbar.classList.toggle('topbar-hidden', hide);
-          if (y < 24 || y < lastY - 4) topbar.classList.remove('topbar-hidden');
+          if (y < 28 || currentOverlay()) {
+            topbar.classList.remove('topbar-hidden');
+            downDistance = 0;
+            upDistance = 0;
+          } else if (delta > 0) {
+            downDistance += delta;
+            upDistance = 0;
+            if (y > 110 && downDistance > 30) topbar.classList.add('topbar-hidden');
+          } else if (delta < 0) {
+            upDistance += -delta;
+            downDistance = 0;
+            if (upDistance > 20) topbar.classList.remove('topbar-hidden');
+          }
         }
-        lastY = y; ticking = false;
+        lastY = y;
+        ticking = false;
       });
     }, { passive: true });
   }
@@ -444,7 +465,7 @@
     const button = $(`[data-tab="${tab}"]`);
     $$('[data-tab]').forEach((item) => item.classList.toggle('active', item === button));
     $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
-    button?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    button?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
     if (tab === 'history') loadHistory();
     if (tab === 'wallet') loadWallet();
     if (tab === 'notifications' || tab === 'settings') loadNotifications();
@@ -674,6 +695,7 @@
     show('#loginView', false);
     verificationState = await loadVerificationState();
     if (verificationState?.status !== 'approved') {
+      document.body.classList.remove('signed-in');
       show('#appView', false);
       show('#verificationView');
       renderVerification();
@@ -681,6 +703,9 @@
     }
     show('#verificationView', false);
     show('#appView');
+    document.body.classList.add('signed-in');
+    document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
+    window.scrollTo({ top: 0, behavior: 'auto' });
     $('#profileName').value = me.name || '';
     $('#profileUsername').value = me.username || '';
     $('#profilePhone').value = me.phone || '';
@@ -1054,7 +1079,7 @@
     bubble.className = `bubble ${message.senderId === me.id ? 'mine' : ''}`;
     bubble.innerHTML = `<b>${P.esc(message.senderName)}</b><br>${P.esc(message.message)}`;
     $('#chatMessages').append(bubble);
-    $('#chatMessages').scrollTo({ top: $('#chatMessages').scrollHeight, behavior: 'smooth' });
+    $('#chatMessages').scrollTo({ top: $('#chatMessages').scrollHeight, behavior: 'auto' });
   }
 
   function previewPostPhoto(event) {
