@@ -712,3 +712,6 @@ html,body{overscroll-behavior-y:auto!important}
   #tab-desk.tab.active{grid-template-rows:auto auto!important;align-content:start!important}
   .listener-home-hero{height:auto!important}
 }
+
+.msg91-captcha{position:fixed;z-index:100000;left:50%;bottom:18px;transform:translateX(-50%);max-width:calc(100vw - 24px)}
+.msg91-captcha:empty{display:none}

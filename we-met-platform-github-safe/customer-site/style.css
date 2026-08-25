@@ -1151,3 +1151,6 @@ html,body{overscroll-behavior-y:auto!important}
   .trust-visuals img:nth-child(2){transform:translateY(0) scale(1.06) rotate(.4deg)!important}
   .trust-visuals img:nth-child(3){transform:translateY(27px) rotate(6deg)!important;margin-left:-5.8%!important}
 }
+
+.msg91-captcha{position:fixed;z-index:100000;left:50%;bottom:18px;transform:translateX(-50%);max-width:calc(100vw - 24px)}
+.msg91-captcha:empty{display:none}
