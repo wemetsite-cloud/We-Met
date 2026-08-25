@@ -49,6 +49,7 @@ const twilioAccountSid = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
 const twilioAuthToken = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
 const twilioFromNumber = String(process.env.TWILIO_FROM_NUMBER || '').trim();
 const twilioMessagingServiceSid = String(process.env.TWILIO_MESSAGING_SERVICE_SID || '').trim();
+const msg91AuthKey = String(process.env.MSG91_AUTH_KEY || '').trim();
 const publicUrl = (
   process.env.PUBLIC_URL
   || process.env.RENDER_EXTERNAL_URL
@@ -81,6 +82,9 @@ const config = {
     subscriptionAmountPaise: number(process.env.RAZORPAY_SUBSCRIPTION_AMOUNT_PAISE, 39900),
     subscriptionTotalCount: number(process.env.RAZORPAY_SUBSCRIPTION_TOTAL_COUNT, 120),
     listenerSubscriptionCreditPaise: number(process.env.LISTENER_SUBSCRIPTION_CREDIT_PAISE, 5000),
+  },
+  msg91: {
+    authKey: msg91AuthKey,
   },
   sms: {
     provider: smsProvider,

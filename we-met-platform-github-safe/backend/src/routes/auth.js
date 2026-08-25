@@ -143,6 +143,112 @@ function validRole(value) {
   return ['customer', 'employee'].includes(value) ? value : null;
 }
 
+
+function msg91TokenHash(accessToken) {
+  return crypto.createHash('sha256').update(`msg91|${String(accessToken || '')}`).digest('hex');
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const part = String(token || '').split('.')[1];
+    if (!part) return null;
+    const normalized = part.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(Buffer.from(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='), 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function collectPhoneCandidates(value, output = new Set(), depth = 0) {
+  if (depth > 7 || value == null) return output;
+  if (typeof value === 'string') {
+    const normalized = internationalPhone(value);
+    if (normalized) output.add(normalized);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectPhoneCandidates(item, output, depth + 1));
+    return output;
+  }
+  if (typeof value === 'object') {
+    for (const [key, nested] of Object.entries(value)) {
+      const lowered = String(key).toLowerCase();
+      if (/identifier|mobile|phone|number|contact/.test(lowered)) collectPhoneCandidates(nested, output, depth + 1);
+      else if (depth < 3 && typeof nested === 'object') collectPhoneCandidates(nested, output, depth + 1);
+    }
+  }
+  return output;
+}
+
+async function verifyMsg91AccessToken(accessToken, expectedPhone) {
+  if (!config.msg91.authKey) {
+    throw Object.assign(new Error('MSG91 server verification is not configured yet. Add MSG91_AUTH_KEY on the server.'), { status: 503, code: 'MSG91_AUTHKEY_MISSING' });
+  }
+  if (!/^[A-Za-z0-9._-]{20,4096}$/.test(String(accessToken || ''))) {
+    throw Object.assign(new Error('OTP verification token is missing or invalid. Request a new OTP.'), { status: 400 });
+  }
+
+  let response;
+  try {
+    response = await fetch('https://control.msg91.com/api/v5/widget/verifyAccessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: new URLSearchParams({ authkey: config.msg91.authKey, 'access-token': String(accessToken) }).toString(),
+      signal: AbortSignal.timeout(12_000),
+    });
+  } catch (error) {
+    console.error('MSG91 access-token verification request failed:', error?.message || error);
+    throw Object.assign(new Error('OTP verification service could not be reached. Please try again.'), { status: 502 });
+  }
+
+  let payload = null;
+  try { payload = await response.json(); } catch { payload = null; }
+  const statusText = String(payload?.type || payload?.status || payload?.message || payload?.error || '').toLowerCase();
+  if (!response.ok || /error|fail|invalid|expired|unauthor/.test(statusText)) {
+    console.error('MSG91 access-token verification rejected:', response.status, payload || 'no-json');
+    throw Object.assign(new Error('OTP verification could not be confirmed. Request a new OTP and try again.'), { status: 400 });
+  }
+
+  const candidates = collectPhoneCandidates(payload);
+  collectPhoneCandidates(decodeJwtPayload(accessToken), candidates);
+  if (!candidates.has(expectedPhone)) {
+    console.error('MSG91 verified token identifier mismatch:', { expectedPhone, candidates: [...candidates] });
+    throw Object.assign(new Error('The verified OTP does not match this mobile number. Start again.'), { status: 400 });
+  }
+  return payload;
+}
+
+async function createMsg91VerifiedChallenge({ accessToken, phone, role, purpose }) {
+  const tokenHash = msg91TokenHash(accessToken);
+  const oneTimeToken = crypto.randomBytes(32).toString('base64url');
+  const oneTimeHash = registrationTokenHash(oneTimeToken);
+  const challengeId = crypto.randomUUID();
+  const tokenExpiresAt = new Date(Date.now() + 15 * 60_000);
+
+  await db.transaction(async (client) => {
+    const alreadyUsed = await client.query('SELECT id FROM otp_challenges WHERE code_hash=$1 LIMIT 1 FOR UPDATE', [tokenHash]);
+    if (alreadyUsed.rows[0]) throw Object.assign(new Error('This OTP verification was already used. Request a new OTP.'), { status: 409 });
+
+    if (purpose === 'registration') {
+      const existing = await client.query('SELECT id FROM users WHERE role=$1 AND phone=$2 LIMIT 1', [role, phone]);
+      if (existing.rows[0]) throw Object.assign(new Error('This mobile number already has an account. Sign in with your password.'), { status: 409, code: 'PASSWORD_LOGIN_REQUIRED' });
+    }
+    if (purpose === 'password_reset') {
+      const existing = await client.query('SELECT id FROM users WHERE role=$1 AND phone=$2 LIMIT 1', [role, phone]);
+      if (!existing.rows[0]) throw Object.assign(new Error('No account was found with this mobile number.'), { status: 404 });
+    }
+
+    await client.query(`
+      INSERT INTO otp_challenges(
+        id,phone,role,purpose,code_hash,expires_at,verified_at,
+        registration_token_hash,registration_expires_at
+      ) VALUES($1,$2,$3,$4,$5,$6,now(),$7,$8)
+    `, [challengeId, phone, role, purpose, tokenHash, tokenExpiresAt, oneTimeHash, tokenExpiresAt]);
+  });
+
+  return { oneTimeToken, tokenExpiresAt };
+}
+
 async function consumeRegistration(client, registrationToken, role, purpose = 'registration') {
   const tokenHash = registrationTokenHash(registrationToken);
   const result = await client.query(`
@@ -192,37 +298,43 @@ router.post('/phone/start', otpStartLimit, asyncHandler(async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
   if (!role) return res.status(400).json({ error: 'Choose a valid account type.' });
 
-  const existing = await db.query(
-    'SELECT id FROM users WHERE role=$1 AND phone=$2 LIMIT 1',
-    [role, phone],
-  );
-  if (existing.rows[0]) {
-    return res.json({ mode: 'password', phone: maskPhone(phone), role });
-  }
+  const existing = await db.query('SELECT id FROM users WHERE role=$1 AND phone=$2 LIMIT 1', [role, phone]);
+  if (existing.rows[0]) return res.json({ mode: 'password', phone: maskPhone(phone), role });
 
-  const challenge = await createOtpChallenge({ phone, role, purpose: 'registration' });
-  return res.status(201).json({
-    mode: 'otp',
-    ...challenge,
-  });
+  return res.json({ mode: 'otp', phone: maskPhone(phone), phoneE164: phone, identifier: phone.slice(1), role });
 }));
 
-router.post('/phone/login/start', otpStartLimit, asyncHandler(async (req, res) => {
-  const phone = internationalPhone(req.body.phone);
-  const role = validRole(String(req.body.role || ''));
-  if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
-  if (!role) return res.status(400).json({ error: 'Choose a valid account type.' });
-  const existing = await db.query('SELECT id FROM users WHERE role=$1 AND phone=$2 LIMIT 1', [role, phone]);
-  if (!existing.rows[0]) return res.status(404).json({ error: 'No account was found with this mobile number.' });
-  const challenge = await createOtpChallenge({ phone, role, purpose: 'login' });
-  return res.status(201).json({ mode: 'otp_login', ...challenge });
+router.post('/phone/login/start', otpStartLimit, asyncHandler(async (_req, res) => {
+  return res.status(410).json({ error: 'Existing accounts sign in with their password. Use Forgot password if you cannot remember it.', code: 'PASSWORD_LOGIN_REQUIRED' });
 }));
 
 router.post('/support/phone/start', loginSupportLimit, asyncHandler(async (req, res) => {
   const phone = internationalPhone(req.body.phone);
   if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
+  return res.status(200).json({ phone: maskPhone(phone), phoneE164: phone, identifier: phone.slice(1) });
+}));
 
-  res.status(201).json(await createOtpChallenge({ phone, role: 'customer', purpose: 'support' }));
+router.post('/msg91/verify', otpVerifyLimit, asyncHandler(async (req, res) => {
+  const accessToken = String(req.body.accessToken || '').trim();
+  const phone = internationalPhone(req.body.phone);
+  const role = validRole(String(req.body.role || ''));
+  const purpose = ['registration', 'password_reset', 'support'].includes(String(req.body.purpose || '')) ? String(req.body.purpose) : null;
+  if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
+  if (!role) return res.status(400).json({ error: 'Choose a valid account type.' });
+  if (!purpose) return res.status(400).json({ error: 'Choose a valid OTP verification purpose.' });
+  if (purpose === 'support' && role !== 'customer') return res.status(400).json({ error: 'Support verification must use the customer verification role.' });
+
+  await verifyMsg91AccessToken(accessToken, phone);
+  const verified = await createMsg91VerifiedChallenge({ accessToken, phone, role, purpose });
+  const response = {
+    verified: true,
+    role,
+    phone: maskPhone(phone),
+    tokenExpiresAt: verified.tokenExpiresAt,
+  };
+  if (purpose === 'password_reset') response.resetToken = verified.oneTimeToken;
+  else response.registrationToken = verified.oneTimeToken;
+  return res.json(response);
 }));
 
 router.post('/phone/verify', otpVerifyLimit, asyncHandler(async (req, res) => {
@@ -504,14 +616,11 @@ router.post('/forgot-password', recoveryLimit, asyncHandler(async (req, res) => 
   const role = validRole(String(req.body.role || ''));
   if (!phone) return res.status(400).json({ error: 'Enter your registered mobile number with country code.' });
   if (!role) return res.status(400).json({ error: 'Choose a valid account type.' });
-  if (!canRequestReset(req, `${role}:${phone}`)) {
-    return res.status(429).json({ error: 'Too many recovery requests. Try again later.' });
-  }
+  if (!canRequestReset(req, `${role}:${phone}`)) return res.status(429).json({ error: 'Too many recovery requests. Try again later.' });
 
   const found = await db.query('SELECT id FROM users WHERE phone=$1 AND role=$2 LIMIT 1', [phone, role]);
   if (!found.rows[0]) return res.status(404).json({ error: 'No account was found with this mobile number.' });
-  const challenge = await createOtpChallenge({ phone, role, purpose: 'password_reset' });
-  return res.status(201).json({ ok: true, ...challenge, message: 'OTP sent to your registered mobile number.' });
+  return res.status(200).json({ ok: true, phone: maskPhone(phone), phoneE164: phone, identifier: phone.slice(1), message: 'Continue to OTP verification.' });
 }));
 
 router.post('/password-reset/status', recoveryLimit, asyncHandler(async (req, res) => {
