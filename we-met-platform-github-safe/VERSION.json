@@ -1,14 +1,13 @@
 {
-  "version": "8.9.13",
-  "name": "msg91-otp-new-users-password-recovery",
+  "version": "8.9.14",
+  "name": "msg91-web-sdk-bootstrap-fix",
   "changes": [
-    "MSG91 Web SDK OTP for new customer registration",
-    "MSG91 Web SDK OTP for new listener registration",
-    "MSG91 OTP for customer and listener forgot-password recovery",
-    "Existing customer and listener accounts use password login only",
-    "Server verifies every MSG91 access token using MSG91_AUTH_KEY before issuing registration/reset tokens",
-    "MSG91/reCAPTCHA CSP and cache rules added to avoid provider initialization failures",
-    "Current 4-digit MSG91 widget OTP and future 6-digit OTP are both accepted by the UI"
+    "MSG91 Web SDK initialization now mirrors the documented provider onload bootstrap",
+    "OTP readiness no longer incorrectly requires retryOtp before the first OTP request",
+    "Resend gracefully falls back to a fresh send when an SDK build exposes retryOtp late",
+    "Provider load and method initialization timeouts now report clearer errors",
+    "MSG91 diagnostics are available through WMMsg91Otp.diagnostics()",
+    "New customer/listener registration and forgot-password continue to use MSG91 OTP; returning accounts use passwords"
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"

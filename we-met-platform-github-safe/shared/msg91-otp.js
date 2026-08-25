@@ -8,9 +8,14 @@
     'https://verify.phone91.com/otp-provider.js',
   ];
   const CAPTCHA_ID = 'wmMsg91Captcha';
+  const PROVIDER_TIMEOUT_MS = 15000;
+  const METHOD_TIMEOUT_MS = 15000;
+
   let readyPromise = null;
   let requestId = '';
+  let lastIdentifier = '';
   let providerIndex = 0;
+  let lastInitError = '';
 
   function ensureCaptchaHost() {
     let host = document.getElementById(CAPTCHA_ID);
@@ -77,68 +82,164 @@
     return token ? token.trim() : '';
   }
 
-  function waitForMethods(timeoutMs = 22000) {
+  function coreMethodsReady() {
+    // retryOtp is intentionally NOT required here. Some SDK builds expose it only
+    // after the first OTP request. Requiring it during bootstrap can cause a false
+    // "could not initialize" error even when sendOtp/verifyOtp are already ready.
+    return typeof window.sendOtp === 'function' && typeof window.verifyOtp === 'function';
+  }
+
+  function waitForCoreMethods(timeoutMs = METHOD_TIMEOUT_MS) {
     const started = Date.now();
     return new Promise((resolve, reject) => {
       const check = () => {
-        if (typeof window.sendOtp === 'function' && typeof window.verifyOtp === 'function' && typeof window.retryOtp === 'function') {
+        if (coreMethodsReady()) {
           resolve(true);
           return;
         }
         if (Date.now() - started >= timeoutMs) {
-          reject(new Error('MSG91 OTP could not initialize. Refresh once and try again.'));
+          const detail = lastInitError ? ` (${lastInitError})` : '';
+          reject(new Error(`MSG91 OTP could not initialize${detail}. Check MSG91 Widget Settings and refresh once.`));
           return;
         }
-        setTimeout(check, 200);
+        setTimeout(check, 150);
       };
       check();
     });
   }
 
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const existing = [...document.scripts].find((item) => item.src === src);
-      if (existing && typeof window.initSendOTP === 'function') return resolve();
-      if (existing) {
-        existing.addEventListener('load', () => resolve(), { once: true });
-        existing.addEventListener('error', () => reject(new Error('MSG91 provider failed to load.')), { once: true });
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = src;
-      script.async = true;
-      script.addEventListener('load', resolve, { once: true });
-      script.addEventListener('error', () => reject(new Error('MSG91 provider failed to load.')), { once: true });
-      document.head.appendChild(script);
+  function waitForRetryMethod(timeoutMs = 2500) {
+    const started = Date.now();
+    return new Promise((resolve) => {
+      const check = () => {
+        if (typeof window.retryOtp === 'function') return resolve(true);
+        if (Date.now() - started >= timeoutMs) return resolve(false);
+        setTimeout(check, 100);
+      };
+      check();
     });
   }
 
-  async function initializeWith(src) {
-    ensureCaptchaHost();
-    await loadScript(src);
-    if (typeof window.initSendOTP !== 'function') throw new Error('MSG91 initializer was not found.');
-    const configuration = {
+  function providerScript(src) {
+    return [...document.scripts].find((item) => item.src === src);
+  }
+
+  function removeProviderScript(src) {
+    const existing = providerScript(src);
+    if (existing?.dataset?.wmMsg91Dynamic === '1') existing.remove();
+  }
+
+  function makeConfiguration() {
+    return {
       widgetId: WIDGET_ID,
       tokenAuth: TOKEN_AUTH,
       identifier: '',
       exposeMethods: true,
       captchaRenderId: CAPTCHA_ID,
+      // Keep callbacks because the official MSG91 example includes them. We use
+      // method-level callbacks for the actual OTP flow, so these are diagnostics.
+      success: () => {},
+      failure: (error) => {
+        lastInitError = errorMessage(error, 'MSG91 widget rejected the request');
+        console.warn('MSG91 widget failure:', error);
+      },
     };
-    window.initSendOTP(configuration);
-    await waitForMethods();
-    return true;
+  }
+
+  function initializeExistingProvider() {
+    if (typeof window.initSendOTP !== 'function') return Promise.reject(new Error('MSG91 initializer was not found.'));
+    ensureCaptchaHost();
+    const configuration = makeConfiguration();
+    try {
+      const result = window.initSendOTP(configuration);
+      if (result && typeof result.then === 'function') {
+        return result.then(() => waitForCoreMethods());
+      }
+      return waitForCoreMethods();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  function initializeWith(src) {
+    ensureCaptchaHost();
+
+    // If the provider is already loaded, initialize immediately.
+    if (providerScript(src) && typeof window.initSendOTP === 'function') {
+      return initializeExistingProvider();
+    }
+
+    return new Promise((resolve, reject) => {
+      const existing = providerScript(src);
+      const script = existing || document.createElement('script');
+      let settled = false;
+
+      const finishReject = (error) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new Error(String(error || 'MSG91 provider failed to load.')));
+      };
+
+      const timer = setTimeout(() => {
+        finishReject(new Error('MSG91 provider script timed out while loading.'));
+      }, PROVIDER_TIMEOUT_MS);
+
+      const onLoad = () => {
+        // Call initSendOTP directly inside the provider's load event. This mirrors
+        // MSG91's documented: onload="initSendOTP(configuration)" integration and
+        // avoids a timing/currentScript race seen with deferred initialization.
+        try {
+          if (typeof window.initSendOTP !== 'function') throw new Error('MSG91 initializer was not found after the provider loaded.');
+          const configuration = makeConfiguration();
+          const result = window.initSendOTP(configuration);
+          Promise.resolve(result)
+            .then(() => waitForCoreMethods())
+            .then(() => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve(true);
+            })
+            .catch((error) => {
+              clearTimeout(timer);
+              finishReject(error);
+            });
+        } catch (error) {
+          clearTimeout(timer);
+          finishReject(error);
+        }
+      };
+
+      const onError = () => {
+        clearTimeout(timer);
+        finishReject(new Error('MSG91 provider failed to load.'));
+      };
+
+      script.addEventListener('load', onLoad, { once: true });
+      script.addEventListener('error', onError, { once: true });
+
+      if (!existing) {
+        script.src = src;
+        script.async = true;
+        script.dataset.wmMsg91Dynamic = '1';
+        document.head.appendChild(script);
+      }
+    });
   }
 
   async function ready() {
-    if (typeof window.sendOtp === 'function' && typeof window.verifyOtp === 'function') return true;
+    if (coreMethodsReady()) return true;
     if (!readyPromise) {
       readyPromise = (async () => {
         let lastError;
         for (; providerIndex < PROVIDERS.length; providerIndex += 1) {
+          const src = PROVIDERS[providerIndex];
           try {
-            return await initializeWith(PROVIDERS[providerIndex]);
+            return await initializeWith(src);
           } catch (error) {
             lastError = error;
+            console.warn(`MSG91 provider initialization failed for ${src}:`, error);
+            removeProviderScript(src);
           }
         }
         throw lastError || new Error('MSG91 OTP could not be loaded.');
@@ -153,37 +254,60 @@
 
   async function send(phone) {
     document.body.classList.add('wm-msg91-active');
-    await ready();
-    const identifier = normalizeIdentifier(phone);
-    requestId = '';
-    return new Promise((resolve, reject) => {
-      window.sendOtp(
-        identifier,
-        (data) => {
-          requestId = findRequestId(data) || requestId;
-          document.body.classList.remove('wm-msg91-active');
-          resolve({ data, reqId: requestId });
-        },
-        (error) => reject(new Error(errorMessage(error, 'Could not send OTP. Please try again.'))),
-      );
-    });
+    try {
+      await ready();
+      const identifier = normalizeIdentifier(phone);
+      lastIdentifier = identifier;
+      requestId = '';
+      return await new Promise((resolve, reject) => {
+        window.sendOtp(
+          identifier,
+          (data) => {
+            requestId = findRequestId(data) || requestId;
+            resolve({ data, reqId: requestId });
+          },
+          (error) => reject(new Error(errorMessage(error, 'Could not send OTP. Please try again.'))),
+        );
+      });
+    } finally {
+      document.body.classList.remove('wm-msg91-active');
+    }
   }
 
   async function retry() {
     document.body.classList.add('wm-msg91-active');
-    await ready();
-    return new Promise((resolve, reject) => {
-      window.retryOtp(
-        null,
-        (data) => {
-          requestId = findRequestId(data) || requestId;
-          document.body.classList.remove('wm-msg91-active');
-          resolve({ data, reqId: requestId });
-        },
-        (error) => reject(new Error(errorMessage(error, 'Could not resend OTP. Please wait and try again.'))),
-        requestId || undefined,
-      );
-    });
+    try {
+      await ready();
+      const hasRetry = await waitForRetryMethod();
+      if (!hasRetry) {
+        // Safe compatibility fallback: if this MSG91 SDK version does not expose
+        // retryOtp until later, request a fresh OTP using the same identifier.
+        if (!lastIdentifier) throw new Error('Request an OTP first.');
+        return await new Promise((resolve, reject) => {
+          window.sendOtp(
+            lastIdentifier,
+            (data) => {
+              requestId = findRequestId(data) || requestId;
+              resolve({ data, reqId: requestId });
+            },
+            (error) => reject(new Error(errorMessage(error, 'Could not resend OTP. Please wait and try again.'))),
+          );
+        });
+      }
+      return await new Promise((resolve, reject) => {
+        window.retryOtp(
+          null,
+          (data) => {
+            requestId = findRequestId(data) || requestId;
+            resolve({ data, reqId: requestId });
+          },
+          (error) => reject(new Error(errorMessage(error, 'Could not resend OTP. Please wait and try again.'))),
+          requestId || undefined,
+        );
+      });
+    } finally {
+      document.body.classList.remove('wm-msg91-active');
+    }
   }
 
   async function verify(otp) {
@@ -199,7 +323,6 @@
             reject(new Error('MSG91 verified the code but did not return an access token. Please request a new OTP.'));
             return;
           }
-          document.body.classList.remove('wm-msg91-active');
           resolve({ data, accessToken, reqId: requestId });
         },
         (error) => reject(new Error(errorMessage(error, 'The OTP is incorrect or expired.'))),
@@ -210,8 +333,23 @@
 
   function reset() {
     requestId = '';
+    lastIdentifier = '';
     document.body.classList.remove('wm-msg91-active');
   }
 
-  window.WMMsg91Otp = Object.freeze({ ready, send, retry, verify, reset, widgetId: WIDGET_ID });
+  function diagnostics() {
+    return {
+      widgetId: WIDGET_ID,
+      providerIndex,
+      initSendOTP: typeof window.initSendOTP,
+      sendOtp: typeof window.sendOtp,
+      verifyOtp: typeof window.verifyOtp,
+      retryOtp: typeof window.retryOtp,
+      getWidgetData: typeof window.getWidgetData,
+      isCaptchaVerified: typeof window.isCaptchaVerified,
+      lastInitError,
+    };
+  }
+
+  window.WMMsg91Otp = Object.freeze({ ready, send, retry, verify, reset, diagnostics, widgetId: WIDGET_ID });
 })();
