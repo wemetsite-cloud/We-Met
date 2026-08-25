@@ -1,21 +1,13 @@
 {
-  "version": "8.9.8",
-  "name": "final-optimized-requested-fixes",
+  "version": "8.9.10",
+  "name": "listener-directory-random-order",
   "changes": [
-    "Forces every portal tab, page and managed overlay to open at the absolute top with manual scroll restoration",
-    "Keeps the confirmed Razorpay Buy and Subscribe checkout functions unchanged",
-    "Applies a light first-paint/loading surface across customer, listener and admin portals and disables page zoom",
-    "Restores the image-first listener desk design and removes the solid settings-list background",
-    "Compacts listener voice-verification and review screens to fit mobile and desktop viewports with a small rose logout link",
-    "Refines customer tilted call-preview card, listener-card spacing, wallet spacing, profile surface and Exclusive lock glow",
-    "Uses the three-portrait overlapping collage style for customer and listener public showcase images",
-    "Improves admin manual-payment balance styling while retaining customer/listener profile-photo support",
-    "Adds expanded Google crawl/index metadata, structured data, robots directives and sitemap metadata",
-    "Retains merged frontend theme stylesheets to keep the project file count reduced"
+    "Randomizes the Choose a listener directory on each fresh site load instead of A-Z order",
+    "Keeps live/online listeners first, listeners on break second, and offline listeners last",
+    "Keeps the random order stable during the same page session so cards do not jump unnecessarily"
   ],
   "notes": [
-    "Only the requested UI, navigation, SEO and optimization changes were applied",
-    "Backend module structure was left intact to reduce deployment risk",
-    "Search-engine metadata improves crawlability but cannot guarantee Google rankings or indexing time"
+    "This is a focused customer listener-directory ordering change only",
+    "Razorpay Buy and Subscribe function bodies were not edited"
   ]
 }

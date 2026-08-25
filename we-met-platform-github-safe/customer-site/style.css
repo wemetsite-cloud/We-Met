@@ -926,8 +926,8 @@ body.razorpay-open:before{display:none!important}body.razorpay-open{background:#
 .wallet-checkout-brand b,.wallet-checkout-summary h2,.wallet-checkout-summary>strong,.wallet-checkout-minutes b{color:var(--ink)!important}.wallet-checkout-brand small,.wallet-checkout-provider,.wallet-checkout-summary>div>small,.wallet-checkout-summary p{color:var(--muted)!important}.wallet-checkout-summary,.wallet-checkout-minutes,.wallet-checkout-trust span{background:#fff8fb!important;color:var(--ink)!important;border-color:#e7dae1!important}.wallet-checkout-minutes small{color:#a42e67!important}.wallet-checkout-trust span{color:#7f6c77!important}
 .merchant-detail-card,.premium-qr-card,.proof-preview,.payment-summary div,.upi-actions-card,.payment-qr-card{background:#fff!important;color:var(--ink)!important;border-color:#e6dbe1!important}.merchant-detail-card strong,.premium-qr-card>strong,.payment-summary strong{color:var(--ink)!important}.merchant-copy,.payment-security-line>span,.premium-paid-button{background:#fff0f6!important;color:#a42e67!important;border:1px solid #ead0dd!important}.premium-qr-card .payment-kicker,.premium-qr-card>small{color:var(--muted)!important}.premium-qr-card .qr-save-link{background:#fff7fa!important;color:#a42e67!important;border-color:#e5d8df!important}.payment-summary .exact-amount,.payment-status-icon.approved{background:#eefaf5!important;color:#28765b!important;border-color:#d6ece3!important}.payment-summary .exact-amount small{color:#5e8677!important}
 
-/* ===== merged v8.9.8 theme layer (file-count cleanup) ===== */
-/* We Met v8.9.8 — complete porcelain light system */
+/* ===== merged v8.9.10 theme layer (file-count cleanup) ===== */
+/* We Met v8.9.10 — complete porcelain light system */
 :root{
   --wm-bg:#fffaf8;--wm-bg2:#faf7ff;--wm-card:#fffdfc;--wm-card2:#fff6fa;
   --wm-ink:#30262d;--wm-muted:#82747d;--wm-line:#eadde4;--wm-pink:#d93f82;
@@ -1050,7 +1050,7 @@ input::placeholder,textarea::placeholder{color:#a99aa3!important}.stack label{co
 .payment-card,.simple-upi-mode,.manual-checkout-panel,.wallet-checkout-summary,.payment-summary div{background:linear-gradient(145deg,#fffdfb,#fff5f9)!important;color:var(--wm-ink)!important;border-color:#e5d8df!important}
 .payment-summary .exact-amount,.simple-upi-mode .payment-summary .exact-amount{background:linear-gradient(135deg,#ffeaf3,#f1edff)!important;color:#8f285b!important;border-color:#e2ccda!important}.payment-summary .exact-amount small{color:#806f79!important}.wallet-checkout-minutes{background:linear-gradient(145deg,#fff0f6,#f2efff)!important;border-color:#e6d3df!important}.wallet-checkout-minutes b,.wallet-checkout-summary h2,.wallet-checkout-summary>strong{color:var(--wm-ink)!important}.wallet-checkout-minutes small,.wallet-checkout-summary p,.wallet-checkout-summary>div>small,.wallet-checkout-trust span{color:var(--wm-muted)!important}.wallet-checkout-trust span{background:rgba(255,253,252,.76)!important;border-color:#e5d9e0!important}.premium-paid-button{background:linear-gradient(145deg,#fff0f6,#f1edff)!important;border-color:#e2ccda!important;color:#94295e!important}.exclusive-post{background:linear-gradient(145deg,#fff4f8,#f4f1ff)!important}
 
-/* ===== v8.9.8 requested UI fixes only ===== */
+/* ===== v8.9.10 requested UI fixes only ===== */
 .hero-buttons{display:flex!important;justify-content:center!important;align-items:center!important}
 .hero-start-button{width:auto!important;min-width:164px!important;max-width:220px!important;padding-inline:30px!important;border-radius:18px!important}
 .phone-preview{transform:rotate(-1.15deg)!important;transform-origin:center!important;margin:10px auto 14px!important}
@@ -1068,7 +1068,7 @@ input::placeholder,textarea::placeholder{color:#a99aa3!important}.stack label{co
 
 
 
-/* ===== v8.9.8 final requested polish ===== */
+/* ===== v8.9.10 final requested polish ===== */
 html,body{background:#fff8fb!important;color-scheme:light!important;overscroll-behavior-y:none}
 .hero-start-button{min-width:205px!important;max-width:250px!important;padding-inline:38px!important}
 .phone-preview{transform:rotate(-1.45deg)!important;border-radius:34px!important;background:linear-gradient(145deg,rgba(255,253,252,.97),rgba(255,246,251,.94) 68%,rgba(245,241,255,.94))!important}
@@ -1104,4 +1104,50 @@ html,body{background:#fff8fb!important;color-scheme:light!important;overscroll-b
  .trust-visuals img:nth-child(3){width:35%!important;right:2%!important;top:41px!important}
  .listener-card-open{grid-template-columns:70px minmax(0,1fr)!important;column-gap:7px!important}
  .listener-card-avatar{width:64px!important;height:64px!important}
+}
+
+
+/* ===== v8.9.10 focused bug-fix pass ===== */
+/* Native page refresh/pull-to-refresh is allowed; viewport zoom remains disabled by the HTML viewport meta. */
+html,body{overscroll-behavior-y:auto!important}
+
+/* Keep the landing CTA comfortably wide without turning it into a full-width bar. */
+.hero-start-button{min-width:220px!important;max-width:270px!important;padding-inline:40px!important}
+
+/* The preview keeps the old slightly tilted-card feel, but with breathing room on both sides. */
+.phone-preview{width:min(390px,92%)!important;max-width:390px!important;margin:14px auto 20px!important;transform:rotate(-1.25deg)!important;transform-origin:center!important}
+.phone-preview .preview-head,.phone-preview .preview-person,.phone-preview .preview-call,.phone-preview .preview-note{transform:rotate(1.25deg)!important}
+
+/* Robust 3-photo portrait collage: no extra bucket/panel behind it, no absolute-position pile-up. */
+.trust-visuals{
+  position:relative!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;
+  width:100%!important;max-width:560px!important;min-height:250px!important;margin:0 auto 8px!important;
+  padding:12px 5px 0!important;overflow:visible!important;background:transparent!important;border:0!important;box-shadow:none!important
+}
+.trust-visuals:before,.trust-visuals:after{display:none!important}
+.trust-visuals img,.trust-visuals img:nth-child(1),.trust-visuals img:nth-child(2),.trust-visuals img:nth-child(3){
+  position:relative!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;
+  flex:0 0 35%!important;width:35%!important;height:auto!important;aspect-ratio:.78!important;object-fit:cover!important;object-position:center!important;
+  margin:0!important;border:4px solid #fff!important;border-radius:22px!important;box-shadow:0 13px 30px rgba(105,68,87,.13)!important
+}
+.trust-visuals img:nth-child(1){z-index:1!important;transform:translateY(31px) rotate(-6deg)!important;margin-right:-6.5%!important}
+.trust-visuals img:nth-child(2){z-index:4!important;transform:translateY(0) scale(1.055) rotate(.5deg)!important}
+.trust-visuals img:nth-child(3){z-index:2!important;transform:translateY(31px) rotate(6deg)!important;margin-left:-6.5%!important}
+
+@media(max-width:760px){
+  .hero-start-button{min-width:218px!important;max-width:258px!important;min-height:51px!important}
+  .phone-preview{width:calc(100% - 44px)!important;max-width:360px!important;padding:16px!important;border-radius:29px!important;margin:15px auto 22px!important}
+  .phone-preview .preview-person{padding:18px 2px 14px!important}
+  .phone-preview .listener-art{width:88px!important;height:88px!important;border-radius:26px!important}
+  .phone-preview .preview-person .language-chip{margin-top:14px!important}
+  .phone-preview .preview-person h3{font-size:22px!important;line-height:1.15!important;margin:12px 0 7px!important}
+  .phone-preview .preview-person p{font-size:13px!important;line-height:1.45!important}
+  .phone-preview .preview-call{padding:14px 12px!important;border-radius:17px!important}
+  .phone-preview .preview-note{margin-top:12px!important}
+  .trust-showcase{padding:18px 16px 22px!important}
+  .trust-visuals{max-width:390px!important;min-height:205px!important;padding:8px 2px 0!important;margin:0 auto 5px!important}
+  .trust-visuals img,.trust-visuals img:nth-child(1),.trust-visuals img:nth-child(2),.trust-visuals img:nth-child(3){flex-basis:34.5%!important;width:34.5%!important;border-width:3px!important;border-radius:18px!important}
+  .trust-visuals img:nth-child(1){transform:translateY(27px) rotate(-6deg)!important;margin-right:-5.8%!important}
+  .trust-visuals img:nth-child(2){transform:translateY(0) scale(1.06) rotate(.4deg)!important}
+  .trust-visuals img:nth-child(3){transform:translateY(27px) rotate(6deg)!important;margin-left:-5.8%!important}
 }

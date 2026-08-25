@@ -27,6 +27,7 @@
   let audioCall = null;
   let currentCall = null;
   let directory = [];
+  const listenerShuffleKeys = new Map();
   let liveListeners = [];
   let liveDirectoryReady = false;
   let subscriptions = [];
@@ -92,6 +93,27 @@
 
   function statusLabel(status) {
     return ({ available: 'Online', online: 'Online', busy: 'In a call', ringing: 'Ringing', break: 'On a break', offline: 'Offline' })[status] || 'Offline';
+  }
+
+  function listenerShuffleKey(listener) {
+    const id = String(listener?.id || listener?.listenerId || listener?.name || Math.random());
+    if (!listenerShuffleKeys.has(id)) listenerShuffleKeys.set(id, Math.random());
+    return listenerShuffleKeys.get(id);
+  }
+
+  function listenerStatusRank(listener) {
+    const status = liveStatus(listener);
+    if (['available', 'online', 'busy', 'ringing'].includes(status)) return 0;
+    if (status === 'break') return 1;
+    return 2;
+  }
+
+  function randomizedListenerOrder(listeners) {
+    return [...listeners].sort((a, b) => {
+      const statusDifference = listenerStatusRank(a) - listenerStatusRank(b);
+      if (statusDifference) return statusDifference;
+      return listenerShuffleKey(a) - listenerShuffleKey(b);
+    });
   }
 
   function isActiveMember(listenerId) {
@@ -387,7 +409,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.8', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.10', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -623,8 +645,8 @@
     const node = $('#listenerGrid');
     if (!node) return;
     const showOtherLanguages = Boolean($('#otherLanguageToggle')?.checked);
-    const primaryListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam');
-    const otherListeners = directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam');
+    const primaryListeners = randomizedListenerOrder(directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam'));
+    const otherListeners = randomizedListenerOrder(directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam'));
     $('#availabilityText').textContent = 'Listeners available';
 
     const cards = (listeners) => listeners.map((listener) => {
