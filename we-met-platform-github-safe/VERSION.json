@@ -1,14 +1,16 @@
 {
-  "version": "8.9.15",
-  "name": "msg91-verification-and-listener-desktop-fix",
+  "version": "8.9.16",
+  "name": "stable-otp-registration-responsive-ui",
   "changes": [
-    "Correct MSG91 OTPs no longer fail when verifyAccessToken omits the phone identifier or returns the national-number form",
-    "When MSG91 does expose an identifier, the backend still rejects a genuine identifier mismatch",
-    "Customer and listener login screens now use one primary action with compact resend/forgot/change-number links",
-    "Listener login uses a wide two-column tablet/desktop layout while the <=700px mobile layout is left unchanged",
-    "Signed-in listener desktop/tablet navigation is moved to a stable top navigation row instead of a floating bottom bar",
-    "Listener desktop/tablet home hero and availability controls are resized for laptop and PC screens",
-    "Customer/listener registration and forgot-password continue to use MSG91 OTP; returning accounts use passwords"
+    "Customer and listener registration are idempotent: a slow/repeated profile submit resumes the account created from the same verified OTP instead of reporting that the phone verification was already used",
+    "Returning numbers continue to open the existing role account with password login until that account is permanently deleted",
+    "New listener accounts remain locked to mandatory voice verification and admin approval before the listener workspace becomes available",
+    "Customer listener profiles use a wider responsive desktop/tablet layout with cleaner banner/avatar/actions/posts and stable navigation",
+    "Customer desktop/tablet navigation is moved out of the floating mobile dock and into a sticky top navigation row",
+    "Listener desktop/tablet login and signed-in views are rebalanced to prevent clipped artwork and oversized empty areas while preserving the <=700px mobile layout",
+    "Dark inherited auth checkboxes/inputs are overridden with accessible light-theme controls across customer and listener authentication",
+    "Decorative background glows are removed from primary app surfaces to reduce visual noise and improve consistency across screen sizes",
+    "Cache/version identifiers are bumped to 8.9.16 so stale 8.9.15 layouts are replaced after deployment"
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"

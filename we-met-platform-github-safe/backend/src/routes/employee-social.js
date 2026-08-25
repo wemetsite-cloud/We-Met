@@ -123,6 +123,13 @@ router.get('/verification/audio/:id', asyncHandler(async (req, res) => {
   res.end(audio.audio_data);
 }));
 
+router.use((req, res, next) => {
+  if (req.user.listener_verification_status !== 'approved') {
+    return res.status(403).json({ error: 'Your listener account activates after voice verification is approved.' });
+  }
+  return next();
+});
+
 router.get('/posts', asyncHandler(async (req, res) => {
   const result = await db.query(`
     SELECT p.id,p.caption,p.image_mime,p.image_size,p.created_at,p.updated_at,

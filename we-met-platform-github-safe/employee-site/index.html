@@ -10,8 +10,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.15">
-  <link rel="stylesheet" href="style.css?v=8.9.15">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.16">
+  <link rel="stylesheet" href="style.css?v=8.9.16">
   <style data-wm-initial-paint>html,body{margin:0;background:#fff8fb!important;color-scheme:light}</style>
 </head>
 <body>
@@ -66,8 +66,9 @@
         <label>Original name<small>Private. Use your real name for admin verification.</small><input id="listenerLegalName" autocomplete="name" minlength="2" maxlength="100" required></label>
         <label>Create password<input id="listenerNewPassword" type="password" minlength="8" autocomplete="new-password" required></label>
         <label class="check"><input id="listenerTerms" type="checkbox" required><span>I am 18+ and accept the Terms and Privacy Policy.</span></label>
+        <p class="listener-verification-hint">After account creation, record the verification line. Your listener workspace activates only after admin approval.</p>
         <div class="automatic-terms"><span>₹1/min starting rate</span><span>₹50/paid membership</span><small>The admin can update your private call rate.</small></div>
-        <button class="button button-primary button-large">Create listener account</button>
+        <button class="button button-primary button-large">Create account &amp; verify voice</button>
       </form>
     </section>
     <button id="listenerSupportButton" class="prelogin-support" type="button">Need login help?</button>
@@ -239,6 +240,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.15"></script><script src="/shared/msg91-otp.js?v=8.9.15"></script><script src="/shared/socket-loader.js?v=8.9.15"></script><script src="api.js?v=8.9.15"></script><script src="/shared/webrtc.js?v=8.9.15"></script><script src="app.js?v=8.9.15"></script>
+  <script src="config.js?v=8.9.16"></script><script src="/shared/msg91-otp.js?v=8.9.16"></script><script src="/shared/socket-loader.js?v=8.9.16"></script><script src="api.js?v=8.9.16"></script><script src="/shared/webrtc.js?v=8.9.16"></script><script src="app.js?v=8.9.16"></script>
 </body>
 </html>

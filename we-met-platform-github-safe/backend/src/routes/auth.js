@@ -284,7 +284,7 @@ async function createVerifiedProviderChallenge({ phone, role, purpose, accessTok
   return { oneTimeToken, tokenExpiresAt };
 }
 
-async function consumeRegistration(client, registrationToken, role, purpose = 'registration') {
+async function consumeRegistration(client, registrationToken, role, purpose = 'registration', options = {}) {
   const tokenHash = registrationTokenHash(registrationToken);
   const result = await client.query(`
     SELECT * FROM otp_challenges
@@ -292,11 +292,18 @@ async function consumeRegistration(client, registrationToken, role, purpose = 'r
     FOR UPDATE
   `, [tokenHash, role, purpose]);
   const challenge = result.rows[0];
-  if (!challenge || !challenge.verified_at || challenge.consumed_at) {
-    throw Object.assign(new Error('This phone verification is invalid or was already used.'), { status: 400 });
+  if (!challenge || !challenge.verified_at) {
+    throw Object.assign(new Error('This phone verification is invalid. Request a new OTP.'), { status: 400 });
   }
   if (!challenge.registration_expires_at || new Date(challenge.registration_expires_at) <= new Date()) {
     throw Object.assign(new Error('Phone verification expired. Request a new OTP.'), { status: 410 });
+  }
+  // Registration submits can be repeated by browsers after a slow network response.
+  // Allow the route to inspect a consumed challenge and return the account that was
+  // already created from this exact secret token instead of falsely telling the user
+  // that a correct OTP failed. Other purposes remain strictly one-time.
+  if (challenge.consumed_at && !options.allowConsumed) {
+    throw Object.assign(new Error('This phone verification was already used.'), { status: 400 });
   }
   return challenge;
 }
@@ -449,19 +456,26 @@ router.post('/phone/register/customer', registrationLimit, asyncHandler(async (r
   if (!termsAccepted) return res.status(400).json({ error: 'Confirm that you are 18 or older and accept the Terms and Privacy Policy.' });
 
   try {
-    const user = await db.transaction(async (client) => {
-      const challenge = await consumeRegistration(client, req.body.registrationToken, 'customer');
+    const result = await db.transaction(async (client) => {
+      const challenge = await consumeRegistration(client, req.body.registrationToken, 'customer', 'registration', { allowConsumed: true });
+      if (challenge.consumed_at) {
+        const existing = await client.query(`SELECT * FROM users WHERE role='customer' AND phone=$1 LIMIT 1`, [challenge.phone]);
+        if (!existing.rows[0]) throw Object.assign(new Error('This phone verification was already used. Request a new OTP.'), { status: 400 });
+        return { user: existing.rows[0], created: false };
+      }
+      const existing = await client.query(`SELECT id FROM users WHERE role='customer' AND phone=$1 LIMIT 1 FOR UPDATE`, [challenge.phone]);
+      if (existing.rows[0]) throw Object.assign(new Error('A customer account already exists with this phone number. Sign in with your password.'), { status: 409 });
       const created = await client.query(`
         INSERT INTO users(role,name,phone,password_hash,terms_accepted_at)
         VALUES('customer',$1,$2,$3,now())
         RETURNING *
       `, [name, challenge.phone, await hashPassword(password)]);
       await client.query('UPDATE otp_challenges SET consumed_at=now() WHERE id=$1', [challenge.id]);
-      return created.rows[0];
+      return { user: created.rows[0], created: true };
     });
-    res.status(201).json({ token: signToken(user), user: publicUser(user) });
+    res.status(result.created ? 201 : 200).json({ token: signToken(result.user), user: publicUser(result.user), resumed: !result.created });
   } catch (error) {
-    if (error.code === '23505') return res.status(409).json({ error: 'A customer account already exists with this phone number.' });
+    if (error.code === '23505') return res.status(409).json({ error: 'A customer account already exists with this phone number. Sign in with your password.' });
     throw error;
   }
 }));
@@ -477,8 +491,15 @@ router.post('/phone/register/listener', registrationLimit, asyncHandler(async (r
   if (!termsAccepted) return res.status(400).json({ error: 'Confirm that you are 18 or older and accept the Terms and Privacy Policy.' });
 
   try {
-    const user = await db.transaction(async (client) => {
-      const challenge = await consumeRegistration(client, req.body.registrationToken, 'employee');
+    const result = await db.transaction(async (client) => {
+      const challenge = await consumeRegistration(client, req.body.registrationToken, 'employee', 'registration', { allowConsumed: true });
+      if (challenge.consumed_at) {
+        const existing = await client.query(`SELECT * FROM users WHERE role='employee' AND phone=$1 LIMIT 1`, [challenge.phone]);
+        if (!existing.rows[0]) throw Object.assign(new Error('This phone verification was already used. Request a new OTP.'), { status: 400 });
+        return { user: existing.rows[0], created: false };
+      }
+      const phoneOwner = await client.query(`SELECT id FROM users WHERE role='employee' AND phone=$1 LIMIT 1 FOR UPDATE`, [challenge.phone]);
+      if (phoneOwner.rows[0]) throw Object.assign(new Error('A listener account already exists with this phone number. Sign in with your password.'), { status: 409 });
       const employeeCode = `WM-L${Date.now().toString().slice(-6)}${crypto.randomInt(10, 99)}`;
       const created = await client.query(`
         INSERT INTO users(
@@ -488,9 +509,9 @@ router.post('/phone/register/listener', registrationLimit, asyncHandler(async (r
         RETURNING *
       `, [name, username, challenge.phone, await hashPassword(password), employeeCode]);
       await client.query('UPDATE otp_challenges SET consumed_at=now() WHERE id=$1', [challenge.id]);
-      return created.rows[0];
+      return { user: created.rows[0], created: true };
     });
-    res.status(201).json({ token: signToken(user), user: publicUser(user) });
+    res.status(result.created ? 201 : 200).json({ token: signToken(result.user), user: publicUser(result.user), resumed: !result.created });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That phone number or public username is already registered.' });
     throw error;

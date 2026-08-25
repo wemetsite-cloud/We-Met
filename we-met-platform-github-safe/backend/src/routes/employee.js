@@ -6,6 +6,12 @@ const { normalizePhone } = require('../phone');
 
 const router = express.Router();
 router.use(authenticate, requireRole('employee'));
+router.use((req, res, next) => {
+  if (req.user.listener_verification_status !== 'approved') {
+    return res.status(403).json({ error: 'Your listener account activates after voice verification is approved.' });
+  }
+  return next();
+});
 
 router.get('/history', asyncHandler(async (req, res) => {
   const result = await db.query(

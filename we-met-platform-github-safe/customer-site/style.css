@@ -1155,8 +1155,99 @@ html,body{overscroll-behavior-y:auto!important}
 /* MSG91 OTP Widget custom-UI captcha host. Empty when CAPTCHA is not required. */
 .wm-msg91-captcha{display:none}.wm-msg91-active .wm-msg91-captcha{display:block;min-width:1px;min-height:1px;position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483000;padding:8px;border-radius:14px;background:#fff;box-shadow:0 14px 45px rgba(45,31,39,.18);max-width:calc(100vw - 24px);overflow:hidden}
 
-/* v8.9.15: keep the phone auth flow focused — one primary action plus compact text links. */
+/* v8.9.16: keep the phone auth flow focused — one primary action plus compact text links. */
 .auth-link-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:-3px}
 .auth-link-row>span{color:#b7a6af;font-size:10px;line-height:1}
 .auth-link-row .auth-previous{width:auto!important;min-height:0!important;padding:5px 3px!important;margin:0!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#9b6680!important;font-size:11px!important;font-weight:800!important}
 .auth-link-row .auth-previous:hover{color:#b82f70!important;text-decoration:underline!important}
+
+/* ===== v8.9.16 final responsive / light-surface stabilization ===== */
+:root{color-scheme:light!important}
+html,body{background:#fffafc!important;color:#392b35!important}
+.page-glow{display:none!important}
+
+/* Remove inherited dark-theme controls from the current light UI. */
+.phone-auth-step input,.auth-card input,.support-auth-card input,.support-auth-card textarea,.security-forms input{
+  background:#fff!important;color:#392b35!important;border-color:#e7dbe2!important;box-shadow:none!important
+}
+.phone-auth-step label,.auth-card label,.support-auth-card label{color:#57454f!important}
+.phone-auth-step .check,.auth-flow .check,.auth-card .check{
+  display:grid!important;grid-template-columns:22px minmax(0,1fr)!important;gap:10px!important;align-items:start!important;
+  padding:12px 13px!important;background:#fff7fb!important;border:1px solid #eadce4!important;border-radius:14px!important;color:#57454f!important
+}
+.phone-auth-step .check input,.auth-flow .check input,.auth-card .check input{width:20px!important;height:20px!important;margin:0!important;accent-color:#df4d8e!important}
+.phone-auth-step .check span,.auth-flow .check span,.auth-card .check span{color:#6f5f68!important;font-size:11px!important;line-height:1.5!important}
+.phone-auth-step .check a,.auth-flow .check a,.auth-card .check a{color:#a82f68!important}
+.auth-progress-line{background:#eadfe5!important}.auth-progress-line i{background:linear-gradient(90deg,#df4d8e,#b391e5)!important}
+
+/* Keep public pages simple: no oversized decorative canvas behind normal content. */
+.topbar{background:rgba(255,253,252,.97)!important;border-bottom:1px solid #eee2e8!important;box-shadow:0 7px 24px rgba(85,52,69,.05)!important;color:#392b35!important}
+.topbar .brand{color:#392b35!important}.topbar .brand strong{color:#392b35!important}.topbar .brand small{color:#8b7781!important}
+.landing{background:#fffafc!important}.landing .hero,.feature-grid,.trust-showcase,.how-it-works,.public-footer{position:relative;z-index:1}
+.feature-grid article,.steps article{box-shadow:none!important}
+
+/* Listener profile is a real responsive page/panel, not a narrow phone card on desktop. */
+#listenerProfileModal{background:rgba(72,48,61,.22)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important}
+#listenerProfileModal .listener-profile-modal{background:#fffdfc!important;border:1px solid #eadfe5!important;overflow:auto!important}
+#listenerProfileModal .listener-profile-head{background:#fffdfc!important}
+.listener-profile-banner{background-size:cover!important;background-repeat:no-repeat!important;background-position:center 34%!important}
+.listener-profile-actions .button,.profile-follow-button{box-shadow:none!important}
+.listener-profile-back,.listener-profile-modal>.close{background:rgba(255,255,255,.96)!important;border:1px solid #e4d7de!important;color:#5c4853!important;box-shadow:0 7px 20px rgba(77,48,63,.09)!important}
+
+/* Desktop/tablet signed-in navigation belongs with the page header. */
+@media(min-width:761px){
+  body.signed-in .topbar{height:72px!important;padding-inline:max(24px,calc((100% - 1180px)/2))!important}
+  .dashboard.shell{width:min(1180px,calc(100% - 44px))!important;padding-bottom:56px!important}
+  body.signed-in .tabs,.dashboard>.tabs{
+    position:sticky!important;left:auto!important;right:auto!important;top:82px!important;bottom:auto!important;transform:none!important;
+    width:100%!important;max-width:none!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    margin:12px 0 20px!important;padding:7px!important;gap:6px!important;background:rgba(255,253,252,.96)!important;
+    border:1px solid #e8dce3!important;border-radius:18px!important;box-shadow:0 9px 28px rgba(83,51,68,.06)!important;z-index:35!important
+  }
+  body.signed-in .tabs button,.dashboard>.tabs button{min-height:48px!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:8px!important;padding:8px 12px!important;color:#806b76!important;border-radius:12px!important}
+  body.signed-in .tabs button svg,.dashboard>.tabs button svg{width:20px!important;height:20px!important}
+  body.signed-in .tabs button.active,.dashboard>.tabs button.active{background:#fff0f6!important;color:#a72f68!important;box-shadow:none!important}
+
+  #listenerGrid,#otherLanguageGrid{display:grid!important;grid-auto-flow:row!important;grid-auto-columns:auto!important;overflow:visible!important;scroll-snap-type:none!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important;margin:0!important;padding:0!important}
+  .listener-card-v8{min-width:0!important;height:100%!important;display:flex!important;flex-direction:column!important;background:#fffdfc!important;border:1px solid #eadfe5!important;box-shadow:none!important}
+  .listener-card-open{flex:1!important}
+
+  #listenerProfileModal .listener-profile-modal{width:min(900px,calc(100vw - 56px))!important;max-width:900px!important;height:auto!important;max-height:88dvh!important;border-radius:28px!important;padding:0 0 24px!important;box-shadow:0 30px 90px rgba(60,35,49,.18)!important}
+  #listenerProfileModal .listener-profile-head{border:0!important;border-bottom:1px solid #eee3e8!important;padding-bottom:20px!important}
+  #listenerProfileModal .listener-profile-banner{height:250px!important;border-radius:28px 28px 0 0!important}
+  #listenerProfileModal .listener-profile-avatar{width:112px!important;height:112px!important;margin:-58px 0 0 30px!important}
+  #listenerProfileModal .listener-profile-title{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:24px!important;align-items:center!important;padding:14px 30px 0!important}
+  #listenerProfileModal .listener-profile-title h2{font-size:34px!important;line-height:1.05!important;margin:4px 0 5px!important}
+  #listenerProfileModal .listener-profile-title p{max-width:600px!important;font-size:13px!important;line-height:1.45!important}
+  #listenerProfileModal .listener-profile-tags,#listenerProfileModal .listener-profile-actions,#listenerProfileModal .call-wallet-note{margin-inline:30px!important;padding-inline:0!important}
+  #listenerProfileModal .listener-profile-tags{display:flex!important;gap:8px!important;flex-wrap:wrap!important}
+  #listenerProfileModal .listener-profile-actions{grid-template-columns:repeat(2,minmax(0,190px))!important;justify-content:start!important;margin-top:14px!important}
+  #listenerProfileModal .exclusive-posts{padding:22px 30px 8px!important;background:#fffdfc!important}
+  #listenerProfileModal .post-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px!important}
+  #listenerProfileModal .listener-profile-back{left:16px!important;top:16px!important}
+  #listenerProfileModal .close{right:16px!important;top:16px!important}
+  #listenerProfileModal .listener-call-fab{right:28px!important;bottom:26px!important}
+}
+
+@media(min-width:761px) and (max-width:1060px){
+  #listenerGrid,#otherLanguageGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #listenerProfileModal .listener-profile-modal{width:calc(100vw - 34px)!important;max-height:90dvh!important}
+  #listenerProfileModal .listener-profile-banner{height:220px!important}
+  #listenerProfileModal .post-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+
+/* Public landing spacing for laptops/tablets: avoid content sitting under the sticky header. */
+@media(min-width:761px){
+  .landing .hero{min-height:620px!important;padding-top:58px!important;padding-bottom:54px!important;gap:clamp(34px,5vw,72px)!important}
+  .landing .hero h1{font-size:clamp(48px,5.6vw,74px)!important}
+  .how-it-works{padding-top:74px!important}.public-footer{margin-top:70px!important}
+}
+
+/* Mobile remains app-like but the profile uses all available space cleanly. */
+@media(max-width:760px){
+  .topbar{background:rgba(255,253,252,.98)!important}
+  #listenerProfileModal{padding:0!important;background:#fffdfc!important;backdrop-filter:none!important}
+  #listenerProfileModal .listener-profile-modal{background:#fffdfc!important}
+  #listenerProfileModal .listener-profile-banner{background-position:center 32%!important}
+  .phone-auth-step .check{background:#fff7fb!important}
+}
