@@ -4,6 +4,7 @@ const { pool } = require('../src/db');
 const { hashPassword } = require('../src/auth');
 const config = require('../src/config');
 const { normalizePhone } = require('../src/phone');
+const { settleCall } = require('../src/call-settlement');
 
 async function upsertAdmin() {
   const passwordHash = await hashPassword(config.admin.password);
@@ -69,9 +70,29 @@ async function reconcileInterruptedListenerSessions() {
   `);
 }
 
+async function reconcileInterruptedCalls() {
+  const interrupted = await pool.query(`
+    UPDATE calls
+    SET status=CASE WHEN status='active' THEN 'ended' ELSE 'cancelled' END,
+        ended_at=COALESCE(ended_at,now()),
+        end_reason=COALESCE(end_reason,'Server restarted')
+    WHERE status IN ('ringing','connecting','active')
+    RETURNING id
+  `);
+
+  for (const row of interrupted.rows) {
+    try {
+      await settleCall(row.id);
+    } catch (error) {
+      console.warn(`Could not settle interrupted call ${row.id}:`, error.message);
+    }
+  }
+}
+
 (async () => {
   const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
   await pool.query(fs.readFileSync(schemaPath, 'utf8'));
+  await reconcileInterruptedCalls();
   await reconcileInterruptedListenerSessions();
   await upsertAdmin();
   const listenerCreated = await upsertInitialListener();

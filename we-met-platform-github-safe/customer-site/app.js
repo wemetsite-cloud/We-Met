@@ -126,8 +126,10 @@
   }
 
   function syncBodyState() {
-    document.body.classList.toggle('modal-open', Boolean(currentOverlay()));
-    $('#appBackButton')?.classList.toggle('hidden', !(currentOverlay() || (me && activeTab !== 'home')));
+    const overlay = currentOverlay();
+    document.body.classList.toggle('modal-open', Boolean(overlay));
+    document.body.classList.toggle('nested-view-open', Boolean(me && overlay));
+    $('#appBackButton')?.classList.toggle('hidden', !(overlay || (me && activeTab !== 'home')));
   }
 
   function openOverlay(id) {
@@ -460,7 +462,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.18', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.19', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -1062,16 +1064,25 @@
       if (state === 'connected' && currentCall.mediaConnected !== true) { currentCall.mediaConnected = true; socket.emit('call:media-state', { callId: currentCall.id, connected: true }); }
       if (['failed', 'disconnected', 'closed'].includes(state) && currentCall.mediaConnected !== false) { currentCall.mediaConnected = false; socket.emit('call:media-state', { callId: currentCall.id, connected: false }); $('#callState').textContent = 'Audio reconnecting…'; }
     } });
-    socket.on('connect', () => socket.emit('listeners:get'));
+    socket.on('connect', () => {
+      socket.emit('listeners:get');
+      if (currentCall?.id) {
+        socket.emit('call:resume', { callId: currentCall.id }, (response) => {
+          if (!response?.ok && currentCall) $('#callState').textContent = 'Reconnecting call…';
+        });
+      }
+    });
     socket.on('disconnect', () => {
-      const wasRequesting = Boolean(pendingCallRequest);
-      const hadCall = Boolean(currentCall);
       liveDirectoryReady = false;
-      liveListeners = [];
-      clearPendingCallRequest();
-      if (currentCall) closeCall();
+      // Do not tear down an established WebRTC peer just because Socket.IO is
+      // reconnecting. The audio path can remain alive while signaling recovers.
+      if (currentCall) {
+        $('#callState').textContent = 'Reconnecting call controls…';
+        P.toast('Call controls are reconnecting. Keep this page open.', 'info');
+      } else if (pendingCallRequest) {
+        P.toast('Calling is reconnecting. Please wait a moment.', 'info');
+      }
       renderDirectory();
-      if (wasRequesting || hadCall) P.toast('Calling is reconnecting. Please try again shortly.', 'error');
     });
     socket.on('listeners:update', ({ listeners = [] }) => {
       liveListeners = listeners;
@@ -1115,8 +1126,41 @@
     socket.on('call:retrying', (data) => { $('#callState').textContent = 'Trying another available listener…'; P.toast(data.reason || 'The listener did not answer.', 'info'); });
     socket.on('call:unavailable', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.message || 'No listener is available right now.', 'info'); });
     socket.on('call:error', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.message || 'The call could not start.', 'error'); if (data.needsTopup) selectTab('wallet'); });
-    socket.on('call:accepted', async (data) => { if (!currentCall) currentCall = { id: data.callId }; currentCall.mediaConnected = false; $('#callState').textContent = 'Preparing microphone…'; try { await audioCall.prepare(data.callId); if (currentCall?.id === data.callId) { $('#callState').textContent = 'Connecting secure audio…'; socket.emit('webrtc:ready', { callId: data.callId }); } } catch (error) { P.toast(error.message || 'Allow microphone access.', 'error'); socket.emit('call:end', { callId: data.callId }); } });
+    socket.on('call:accepted', async (data) => {
+      if (!currentCall) currentCall = { id: data.callId };
+      if (data.employee?.id) {
+        const saved = directory.find((item) => item.id === data.employee.id);
+        currentCall.employee = { ...(saved || {}), ...data.employee };
+        $('#callPerson').textContent = currentCall.employee.name || 'Listener';
+        $('#callBio').textContent = currentCall.employee.bio || 'A private conversation';
+        $('#callAvatarImage').src = listenerImage(currentCall.employee);
+        const callShell = $('#callModal .call-shell');
+        if (callShell) callShell.style.setProperty('--call-profile-bg', `url("${listenerImage(currentCall.employee, 'banner')}")`);
+        show('#callProfileButton', true);
+        show('#callFollowButton', true);
+        show('#callSubscribeButton', !isActiveMember(currentCall.employee.id) && !currentCall.employee.subscribed);
+        $('#callFollowButton').textContent = currentCall.employee.following ? 'Following' : 'Follow';
+      }
+      currentCall.mediaConnected = false;
+      $('#callState').textContent = 'Preparing microphone…';
+      try {
+        await audioCall.prepare(data.callId);
+        if (currentCall?.id === data.callId) {
+          $('#callState').textContent = 'Connecting secure audio…';
+          socket.emit('webrtc:ready', { callId: data.callId });
+        }
+      } catch (error) {
+        P.toast(error.message || 'Allow microphone access.', 'error');
+        socket.emit('call:end', { callId: data.callId });
+      }
+    });
     socket.on('webrtc:start', async ({ callId }) => { if (currentCall?.id === callId) { try { await audioCall.createOffer(); } catch { socket.emit('call:end', { callId }); } } });
+    socket.on('call:resumed', ({ callId, state } = {}) => {
+      if (!currentCall || currentCall.id !== callId) return;
+      audioCall?.resumeRemoteAudio?.();
+      $('#callState').textContent = state === 'active' ? 'Connected · wallet billing active' : 'Reconnecting secure audio…';
+      if (currentCall.mediaConnected) socket.emit('call:media-state', { callId, connected: true });
+    });
     socket.on('call:connected', () => { if (currentCall) { $('#callState').textContent = 'Connected · wallet billing active'; P.notify('We Met', 'Your private call is connected.'); } });
     socket.on('call:audio-paused', () => { if (currentCall) $('#callState').textContent = 'Audio paused · wallet billing paused'; });
     socket.on('call:audio-restored', () => { if (currentCall) $('#callState').textContent = 'Connected · wallet billing active'; });

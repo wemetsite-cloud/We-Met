@@ -177,7 +177,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.18', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.19', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -921,6 +921,9 @@
       $('#connectionBadge').textContent = 'Connected';
       $('#connectionBadge').className = 'status online';
       $('#connectionBadge').title = 'Calling server connected';
+      if (currentCall?.id) {
+        socket.emit('call:resume', { callId: currentCall.id }, () => {});
+      }
     });
     socket.on('disconnect', () => {
       $('#connectionBadge').textContent = 'Reconnecting…';
@@ -930,16 +933,10 @@
       $('#offlineBtn').disabled = true;
       $('#breakBtn').disabled = true;
       if (currentCall) {
-        stopRing();
-        audioCall?.stop();
-        show('#incomingModal', false);
-        show('#callView', false);
-        show('#restoreListenerCall', false);
-        currentCall = null;
-        if (history.state?.marker === NAVIGATION_MARKER && history.state.overlay) {
-          setNavigationState({ overlay: null }, 'replace');
-        }
-        P.toast('Connection lost. The call was closed safely.', 'error');
+        // Keep the WebRTC peer and the current call UI alive during a short
+        // signaling reconnect. Closing them here caused accepted calls to drop.
+        $('#callState').textContent = 'Reconnecting call controls…';
+        P.toast('Call controls are reconnecting. Keep this page open.', 'info');
       }
     });
     socket.on('connect_error', (error) => console.warn('Calling server reconnecting:', error?.message || error));
@@ -972,6 +969,16 @@
       } catch (error) {
         P.toast(error.message || 'The audio connection could not start.', 'error');
         socket.emit('call:end', { callId });
+      }
+    });
+    socket.on('call:resumed', ({ callId, state } = {}) => {
+      if (!currentCall || currentCall.id !== callId) return;
+      audioCall?.resumeRemoteAudio?.();
+      if (state === 'ringing') {
+        $('#callState').textContent = 'Incoming call restored';
+      } else {
+        $('#callState').textContent = state === 'active' ? 'Connected · customer billing is active' : 'Reconnecting secure audio…';
+        if (currentCall.mediaConnected) socket.emit('call:media-state', { callId, connected: true });
       }
     });
     socket.on('call:connected', () => {
@@ -1072,16 +1079,45 @@
     startRing();
   }
 
-  function accept() {
+  async function accept() {
     if (!currentCall || !socket?.connected) return;
+    const acceptingCallId = currentCall.id;
     audioCall?.resumeRemoteAudio?.();
     $('#acceptBtn').disabled = true;
     $('#rejectBtn').disabled = true;
-    socket.emit('call:accept', { callId: currentCall.id });
+
+    try {
+      // Acquire microphone before claiming the broadcast call. This prevents a
+      // listener with denied microphone permission from winning and then
+      // immediately breaking the customer's call.
+      await audioCall.ensureMedia();
+    } catch (error) {
+      $('#acceptBtn').disabled = false;
+      $('#rejectBtn').disabled = false;
+      P.toast(error.message || 'Allow microphone access before answering.', 'error');
+      return;
+    }
+
+    if (!currentCall || currentCall.id !== acceptingCallId || !socket.connected) {
+      $('#acceptBtn').disabled = false;
+      $('#rejectBtn').disabled = false;
+      return;
+    }
+
     $('#customerName').textContent = currentCall.customer.name;
     setCustomerCallPhoto(currentCall.customer, '#activeCustomerPhoto', '#activeCustomerInitialsText');
     $('#chatMessages').innerHTML = '<div class="bubble">Private text chat is ready.</div>';
     $('#callTimer').textContent = '0:00';
+
+    socket.timeout(8000).emit('call:accept', { callId: acceptingCallId }, (error, response) => {
+      if (!error && response?.ok) return;
+      stopRing();
+      show('#incomingModal', false);
+      $('#acceptBtn').disabled = false;
+      $('#rejectBtn').disabled = false;
+      if (currentCall?.id === acceptingCallId) currentCall = null;
+      P.toast(response?.error || 'Another listener answered this call first.', 'info');
+    });
   }
 
   async function prepareRingtone() {

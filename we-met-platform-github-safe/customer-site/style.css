@@ -1357,3 +1357,67 @@ body.signed-in .dashboard,body.signed-in .tab,body.signed-in .listener-grid,body
   body.signed-in #tabs,body.signed-in .dashboard>.tabs{bottom:0!important;width:100%!important;max-width:none!important;border-radius:0!important;border-width:1px 0 0!important;padding:5px 5px calc(5px + env(safe-area-inset-bottom))!important}
   body.signed-in .dashboard{padding-bottom:calc(86px + env(safe-area-inset-bottom))!important}
 }
+
+/* ===== v8.9.19 final nested-page + mobile navigation pass ===== */
+/* Root navigation belongs only to the five root customer tabs. Nested screens
+   (listener profile, post viewer, checkout, legal, active call) own the viewport. */
+body.signed-in.nested-view-open #tabs,
+body.signed-in.nested-view-open .dashboard>.tabs{display:none!important}
+body.signed-in.nested-view-open .dashboard{padding-bottom:28px!important}
+
+/* Listener profiles are real inner pages on desktop/tablet, not small popups. */
+#listenerProfileModal{
+  position:fixed!important;inset:0!important;z-index:130!important;
+  display:flex!important;align-items:flex-start!important;justify-content:center!important;
+  padding:0!important;overflow:auto!important;overscroll-behavior:contain!important;
+  background:linear-gradient(180deg,#fffafc 0%,#fff7fb 100%)!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+}
+#listenerProfileModal.hidden{display:none!important}
+#listenerProfileModal .listener-profile-modal{
+  position:relative!important;width:min(1180px,100%)!important;max-width:1180px!important;
+  min-height:100dvh!important;height:auto!important;max-height:none!important;margin:0 auto!important;
+  padding:68px 24px 48px!important;border:0!important;border-radius:0!important;
+  overflow:visible!important;background:transparent!important;box-shadow:none!important;
+}
+#listenerProfileModal #listenerProfileContent{width:100%!important;min-width:0!important}
+#listenerProfileModal .listener-profile-head{
+  overflow:hidden!important;border:1px solid #eadfe5!important;border-radius:28px!important;
+  background:linear-gradient(145deg,#fff,#fff8fb)!important;box-shadow:0 14px 42px rgba(78,45,64,.07)!important;
+}
+#listenerProfileModal .listener-profile-banner{height:clamp(240px,31vw,360px)!important;border-radius:0!important;background-position:center 32%!important}
+#listenerProfileModal .listener-profile-avatar{width:122px!important;height:122px!important;margin:-62px 0 0 30px!important}
+#listenerProfileModal .listener-profile-title{padding:14px 30px 0!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:20px!important;align-items:center!important}
+#listenerProfileModal .listener-profile-title h2{font-size:clamp(30px,3.5vw,42px)!important;line-height:1.02!important}
+#listenerProfileModal .listener-profile-title p{max-width:700px!important;font-size:13px!important;line-height:1.55!important}
+#listenerProfileModal .listener-profile-tags,#listenerProfileModal .listener-profile-actions,#listenerProfileModal .call-wallet-note{margin-inline:30px!important}
+#listenerProfileModal .listener-profile-actions{display:grid!important;grid-template-columns:repeat(2,minmax(160px,220px))!important;justify-content:start!important;gap:10px!important}
+#listenerProfileModal .exclusive-posts{margin-top:20px!important;padding:24px 2px 10px!important;background:transparent!important}
+#listenerProfileModal .post-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
+#listenerProfileModal .listener-profile-back,#listenerProfileModal .close{
+  position:fixed!important;top:14px!important;z-index:132!important;width:44px!important;height:44px!important;
+  display:grid!important;place-items:center!important;margin:0!important;border:1px solid #eadfe5!important;border-radius:14px!important;
+  background:rgba(255,253,252,.96)!important;color:#9e3268!important;box-shadow:0 8px 24px rgba(70,43,58,.08)!important;
+}
+#listenerProfileModal .listener-profile-back{left:max(14px,calc((100vw - 1180px)/2 + 14px))!important}
+#listenerProfileModal .close{right:max(14px,calc((100vw - 1180px)/2 + 14px))!important}
+#listenerProfileModal .listener-call-fab{position:fixed!important;right:max(22px,calc((100vw - 1180px)/2 + 22px))!important;bottom:24px!important;z-index:132!important}
+
+/* Phones use symbols only in the persistent customer dock. */
+@media(max-width:700px){
+  body.signed-in #tabs button span,body.signed-in .dashboard>.tabs button span{display:none!important}
+  body.signed-in #tabs button,body.signed-in .dashboard>.tabs button{min-height:56px!important;padding:7px!important;gap:0!important}
+  body.signed-in #tabs button svg,body.signed-in .dashboard>.tabs button svg{width:24px!important;height:24px!important}
+  #listenerProfileModal .listener-profile-modal{padding:64px 0 32px!important}
+  #listenerProfileModal .listener-profile-head{border:0!important;border-radius:0!important;box-shadow:none!important}
+  #listenerProfileModal .listener-profile-banner{height:220px!important}
+  #listenerProfileModal .listener-profile-avatar{width:108px!important;height:108px!important;margin:-54px 0 0 18px!important}
+  #listenerProfileModal .listener-profile-title{grid-template-columns:1fr!important;padding:12px 18px 0!important}
+  #listenerProfileModal .listener-profile-tags,#listenerProfileModal .listener-profile-actions,#listenerProfileModal .call-wallet-note{margin-inline:18px!important}
+  #listenerProfileModal .listener-profile-actions{grid-template-columns:1fr 1fr!important}
+  #listenerProfileModal .exclusive-posts{padding-inline:18px!important}
+  #listenerProfileModal .post-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important}
+  #listenerProfileModal .listener-profile-back{left:10px!important;top:10px!important}
+  #listenerProfileModal .close{right:10px!important;top:10px!important}
+  #listenerProfileModal .listener-call-fab{right:16px!important;bottom:18px!important}
+}

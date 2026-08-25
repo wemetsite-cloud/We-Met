@@ -1099,3 +1099,43 @@ body.signed-in #verificationView{display:none!important}
   body.signed-in .listener-main{padding-bottom:calc(86px + env(safe-area-inset-bottom))!important}
   body.signed-in .listener-bottom-nav{position:fixed!important;top:auto!important;bottom:0!important;left:0!important;right:0!important;transform:none!important;width:100%!important;max-width:none!important;margin:0!important;z-index:120!important}
 }
+
+/* ===== v8.9.19 final listener workspace surface cleanup ===== */
+/* Settings/followers/profile are sections of the app, not giant white cards. */
+#tab-settings,#tab-followers,#tab-profile{background:transparent!important;box-shadow:none!important;border:0!important}
+#tab-settings .compact-page-title,#tab-followers .compact-page-title{margin-bottom:18px!important;padding-inline:4px!important}
+.listener-settings-list{width:100%!important;max-width:900px!important;gap:12px!important;padding:2px!important;background:transparent!important}
+.listener-settings-item{
+  background:linear-gradient(145deg,rgba(255,249,252,.94),rgba(248,244,255,.88))!important;
+  border:1px solid #eadde5!important;border-radius:20px!important;box-shadow:0 8px 26px rgba(79,48,65,.045)!important;
+}
+.listener-settings-item>summary,.settings-static-head{background:transparent!important}
+.listener-settings-body{background:transparent!important;border-top:1px solid #eee3e8!important;padding:18px!important}
+.settings-notification-list{background:transparent!important}.settings-notification{background:transparent!important}
+.settings-action-row{background:linear-gradient(145deg,rgba(255,249,252,.94),rgba(248,244,255,.88))!important}
+
+/* Followers use the desktop width instead of leaving a blank white half-page. */
+.follower-grid{width:100%!important;max-width:100%!important;border-top:1px solid #eadfe5!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0 28px!important;background:transparent!important}
+.follower-card{background:transparent!important;color:#392b35!important;border-bottom:1px solid #eadfe5!important;box-shadow:none!important;padding:14px 4px!important}
+.follower-card strong,.followers-empty strong{color:#392b35!important}.follower-card small,.followers-empty small{color:#83727c!important}
+
+/* Profile menu rows stay lightweight and integrated with the page. */
+.app-profile,.profile-menu,.profile-menu>button{background:transparent!important;box-shadow:none!important}
+.profile-menu>button{border-width:0 0 1px!important;border-radius:0!important;border-color:#eadfe5!important;padding:18px 4px!important}
+.profile-menu>button:hover{background:rgba(255,240,246,.55)!important}
+
+/* Desktop/tablet workspace keeps a calm app surface and enough breathing room. */
+@media(min-width:701px){
+  body.signed-in #appView{background:linear-gradient(180deg,#fffafc,#fff8fb)!important}
+  body.signed-in .listener-main{width:min(1200px,calc(100% - 48px))!important;max-width:1200px!important;padding-top:24px!important}
+  #tab-settings,#tab-followers,#tab-profile,#tab-inbox,#tab-posts,#tab-wallet{padding:8px 0 28px!important}
+  .listener-bottom-nav{bottom:max(14px,env(safe-area-inset-bottom))!important}
+}
+@media(min-width:701px) and (max-width:980px){
+  .follower-grid{grid-template-columns:1fr!important}
+  .listener-settings-list{max-width:100%!important}
+}
+@media(max-width:700px){
+  .follower-grid{grid-template-columns:1fr!important;gap:0!important}
+  .listener-settings-item{border-radius:16px!important;box-shadow:none!important}
+}

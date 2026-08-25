@@ -1,4 +1,4 @@
-const VERSION = '8.9.18';
+const VERSION = '8.9.19';
 const CACHE_PREFIX = 'we-met-admin-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = ['./','index.html','style.css','app.js','api.js','config.js','manifest.webmanifest','/shared/logo.svg','/shared/favicon.png','/shared/icon-192.png','/shared/icon-512.png'];

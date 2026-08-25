@@ -15,6 +15,8 @@
       this.pendingIce = [];
       this.offerStarted = false;
       this.lastState = null;
+      this.restartTimer = null;
+      this.restartingIce = false;
       this.bindSignals();
     }
 
@@ -124,12 +126,37 @@
       };
       this.peer.onconnectionstatechange = () => {
         const state = this.peer?.connectionState;
-        if (state) this.reportState(state);
+        if (!state) return;
+        if (state === 'connected') this.clearRestartTimer();
+        this.reportState(state);
       };
       this.peer.oniceconnectionstatechange = () => {
         const state = this.peer?.iceConnectionState;
-        if (state === 'connected' || state === 'completed') this.reportState('connected');
-        else if (['failed', 'disconnected', 'closed'].includes(state)) this.reportState(state);
+        if (state === 'connected' || state === 'completed') {
+          this.clearRestartTimer();
+          this.reportState('connected');
+          return;
+        }
+        if (state === 'disconnected') {
+          this.reportState('disconnected');
+          // ICE can briefly enter disconnected while a phone changes Wi‑Fi/cell
+          // path. Give it a moment before the initiating peer renegotiates.
+          if (this.offerStarted && !this.restartTimer) {
+            this.restartTimer = setTimeout(() => {
+              this.restartTimer = null;
+              if (this.peer?.iceConnectionState === 'disconnected') {
+                this.restartIce().catch((error) => console.warn('ICE restart failed:', error));
+              }
+            }, 2500);
+          }
+          return;
+        }
+        if (state === 'failed') {
+          this.reportState('failed');
+          if (this.offerStarted) this.restartIce().catch((error) => console.warn('ICE restart failed:', error));
+          return;
+        }
+        if (state === 'closed') this.reportState('closed');
       };
       return this.peer;
     }
@@ -138,23 +165,43 @@
       if (!callId) throw new Error('Missing call ID.');
       this.stopPeerOnly();
       this.pendingIce = [];
+      this.clearRestartTimer();
+      this.restartingIce = false;
       this.callId = callId;
       this.offerStarted = false;
       this.lastState = null;
       await this.ensurePeer();
     }
 
-    async createOffer() {
-      if (!this.callId || this.offerStarted) return;
-      this.offerStarted = true;
+    async createOffer({ iceRestart = false } = {}) {
+      if (!this.callId || (this.offerStarted && !iceRestart)) return;
+      if (!iceRestart) this.offerStarted = true;
       try {
         await this.ensurePeer();
-        const offer = await this.peer.createOffer({ offerToReceiveAudio: true });
+        const offer = await this.peer.createOffer({ offerToReceiveAudio: true, iceRestart });
         await this.peer.setLocalDescription(offer);
         this.socket.emit('webrtc:offer', { callId: this.callId, payload: this.peer.localDescription });
       } catch (error) {
-        this.offerStarted = false;
+        if (!iceRestart) this.offerStarted = false;
         throw error;
+      }
+    }
+
+    clearRestartTimer() {
+      if (this.restartTimer) clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+
+    async restartIce() {
+      if (!this.callId || !this.offerStarted || this.restartingIce) return;
+      if (!this.peer || this.peer.signalingState === 'closed') return;
+      this.restartingIce = true;
+      this.clearRestartTimer();
+      try {
+        if (typeof this.peer.restartIce === 'function') this.peer.restartIce();
+        await this.createOffer({ iceRestart: true });
+      } finally {
+        this.restartingIce = false;
       }
     }
 
@@ -189,6 +236,8 @@
         this.peer.close();
       }
       this.peer = null;
+      this.clearRestartTimer();
+      this.restartingIce = false;
       this.offerStarted = false;
       this.lastState = null;
       if (this.remoteAudio) this.remoteAudio.srcObject = null;
