@@ -29,7 +29,7 @@
   let bannerImageDraft;
   let listenerAuthState = { phone: '', registrationToken: '', otpPurpose: 'registration' };
   let listenerRecoveryState = { phone: '', resetToken: '' };
-  let listenerSupportState = { phone: '', verificationToken: '' };
+  let listenerSupportState = { phone: '', challengeId: '', verificationToken: '' };
   let verificationState = null;
   let voiceRecorder = null;
   let voiceChunks = [];
@@ -164,7 +164,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.12', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.13', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -201,10 +201,6 @@
     show('#listenerPostEditModal', false);
     show('#restoreListenerCall', false);
     ['listenerPhoneForm','listenerPasswordForm','listenerOtpForm','listenerDetailsForm','listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm','recoveryRequestForm','employeeRecoveryOtpForm','employeeResetForm'].forEach((id) => document.getElementById(id)?.reset());
-    listenerAuthState = { phone: '', registrationToken: '', otpPurpose: 'registration' };
-    listenerSupportState = { phone: '', verificationToken: '' };
-    listenerRecoveryState = { phone: '', resetToken: '' };
-    window.WeMetOtp?.reset();
     showListenerAuthStep('welcome');
     document.body.classList.remove('signed-in');
     document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
@@ -337,6 +333,7 @@
     $('#listenerPasswordForm').addEventListener('submit', listenerPasswordLogin);
     $('#listenerForgotPassword').addEventListener('click', openRecovery);
     $('#listenerOtpForm').addEventListener('submit', verifyListenerOtp);
+    $('#listenerResendOtp').addEventListener('click', resendListenerRegistrationOtp);
     $('#listenerDetailsForm').addEventListener('submit', registerListener);
     $('#listenerSupportButton').addEventListener('click', () => openManagedOverlay('#listenerSupportModal', 'listenerSupportModal'));
     $('#closeListenerSupport').addEventListener('click', () => closeManagedOverlay('listenerSupportModal'));
@@ -349,6 +346,7 @@
     $('#listenerRecoveryBack').addEventListener('click', goBackInListener);
     $('#recoveryRequestForm').addEventListener('submit', requestRecovery);
     $('#employeeRecoveryOtpForm').addEventListener('submit', verifyEmployeeRecovery);
+    $('#employeeRecoveryResendOtp').addEventListener('click', resendEmployeeRecoveryOtp);
     $('#employeeResetForm').addEventListener('submit', completeRecovery);
     $('#logoutBtn').addEventListener('click', logout);
     $('#listenerBackButton').addEventListener('click', goBackInListener);
@@ -512,6 +510,28 @@
     return `${$(countrySelector)?.value || '+91'}${national}`;
   }
 
+  function canonicalPhone(value) {
+    const raw = String(value || '').trim();
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 10) return `+91${digits}`;
+    if (digits.length >= 8 && digits.length <= 15 && digits[0] !== '0') return `+${digits}`;
+    return raw;
+  }
+
+  async function sendMsg91Otp(phone) {
+    if (!window.WMMsg91Otp) throw new Error('MSG91 OTP is not available. Refresh and try again.');
+    await window.WMMsg91Otp.send(phone);
+  }
+
+  async function verifyMsg91ForServer({ phone, role, purpose, otp }) {
+    if (!window.WMMsg91Otp) throw new Error('MSG91 OTP is not available. Refresh and try again.');
+    const verified = await window.WMMsg91Otp.verify(otp);
+    return P.api('/api/auth/msg91/verify', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken: verified.accessToken, phone, role, purpose }),
+    });
+  }
+
   async function startListenerPhone(event) {
     event.preventDefault();
     const button = event.submitter; button.disabled = true;
@@ -525,11 +545,11 @@
         showListenerAuthStep('password');
       } else {
         listenerAuthState.otpPurpose = 'registration';
-        window.WeMetOtp.reset();
-        await window.WeMetOtp.send(response.identifier || phone);
+        window.WMMsg91Otp?.reset();
+        await sendMsg91Otp(phone);
         show('#listenerDevelopmentOtp', false);
         showListenerAuthStep('otp');
-        P.toast('OTP sent to your mobile number.', 'success');
+        P.toast('OTP sent by SMS.', 'success');
       }
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
@@ -549,14 +569,20 @@
   async function verifyListenerOtp(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const verified = await window.WeMetOtp.verify($('#listenerOtp').value);
-      const response = await P.api('/api/auth/msg91/verify', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken: verified.accessToken, phone: listenerAuthState.phone, role: 'employee', purpose: 'registration' }),
+      const response = await verifyMsg91ForServer({
+        phone: listenerAuthState.phone, role: 'employee', purpose: 'registration', otp: $('#listenerOtp').value,
       });
       listenerAuthState.registrationToken = response.registrationToken;
       showListenerAuthStep('details');
     } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function resendListenerRegistrationOtp() {
+    const button = $('#listenerResendOtp');
+    button.disabled = true;
+    try { await window.WMMsg91Otp.retry(); P.toast('OTP resent by SMS.', 'success'); }
+    catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
 
@@ -574,13 +600,10 @@
     try {
       const phone = composedPhone('#listenerSupportCountry', '#listenerSupportPhone');
       const response = await P.api('/api/auth/support/phone/start', { method: 'POST', body: JSON.stringify({ phone }) });
-      listenerSupportState = { phone: response.phoneE164, verificationToken: '' };
+      listenerSupportState = { phone, challengeId: response.challengeId, verificationToken: '' };
       $('#listenerSupportPhonePreview').textContent = response.phone;
-      window.WeMetOtp.reset();
-      await window.WeMetOtp.send(response.identifier || response.phoneE164);
-      show('#listenerSupportDevelopmentOtp', false);
+      if (response.developmentOtp) { $('#listenerSupportDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#listenerSupportDevelopmentOtp'); }
       show('#listenerSupportPhoneForm', false); show('#listenerSupportOtpForm');
-      P.toast('OTP sent to your mobile number.', 'success');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
@@ -588,11 +611,7 @@
   async function verifyListenerSupport(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const verified = await window.WeMetOtp.verify($('#listenerSupportOtp').value);
-      const response = await P.api('/api/auth/msg91/verify', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken: verified.accessToken, phone: listenerSupportState.phone, role: 'customer', purpose: 'support' }),
-      });
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: listenerSupportState.challengeId, otp: $('#listenerSupportOtp').value }) });
       listenerSupportState.verificationToken = response.registrationToken;
       show('#listenerSupportOtpForm', false); show('#listenerSupportIssueForm');
     } catch (error) { P.toast(error.message, 'error'); }
@@ -613,7 +632,6 @@
 
   function openRecovery() {
     listenerRecoveryState = { phone: '', resetToken: '' };
-    window.WeMetOtp?.reset();
     ['recoveryRequestForm','employeeRecoveryOtpForm','employeeResetForm'].forEach((id) => document.getElementById(id)?.reset());
     $('#recoveryPhone').value = listenerAuthState.phone || '';
     show('#recoveryRequestForm');
@@ -635,14 +653,15 @@
     event.preventDefault();
     const button = event.submitter; button.disabled = true;
     try {
+      const phone = canonicalPhone($('#recoveryPhone').value);
       const response = await P.api('/api/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ identifier: $('#recoveryPhone').value, role: 'employee' }),
+        body: JSON.stringify({ identifier: phone, role: 'employee' }),
       });
-      listenerRecoveryState.phone = response.phoneE164;
+      listenerRecoveryState.phone = phone;
       $('#employeeRecoveryPhonePreview').textContent = response.phone;
-      window.WeMetOtp.reset();
-      await window.WeMetOtp.send(response.identifier || response.phoneE164);
+      window.WMMsg91Otp?.reset();
+      await sendMsg91Otp(phone);
       show('#employeeRecoveryDevelopmentOtp', false);
       show('#recoveryRequestForm', false);
       show('#employeeRecoveryOtpForm');
@@ -656,12 +675,9 @@
     event.preventDefault();
     const button = event.submitter; button.disabled = true;
     try {
-      const verified = await window.WeMetOtp.verify($('#employeeRecoveryOtp').value);
-      const response = await P.api('/api/auth/msg91/verify', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken: verified.accessToken, phone: listenerRecoveryState.phone, role: 'employee', purpose: 'password_reset' }),
+      const response = await verifyMsg91ForServer({
+        phone: listenerRecoveryState.phone, role: 'employee', purpose: 'password_reset', otp: $('#employeeRecoveryOtp').value,
       });
-      if (!response.resetToken) throw new Error('Password reset verification failed. Request a new OTP.');
       listenerRecoveryState.resetToken = response.resetToken;
       show('#employeeRecoveryOtpForm', false);
       show('#employeeResetForm');
@@ -669,6 +685,14 @@
     } catch (error) {
       P.toast(error.message, 'error');
     } finally { button.disabled = false; }
+  }
+
+  async function resendEmployeeRecoveryOtp() {
+    const button = $('#employeeRecoveryResendOtp');
+    button.disabled = true;
+    try { await window.WMMsg91Otp.retry(); P.toast('OTP resent by SMS.', 'success'); }
+    catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
   }
 
   async function completeRecovery(event) {

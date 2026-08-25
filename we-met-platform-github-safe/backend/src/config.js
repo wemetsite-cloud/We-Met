@@ -41,6 +41,7 @@ const razorpayKeyId = String(process.env.RAZORPAY_KEY_ID || '').trim();
 const razorpayKeySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
 const razorpaySubscriptionPlanId = String(process.env.RAZORPAY_SUBSCRIPTION_PLAN_ID || 'plan_TTIsGpwDtJmgi5').trim();
 const razorpayWebhookSecret = String(process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
+const msg91AuthKey = String(process.env.MSG91_AUTH_KEY || '').trim();
 const smsEnabled = bool(process.env.SMS_ENABLED, false);
 const smsProvider = String(process.env.SMS_PROVIDER || 'fast2sms').trim().toLowerCase();
 const fast2smsApiKey = String(process.env.FAST2SMS_API_KEY || '').trim();
@@ -49,7 +50,6 @@ const twilioAccountSid = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
 const twilioAuthToken = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
 const twilioFromNumber = String(process.env.TWILIO_FROM_NUMBER || '').trim();
 const twilioMessagingServiceSid = String(process.env.TWILIO_MESSAGING_SERVICE_SID || '').trim();
-const msg91AuthKey = String(process.env.MSG91_AUTH_KEY || '').trim();
 const publicUrl = (
   process.env.PUBLIC_URL
   || process.env.RENDER_EXTERNAL_URL
@@ -85,6 +85,7 @@ const config = {
   },
   msg91: {
     authKey: msg91AuthKey,
+    verifyAccessTokenUrl: 'https://control.msg91.com/api/v5/widget/verifyAccessToken',
   },
   sms: {
     provider: smsProvider,

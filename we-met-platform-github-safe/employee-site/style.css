@@ -713,5 +713,5 @@ html,body{overscroll-behavior-y:auto!important}
   .listener-home-hero{height:auto!important}
 }
 
-.msg91-captcha{position:fixed;z-index:100000;left:50%;bottom:18px;transform:translateX(-50%);max-width:calc(100vw - 24px)}
-.msg91-captcha:empty{display:none}
+/* MSG91 OTP Widget custom-UI captcha host. Empty when CAPTCHA is not required. */
+.wm-msg91-captcha{display:none}.wm-msg91-active .wm-msg91-captcha{display:block;min-width:1px;min-height:1px;position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483000;padding:8px;border-radius:14px;background:#fff;box-shadow:0 14px 45px rgba(45,31,39,.18);max-width:calc(100vw - 24px);overflow:hidden}

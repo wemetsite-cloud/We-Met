@@ -1,4 +1,4 @@
-const VERSION = '8.9.12';
+const VERSION = '8.9.13';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -8,8 +8,8 @@ const STATIC = [
   'app.js',
   'api.js',
   '/shared/socket-loader.js',
-  '/shared/msg91-otp.js',
   '/shared/webrtc.js',
+  '/shared/msg91-otp.js',
   'config.js',
   'manifest.webmanifest',
   'legal.css',

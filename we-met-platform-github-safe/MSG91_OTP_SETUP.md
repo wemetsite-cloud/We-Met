@@ -1,38 +1,24 @@
-# MSG91 OTP setup for We Met v8.9.12
+# MSG91 OTP setup (v8.9.13)
 
-This build uses **password login for every existing customer/listener**. OTP is used for **new account phone verification** and **Forgot password** recovery. The existing login screen no longer offers an OTP-login bypass.
+This build uses the configured MSG91 OTP Widget for **new customer registration**, **new listener registration**, and **forgot-password recovery**. Returning users sign in with their password.
 
-## Already configured in this ZIP
+## Already embedded in the web clients
+- Widget ID: `3668796d6a79393230383731`
+- OTP Widget token name: `WEMETWEB` (the generated token value is embedded in `/shared/msg91-otp.js`)
+- Web SDK mode: custom UI / exposed methods
 
-- OTP Widget ID is configured in `customer-site/config.js` and `employee-site/config.js`.
-- The OTP Widget client token (`WEMETWEB`) is configured for the browser SDK.
-- Both sites use MSG91 **Web SDK for custom UI**, so the existing We Met forms remain unchanged.
-- `sendOtp`, `verifyOtp`, and `retryOtp` are wrapped by `/shared/msg91-otp.js`.
-- The backend accepts the verified MSG91 access token and creates a short-lived one-time registration/reset token only after server-side verification.
-- Legacy Fast2SMS/Twilio sending is disabled (`SMS_ENABLED=false`).
+## Required Render environment variable
+Add the private MSG91 account Authkey created for the server:
 
-## One required Render secret
+```text
+MSG91_AUTH_KEY=<your WEMETSERVER Authkey>
+```
 
-Add this environment variable to the backend service before going live:
+Do **not** put the private `MSG91_AUTH_KEY` in customer or listener JavaScript. The browser receives a one-time MSG91 access token after OTP verification; the backend verifies that token with MSG91 and checks that the verified phone matches the requested account phone before allowing registration or password reset.
 
-`MSG91_AUTH_KEY=<your private MSG91 account Authkey>`
+## Flow
+- New customer/listener: phone -> MSG91 SMS OTP -> backend access-token verification -> create password/profile.
+- Existing customer/listener: phone -> password. No OTP-login button.
+- Forgot password: registered phone -> MSG91 SMS OTP -> backend access-token verification -> set new password.
 
-Use the **account Authkey from MSG91 Server Side Integration/Authkey**, not the `WEMETWEB` OTP Widget token. Never place `MSG91_AUTH_KEY` in frontend files.
-
-Then redeploy the backend.
-
-## Authentication behavior
-
-1. User enters phone number.
-2. Backend checks whether that role+phone already exists.
-3. Existing account: password screen only. If forgotten, user chooses **Forgot password**, receives MSG91 OTP, verifies it, and sets a new password.
-4. New account: MSG91 OTP is sent, verified, and the user then creates their profile + password.
-5. Returning users continue to use the password they created.
-
-## OTP length
-
-The current MSG91 widget in the supplied setup is 4 digits. The forms accept 4–6 digits so the site also works if you later change the widget to 6 digits.
-
-## v8.9.12 loader/CSP fix
-
-The production CSP now permits the MSG91 OTP provider plus Google reCAPTCHA resources, and the client loader retries the official `verify.phone91.com` provider if the primary `verify.msg91.com` script fails. Server-side access-token verification now uses the JSON body shown by the MSG91 Server Side Integration panel.
+The old Fast2SMS/Twilio OTP code remains only for the separate pre-login support verification path; it is not used for registration or forgot-password in this build.

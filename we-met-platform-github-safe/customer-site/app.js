@@ -38,7 +38,7 @@
   let followingListeners = [];
   let authState = { phone: '', registrationToken: '', otpPurpose: 'registration' };
   let customerRecoveryState = { phone: '', resetToken: '' };
-  let supportAuthState = { phone: '', registrationToken: '' };
+  let supportAuthState = { challengeId: '', registrationToken: '' };
   let postObjectUrls = [];
   let activeProfilePosts = [];
   let activeProfileListener = null;
@@ -224,7 +224,6 @@
 
   function openAuth() {
     authState = { phone: '', registrationToken: '', otpPurpose: 'registration' };
-    window.WeMetOtp?.reset();
     ['phoneStartForm', 'phonePasswordForm', 'phoneOtpForm', 'phoneDetailsForm'].forEach((id) => document.getElementById(id)?.reset());
     show('#developmentOtp', false);
     showPhoneStep('welcome');
@@ -236,6 +235,28 @@
     const digits = raw.replace(/\D/g, '');
     if (raw.startsWith('+')) return `+${digits}`;
     return `${$(countrySelector).value}${digits.replace(/^0+/, '')}`;
+  }
+
+  function canonicalPhone(value) {
+    const raw = String(value || '').trim();
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 10) return `+91${digits}`;
+    if (digits.length >= 8 && digits.length <= 15 && digits[0] !== '0') return `+${digits}`;
+    return raw;
+  }
+
+  async function sendMsg91Otp(phone) {
+    if (!window.WMMsg91Otp) throw new Error('MSG91 OTP is not available. Refresh and try again.');
+    await window.WMMsg91Otp.send(phone);
+  }
+
+  async function verifyMsg91ForServer({ phone, role, purpose, otp }) {
+    if (!window.WMMsg91Otp) throw new Error('MSG91 OTP is not available. Refresh and try again.');
+    const verified = await window.WMMsg91Otp.verify(otp);
+    return P.api('/api/auth/msg91/verify', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken: verified.accessToken, phone, role, purpose }),
+    });
   }
 
   async function startPhone(event) {
@@ -252,11 +273,11 @@
         showPhoneStep('password');
       } else {
         authState.otpPurpose = 'registration';
-        window.WeMetOtp.reset();
-        await window.WeMetOtp.send(response.identifier || phone);
+        window.WMMsg91Otp?.reset();
+        await sendMsg91Otp(phone);
         show('#developmentOtp', false);
         showPhoneStep('otp');
-        P.toast('OTP sent to your mobile number.', 'success');
+        P.toast('OTP sent by SMS.', 'success');
       }
     } catch (error) { P.toast(error.message, 'error'); }
     finally { submit.disabled = false; }
@@ -279,10 +300,8 @@
     const submit = event.submitter;
     submit.disabled = true;
     try {
-      const verified = await window.WeMetOtp.verify($('#authOtp').value);
-      const response = await P.api('/api/auth/msg91/verify', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken: verified.accessToken, phone: authState.phone, role: 'customer', purpose: 'registration' }),
+      const response = await verifyMsg91ForServer({
+        phone: authState.phone, role: 'customer', purpose: 'registration', otp: $('#authOtp').value,
       });
       authState.registrationToken = response.registrationToken;
       showPhoneStep('details');
@@ -290,9 +309,18 @@
     finally { submit.disabled = false; }
   }
 
+  async function resendCustomerRegistrationOtp() {
+    const button = $('#customerResendOtp');
+    button.disabled = true;
+    try {
+      await window.WMMsg91Otp.retry();
+      P.toast('OTP resent by SMS.', 'success');
+    } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
   function openCustomerRecovery() {
     customerRecoveryState = { phone: '', resetToken: '' };
-    window.WeMetOtp?.reset();
     ['customerRecoveryPhoneForm', 'customerRecoveryOtpForm', 'customerRecoveryPasswordForm'].forEach((id) => document.getElementById(id)?.reset());
     show('#customerRecoveryPhoneForm'); show('#customerRecoveryOtpForm', false); show('#customerRecoveryPasswordForm', false); show('#customerRecoveryDevelopmentOtp', false);
     if (authState.phone) $('#customerRecoveryPhone').value = authState.phone;
@@ -303,14 +331,15 @@
   async function startCustomerRecovery(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const response = await P.api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier: $('#customerRecoveryPhone').value, role: 'customer' }) });
-      customerRecoveryState.phone = response.phoneE164;
+      const phone = canonicalPhone($('#customerRecoveryPhone').value);
+      const response = await P.api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier: phone, role: 'customer' }) });
+      customerRecoveryState.phone = phone;
       $('#customerRecoveryPhonePreview').textContent = response.phone;
-      window.WeMetOtp.reset();
-      await window.WeMetOtp.send(response.identifier || response.phoneE164);
+      window.WMMsg91Otp?.reset();
+      await sendMsg91Otp(phone);
       show('#customerRecoveryDevelopmentOtp', false);
       show('#customerRecoveryPhoneForm', false); show('#customerRecoveryOtpForm'); $('#customerRecoveryOtp').focus();
-      P.toast('OTP sent to your registered mobile number.', 'success');
+      P.toast('OTP sent by SMS.', 'success');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
@@ -318,15 +347,21 @@
   async function verifyCustomerRecovery(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const verified = await window.WeMetOtp.verify($('#customerRecoveryOtp').value);
-      const response = await P.api('/api/auth/msg91/verify', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken: verified.accessToken, phone: customerRecoveryState.phone, role: 'customer', purpose: 'password_reset' }),
+      const response = await verifyMsg91ForServer({
+        phone: customerRecoveryState.phone, role: 'customer', purpose: 'password_reset', otp: $('#customerRecoveryOtp').value,
       });
       if (!response.resetToken) throw new Error('Password reset verification failed. Request a new OTP.');
       customerRecoveryState.resetToken = response.resetToken;
       show('#customerRecoveryOtpForm', false); show('#customerRecoveryPasswordForm'); $('#customerRecoveryPassword').focus();
     } catch (error) { P.toast(error.message, 'error'); }
+    finally { button.disabled = false; }
+  }
+
+  async function resendCustomerRecoveryOtp() {
+    const button = $('#customerRecoveryResendOtp');
+    button.disabled = true;
+    try { await window.WMMsg91Otp.retry(); P.toast('OTP resent by SMS.', 'success'); }
+    catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
 
@@ -355,8 +390,7 @@
   }
 
   function openPreloginSupport() {
-    supportAuthState = { phone: '', registrationToken: '' };
-    window.WeMetOtp?.reset();
+    supportAuthState = { challengeId: '', registrationToken: '' };
     $('#preloginSupportPhoneForm').reset(); $('#preloginSupportOtpForm').reset(); $('#preloginSupportIssueForm').reset();
     show('#preloginSupportPhoneForm'); show('#preloginSupportOtpForm', false); show('#preloginSupportIssueForm', false); show('#supportDevelopmentOtp', false);
     openOverlay('preloginSupportModal');
@@ -368,13 +402,10 @@
     try {
       const phone = composedPhone('#supportCountry', '#supportPhone');
       const response = await P.api('/api/auth/support/phone/start', { method: 'POST', body: JSON.stringify({ phone }) });
-      supportAuthState = { phone: response.phoneE164, registrationToken: '' };
+      supportAuthState.challengeId = response.challengeId;
       $('#supportPhonePreview').textContent = response.phone;
-      window.WeMetOtp.reset();
-      await window.WeMetOtp.send(response.identifier || response.phoneE164);
-      show('#supportDevelopmentOtp', false);
+      if (response.developmentOtp) { $('#supportDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#supportDevelopmentOtp'); }
       show('#preloginSupportPhoneForm', false); show('#preloginSupportOtpForm'); $('#supportOtp').focus();
-      P.toast('OTP sent to your mobile number.', 'success');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
   }
@@ -382,11 +413,7 @@
   async function verifyPreloginSupport(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const verified = await window.WeMetOtp.verify($('#supportOtp').value);
-      const response = await P.api('/api/auth/msg91/verify', {
-        method: 'POST',
-        body: JSON.stringify({ accessToken: verified.accessToken, phone: supportAuthState.phone, role: 'customer', purpose: 'support' }),
-      });
+      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: supportAuthState.challengeId, otp: $('#supportOtp').value }) });
       supportAuthState.registrationToken = response.registrationToken;
       show('#preloginSupportOtpForm', false); show('#preloginSupportIssueForm'); $('#supportIssue').focus();
     } catch (error) { P.toast(error.message, 'error'); }
@@ -419,7 +446,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.12', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.13', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -443,9 +470,11 @@
     $('#phonePasswordForm').onsubmit = passwordLogin;
     $('#customerForgotPassword').onclick = openCustomerRecovery;
     $('#phoneOtpForm').onsubmit = verifyOtp;
+    $('#customerResendOtp').onclick = resendCustomerRegistrationOtp;
     $('#phoneDetailsForm').onsubmit = registerCustomer;
     $('#customerRecoveryPhoneForm').onsubmit = startCustomerRecovery;
     $('#customerRecoveryOtpForm').onsubmit = verifyCustomerRecovery;
+    $('#customerRecoveryResendOtp').onclick = resendCustomerRecoveryOtp;
     $('#customerRecoveryPasswordForm').onsubmit = completeCustomerRecovery;
     $$('[data-auth-phone-back]').forEach((button) => { button.onclick = () => showPhoneStep('phone'); });
     $$('[data-password-toggle]').forEach((button) => { button.onclick = () => togglePassword(button); });
