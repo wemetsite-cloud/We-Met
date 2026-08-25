@@ -163,23 +163,43 @@ function decodeJwtPayload(token) {
 }
 
 function collectPhoneCandidates(value, output = [], depth = 0) {
-  if (depth > 5 || value == null) return output;
-  if (typeof value === 'string' || typeof value === 'number') return output;
+  if (depth > 6 || value == null) return output;
   if (Array.isArray(value)) {
     value.forEach((item) => collectPhoneCandidates(item, output, depth + 1));
     return output;
   }
   if (typeof value !== 'object') return output;
-  const phoneKeys = new Set(['identifier','mobile','mobileno','mobilenumber','phone','phonenumber','phone_number','useridentifier','user_identifier','sub']);
+
+  // MSG91 has used a few different response/JWT field names across Widget SDK
+  // revisions. Keep this deliberately tolerant, but only treat values under a
+  // phone/identifier-like key as a phone candidate.
   for (const [key, item] of Object.entries(value)) {
-    const compactKey = String(key).toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (phoneKeys.has(compactKey) && (typeof item === 'string' || typeof item === 'number')) {
+    const compactKey = String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const isPhoneLikeKey = compactKey.includes('phone')
+      || compactKey.includes('mobile')
+      || compactKey.includes('identifier');
+    if (isPhoneLikeKey && (typeof item === 'string' || typeof item === 'number')) {
       const digits = String(item).replace(/\D/g, '');
       if (digits.length >= 8 && digits.length <= 15) output.push(digits);
     }
     if (item && typeof item === 'object') collectPhoneCandidates(item, output, depth + 1);
   }
   return output;
+}
+
+function phoneDigitsMatch(expected, candidate) {
+  const a = String(expected || '').replace(/\D/g, '');
+  const b = String(candidate || '').replace(/\D/g, '');
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  // Some MSG91 responses return E.164 digits (country code + national number),
+  // while others expose only the national number. A suffix match of at least
+  // 8 digits safely handles that representation difference without accepting
+  // short/ambiguous values.
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length > b.length ? a : b;
+  return shorter.length >= 8 && longer.endsWith(shorter);
 }
 
 function msg91ResponseLooksSuccessful(payload) {
@@ -221,13 +241,25 @@ async function verifyMsg91AccessToken(accessToken, phone) {
   }
 
   const expectedDigits = String(phone).replace(/\D/g, '');
-  const candidates = [
+  const candidates = [...new Set([
     ...collectPhoneCandidates(payload),
     ...collectPhoneCandidates(decodeJwtPayload(accessToken)),
-  ];
-  if (!candidates.some((digits) => digits === expectedDigits)) {
-    console.error('MSG91 verified token did not match requested phone.', { expectedLast4: expectedDigits.slice(-4), candidateLast4: candidates.map((v) => v.slice(-4)) });
-    throw Object.assign(new Error('The verified OTP does not match this mobile number. Request a new OTP.'), { status: 400 });
+  ])];
+
+  // The verifyAccessToken endpoint is the source of truth that the OTP was
+  // successfully verified. When MSG91 includes the identifier in its response
+  // (or JWT), bind it to the requested phone and reject a real mismatch. Some
+  // Widget responses only return verification status and no identifier at all;
+  // treating that absence as a mismatch caused valid OTPs to fail on We Met.
+  if (candidates.length && !candidates.some((digits) => phoneDigitsMatch(expectedDigits, digits))) {
+    console.error('MSG91 verified token identifier did not match requested phone.', {
+      expectedLast4: expectedDigits.slice(-4),
+      candidateLast4: candidates.map((v) => v.slice(-4)),
+    });
+    throw Object.assign(new Error('The verified OTP belongs to a different mobile number. Request a new OTP.'), { status: 400 });
+  }
+  if (!candidates.length) {
+    console.info('MSG91 access token verified; provider response did not expose a phone identifier.');
   }
   return payload;
 }

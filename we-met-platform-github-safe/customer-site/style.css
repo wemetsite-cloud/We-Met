@@ -1154,3 +1154,9 @@ html,body{overscroll-behavior-y:auto!important}
 
 /* MSG91 OTP Widget custom-UI captcha host. Empty when CAPTCHA is not required. */
 .wm-msg91-captcha{display:none}.wm-msg91-active .wm-msg91-captcha{display:block;min-width:1px;min-height:1px;position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483000;padding:8px;border-radius:14px;background:#fff;box-shadow:0 14px 45px rgba(45,31,39,.18);max-width:calc(100vw - 24px);overflow:hidden}
+
+/* v8.9.15: keep the phone auth flow focused — one primary action plus compact text links. */
+.auth-link-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:-3px}
+.auth-link-row>span{color:#b7a6af;font-size:10px;line-height:1}
+.auth-link-row .auth-previous{width:auto!important;min-height:0!important;padding:5px 3px!important;margin:0!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#9b6680!important;font-size:11px!important;font-weight:800!important}
+.auth-link-row .auth-previous:hover{color:#b82f70!important;text-decoration:underline!important}

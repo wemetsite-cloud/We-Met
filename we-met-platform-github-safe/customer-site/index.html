@@ -35,8 +35,8 @@
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.14">
-  <link rel="stylesheet" href="style.css?v=8.9.14">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.15">
+  <link rel="stylesheet" href="style.css?v=8.9.15">
   <style data-wm-initial-paint>html,body{margin:0;background:#fff8fb!important;color-scheme:light}</style>
 </head>
 <body>
@@ -233,8 +233,8 @@
       <div class="auth-brand"><img class="auth-logo" src="/shared/logo.svg" alt=""><span><b>We Met</b><small>Private by design</small></span></div>
       <section class="phone-auth-step active" data-phone-step="welcome"><span class="eyebrow">WELCOME</span><h2 id="authTitle">Let’s start</h2><p>One private phone-first account.</p><button id="authBegin" class="button button-primary button-large" type="button">Let’s start</button></section>
       <form id="phoneStartForm" class="phone-auth-step stack" data-phone-step="phone"><span class="auth-step-number">1 / 4</span><h2>Your mobile number</h2><p>Used only to secure your account.</p><label>Mobile number<div class="phone-field international"><select id="authCountry" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option><option value="+49">🇩🇪 +49</option><option value="+33">🇫🇷 +33</option><option value="+81">🇯🇵 +81</option></select><input id="authPhone" inputmode="tel" autocomplete="tel-national" maxlength="14" placeholder="Mobile number" required></div></label><button class="button button-primary button-large" type="submit">Continue</button></form>
-      <form id="phonePasswordForm" class="phone-auth-step stack" data-phone-step="password"><span class="auth-step-number">2 / 2</span><h2>Welcome back</h2><p>Enter the password for <b id="authPhonePreview">your number</b>.</p><label>Password<div class="password-field"><input id="authPassword" type="password" minlength="8" autocomplete="current-password" required><button type="button" data-password-toggle="authPassword">Show</button></div></label><button class="button button-primary button-large" type="submit">Open We Met</button><button id="customerForgotPassword" class="auth-previous" type="button">Forgot password?</button><button class="auth-previous" data-auth-phone-back type="button">← Change number</button></form>
-      <form id="phoneOtpForm" class="phone-auth-step stack" data-phone-step="otp"><span class="auth-step-number">2 / 4</span><h2>Enter your OTP</h2><p>We sent a code to <b id="otpPhonePreview">your number</b>.</p><label>OTP<input id="authOtp" class="otp-input" inputmode="numeric" autocomplete="one-time-code" minlength="4" maxlength="6" pattern="[0-9]{4,6}" required></label><small id="developmentOtp" class="dev-otp hidden"></small><button class="button button-primary button-large" type="submit">Verify OTP</button><button id="customerResendOtp" class="button button-soft" type="button">Resend OTP</button><button class="auth-previous" data-auth-phone-back type="button">← Change number</button></form>
+      <form id="phonePasswordForm" class="phone-auth-step stack" data-phone-step="password"><span class="auth-step-number">2 / 2</span><h2>Welcome back</h2><p>Enter the password for <b id="authPhonePreview">your number</b>.</p><label>Password<div class="password-field"><input id="authPassword" type="password" minlength="8" autocomplete="current-password" required><button type="button" data-password-toggle="authPassword">Show</button></div></label><button class="button button-primary button-large" type="submit">Open We Met</button><div class="auth-link-row"><button id="customerForgotPassword" class="auth-previous" type="button">Forgot password?</button><span aria-hidden="true">•</span><button class="auth-previous" data-auth-phone-back type="button">Change number</button></div></form>
+      <form id="phoneOtpForm" class="phone-auth-step stack" data-phone-step="otp"><span class="auth-step-number">2 / 4</span><h2>Enter your OTP</h2><p>We sent a code to <b id="otpPhonePreview">your number</b>.</p><label>OTP<input id="authOtp" class="otp-input" inputmode="numeric" autocomplete="one-time-code" minlength="4" maxlength="6" pattern="[0-9]{4,6}" required></label><small id="developmentOtp" class="dev-otp hidden"></small><button class="button button-primary button-large" type="submit">Verify OTP</button><div class="auth-link-row"><button id="customerResendOtp" class="auth-previous" type="button">Resend code</button><span aria-hidden="true">•</span><button class="auth-previous" data-auth-phone-back type="button">Change number</button></div></form>
       <form id="phoneDetailsForm" class="phone-auth-step stack" data-phone-step="details"><span class="auth-step-number">3–4 / 4</span><h2>Finish your profile</h2><p>This name is shown only inside your account.</p><label>Your name<input id="authName" autocomplete="name" minlength="2" maxlength="80" required></label><label>Create password<div class="password-field"><input id="authNewPassword" type="password" minlength="8" autocomplete="new-password" required><button type="button" data-password-toggle="authNewPassword">Show</button></div></label><label class="check"><input id="authTerms" type="checkbox" required><span>I am 18+ and accept the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label><button class="button button-primary button-large" type="submit">Get started</button></form>
     </div>
   </div>
@@ -265,11 +265,11 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.14"></script><script src="/shared/msg91-otp.js?v=8.9.14"></script>
-  <script src="/shared/socket-loader.js?v=8.9.14"></script>
-  <script src="api.js?v=8.9.14"></script>
-  <script src="/shared/webrtc.js?v=8.9.14"></script>
+  <script src="config.js?v=8.9.15"></script><script src="/shared/msg91-otp.js?v=8.9.15"></script>
+  <script src="/shared/socket-loader.js?v=8.9.15"></script>
+  <script src="api.js?v=8.9.15"></script>
+  <script src="/shared/webrtc.js?v=8.9.15"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app.js?v=8.9.14"></script>
+  <script src="app.js?v=8.9.15"></script>
 </body>
 </html>

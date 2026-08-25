@@ -1,4 +1,4 @@
-# MSG91 OTP setup (v8.9.14)
+# MSG91 OTP setup (v8.9.15)
 
 This build uses the configured MSG91 OTP Widget for **new customer registration**, **new listener registration**, and **forgot-password recovery**. Returning users sign in with their password.
 
@@ -31,10 +31,10 @@ In OTP > Widgets > your widget:
 8. Use **Preview Demo** in MSG91. If Preview Demo itself fails, fix the widget/account configuration before changing We Met code.
 9. Immediately after a failed website attempt, open OTP Widget > **Logs**. If there is no request/log at all, the provider did not reach MSG91 and the problem is client-side initialization/network/CSP. If a log exists, use its status/error to diagnose the MSG91-side rejection.
 
-## What v8.9.14 changes
+## What v8.9.15 changes
 Earlier code waited for `sendOtp`, `verifyOtp`, **and `retryOtp`** before considering the SDK initialized. Some provider builds can expose resend later than the core send/verify methods, creating a false initialization timeout.
 
-v8.9.14:
+v8.9.15:
 - requires only the core `sendOtp` + `verifyOtp` methods during bootstrap;
 - calls `initSendOTP(configuration)` directly in the provider `load` event to mirror MSG91's documented integration;
 - handles async initialization if the provider returns a Promise;
@@ -45,3 +45,14 @@ v8.9.14:
 - New customer/listener: phone -> MSG91 SMS OTP -> backend access-token verification -> create password/profile.
 - Existing customer/listener: phone -> password. No OTP-login button.
 - Forgot password: registered phone -> MSG91 SMS OTP -> backend access-token verification -> set new password.
+
+
+## v8.9.15 verification correction
+
+MSG91's `verifyAccessToken` endpoint is authoritative for successful OTP verification. Depending on Widget/API response shape, MSG91 may return the verified identifier as E.164 digits, national-number digits, or no identifier field at all. v8.9.15 therefore:
+
+- accepts a successful server-side MSG91 verification when no identifier is exposed;
+- accepts equivalent country-code vs national-number representations (minimum 8-digit suffix match); and
+- still rejects the request when MSG91 explicitly exposes a different phone identifier.
+
+This removes the false `The verified OTP does not match this mobile number` error that could appear after a correct OTP.

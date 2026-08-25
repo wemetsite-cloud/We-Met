@@ -192,7 +192,7 @@ test('the customer portal ships the v8 membership layout and phone-first authent
   assert.match(app, /data-subscribe/);
   assert.match(app, /Calls need only wallet talk-time/);
   assert.doesNotMatch(app, /data-video|Start video call/);
-  assert.match(serviceWorker, /const VERSION = '8\.7\.0'/);
+  assert.match(serviceWorker, /const VERSION = '8\.9\.15'/);
 });
 }
 
@@ -454,7 +454,7 @@ test('isolates portal sessions by role and clears stale mismatched tokens', () =
     assert.match(api, /isAuthError/);
     assert.match(api, /NETWORK_ERROR/);
     assert.match(config, new RegExp(`EXPECTED_ROLE: '${role}'`));
-    assert.match(serviceWorker, /const VERSION = '8\.7\.0'/);
+    assert.match(serviceWorker, /const VERSION = '8\.9\.15'/);
     assert.doesNotMatch(serviceWorker, /client\.navigate/);
     assert.doesNotMatch(read(site, 'app.js'), /registration\.update\(\)/);
   }

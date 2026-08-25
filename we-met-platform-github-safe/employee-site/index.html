@@ -10,8 +10,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.14">
-  <link rel="stylesheet" href="style.css?v=8.9.14">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.15">
+  <link rel="stylesheet" href="style.css?v=8.9.15">
   <style data-wm-initial-paint>html,body{margin:0;background:#fff8fb!important;color-scheme:light}</style>
 </head>
 <body>
@@ -49,17 +49,15 @@
         <span class="step-label">2 / 2</span><h2>Welcome back</h2><p>Enter the password for <b id="listenerPhonePreview">your number</b>.</p>
         <label>Password<input id="listenerLoginPassword" type="password" minlength="8" autocomplete="current-password" required></label>
         <button class="button button-primary button-large">Open listener app</button>
-        
-        <button id="listenerForgotPassword" class="auth-back" type="button">Forgot password?</button>
-        <button class="auth-back" data-listener-auth-back type="button">← Change number</button>
+        <div class="auth-link-row"><button id="listenerForgotPassword" class="auth-back" type="button">Forgot password?</button><span aria-hidden="true">•</span><button class="auth-back" data-listener-auth-back type="button">Change number</button></div>
       </form>
 
       <form id="listenerOtpForm" class="listener-auth-step stack" data-listener-auth="otp">
         <span class="step-label">2 / 5</span><h2>Verify your number</h2><p>Enter the OTP sent to <b id="listenerOtpPhone">your number</b>.</p>
         <label>OTP<input id="listenerOtp" class="listener-otp" inputmode="numeric" autocomplete="one-time-code" minlength="4" maxlength="6" pattern="[0-9]{4,6}" required></label>
         <small id="listenerDevelopmentOtp" class="dev-otp hidden"></small>
-        <button class="button button-primary button-large">Verify OTP</button><button id="listenerResendOtp" class="button button-soft" type="button">Resend OTP</button>
-        <button class="auth-back" data-listener-auth-back type="button">← Change number</button>
+        <button class="button button-primary button-large">Verify OTP</button>
+        <div class="auth-link-row"><button id="listenerResendOtp" class="auth-back" type="button">Resend code</button><span aria-hidden="true">•</span><button class="auth-back" data-listener-auth-back type="button">Change number</button></div>
       </form>
 
       <form id="listenerDetailsForm" class="listener-auth-step stack" data-listener-auth="details">
@@ -241,6 +239,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.14"></script><script src="/shared/msg91-otp.js?v=8.9.14"></script><script src="/shared/socket-loader.js?v=8.9.14"></script><script src="api.js?v=8.9.14"></script><script src="/shared/webrtc.js?v=8.9.14"></script><script src="app.js?v=8.9.14"></script>
+  <script src="config.js?v=8.9.15"></script><script src="/shared/msg91-otp.js?v=8.9.15"></script><script src="/shared/socket-loader.js?v=8.9.15"></script><script src="api.js?v=8.9.15"></script><script src="/shared/webrtc.js?v=8.9.15"></script><script src="app.js?v=8.9.15"></script>
 </body>
 </html>
