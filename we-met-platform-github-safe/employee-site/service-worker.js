@@ -1,7 +1,7 @@
-const VERSION = '8.9.6';
+const VERSION = '8.9.7';
 const CACHE_PREFIX = 'we-met-listener-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
-const STATIC = ['./','index.html','style.css','theme-v8.9.6.css','app.js','api.js','config.js','manifest.webmanifest','/shared/socket-loader.js','/shared/webrtc.js','/shared/logo.svg','/shared/favicon.png','/shared/icon-192.png','/shared/icon-512.png','/shared/default-listener-banner.png'];
+const STATIC = ['./','index.html','style.css','app.js','api.js','config.js','manifest.webmanifest','/shared/socket-loader.js','/shared/webrtc.js','/shared/logo.svg','/shared/favicon.png','/shared/icon-192.png','/shared/icon-512.png','/shared/default-listener-banner.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE)

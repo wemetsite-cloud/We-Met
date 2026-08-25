@@ -28,6 +28,31 @@
   let adminPostUrls = [];
   let showcaseImages = [];
   let activePage = 'overview';
+  const adminProfilePhotoUrls = new Map();
+
+  async function hydrateAdminProfilePhotos(scope = document) {
+    const nodes = [...scope.querySelectorAll('[data-admin-profile-photo]')];
+    await Promise.allSettled(nodes.map(async (node) => {
+      const userId = node.dataset.adminProfilePhoto;
+      if (!userId || node.dataset.photoLoaded === '1') return;
+      try {
+        let url = adminProfilePhotoUrls.get(userId);
+        if (!url) {
+          const blob = await P.apiBlob(`/api/admin/users/${encodeURIComponent(userId)}/profile-image`, { cache: 'no-store' });
+          url = URL.createObjectURL(blob);
+          adminProfilePhotoUrls.set(userId, url);
+        }
+        node.innerHTML = `<img src="${P.esc(url)}" alt="" draggable="false">`;
+        node.classList.add('has-photo');
+        node.dataset.photoLoaded = '1';
+      } catch {}
+    }));
+  }
+
+  function customerAvatarMarkup(user, className = '') {
+    return `<span class="customer-avatar customer-photo ${className}" data-admin-profile-photo="${P.esc(user.id)}">${P.esc(initials(user.name))}</span>`;
+  }
+
   let liveRefreshTimer = null;
   const queueFilters = { verifications: 'new', withdrawals: 'new', reports: 'new', support: 'new' };
 
@@ -138,13 +163,15 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.6', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.7', { updateViaCache: 'none' });
     } catch { }
   }
 
   function leaveAdminSession() {
     P.Store.clear();
     clearInterval(liveRefreshTimer);
+    adminProfilePhotoUrls.forEach((url) => URL.revokeObjectURL(url));
+    adminProfilePhotoUrls.clear();
     me = null;
     users = [];
     show('#loginView');
@@ -471,7 +498,8 @@
     $('#customerActiveCount').textContent = all.filter(user => user.status === 'active').length;
     $('#customerPhoneCount').textContent = all.filter(user => user.phone).length;
     $('#customerWalletTotal').textContent = P.duration(all.reduce((total, user) => total + Number(user.balance_seconds || 0), 0));
-    $('#customersTable').innerHTML = list.length ? list.map(user => `<article class="customer-card clickable-card" role="listitem" tabindex="0" data-user-profile="${user.id}"><header><span class="customer-avatar">${P.esc(initials(user.name))}</span><div>${profileLink(user.id, user.name, user.phone || 'Phone not available')}</div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></header><div class="customer-contact-grid"><div><small>Phone</small>${user.phone ? `<a class="phone-link" href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : '<span class="contact-missing">Not provided</span>'}</div><div><small>Wallet balance</small><strong>${P.duration(user.balance_seconds)}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div></div><div class="customer-card-actions"><button class="ghost" data-user-profile="${user.id}">Full profile</button><button class="primary" data-minutes="${user.id}">Minutes</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button></div></article>`).join('') : `<div class="customer-empty"><b>${query ? 'No matching customers' : 'No customers yet'}</b><p>${query ? 'Try a different name or phone number.' : 'New customer accounts will appear here automatically.'}</p></div>`;
+    $('#customersTable').innerHTML = list.length ? list.map(user => `<article class="customer-card clickable-card" role="listitem" tabindex="0" data-user-profile="${user.id}"><header>${customerAvatarMarkup(user)}<div>${profileLink(user.id, user.name, user.phone || 'Phone not available')}</div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></header><div class="customer-contact-grid"><div><small>Phone</small>${user.phone ? `<a class="phone-link" href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : '<span class="contact-missing">Not provided</span>'}</div><div><small>Wallet balance</small><strong>${P.duration(user.balance_seconds)}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div></div><div class="customer-card-actions"><button class="ghost" data-user-profile="${user.id}">Full profile</button><button class="primary" data-minutes="${user.id}">Minutes</button><button class="warning" data-suspend="${user.id}">Suspend</button><button class="${user.status === 'blocked' ? 'ghost' : 'danger'}" data-block="${user.id}" data-status="${P.esc(user.status)}">${user.status === 'blocked' ? 'Activate' : 'Block'}</button></div></article>`).join('') : `<div class="customer-empty"><b>${query ? 'No matching customers' : 'No customers yet'}</b><p>${query ? 'Try a different name or phone number.' : 'New customer accounts will appear here automatically.'}</p></div>`;
+    hydrateAdminProfilePhotos($('#customersTable'));
   }
 
   function renderEmployees() {
@@ -506,7 +534,8 @@
       const recentCalls = (data.calls || []).slice(0, 20).map(call => `<div class="profile-row"><div>${profileLink(call.customer_id, call.customer_name)} <span class="connection-arrow">↔</span> ${profileLink(call.employee_id, call.employee_name)}</div><span class="pill ${P.esc(call.status)}">${P.esc(call.status)}</span><small>${P.duration(call.billed_seconds)}${user.role === 'employee' ? ` • ${P.moneyExact(call.listener_earnings_paise)}` : ''} • ${P.date(call.started_at || call.created_at)}</small></div>`).join('') || '<p>No calls recorded.</p>';
       const wallet = (data.wallet || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${Number(entry.seconds_delta) >= 0 ? '+' : '−'}${P.duration(Math.abs(Number(entry.seconds_delta)))}</strong><span>${P.esc(entry.note || entry.type)}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No wallet entries.</p>';
       const audit = (data.audits || []).slice(0, 20).map(entry => `<div class="profile-row"><strong>${P.esc(entry.action)}</strong><span>${P.esc(entry.admin_name || 'Administrator')}</span><small>${P.date(entry.created_at)}</small></div>`).join('') || '<p>No administrator changes recorded for this account.</p>';
-      modal(`${user.name} — full profile`, `<div class="full-profile"><section class="profile-identity">${user.role === 'employee' ? listenerAvatarMarkup(user, 'profile-avatar') : `<span class="customer-avatar profile-avatar">${P.esc(initials(user.name))}</span>`}<div><span class="eyebrow">${P.esc(user.role)} PROFILE</span><h2>${P.esc(user.name)}</h2><p>${P.esc(user.email || user.username || 'No login identifier')}</p></div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></section><div class="profile-facts"><div><small>Phone</small><strong>${user.phone ? `<a href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : 'Not provided'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div><div><small>Last login</small><strong>${user.last_login_at ? P.date(user.last_login_at) : 'Not recorded'}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div>${user.role === 'customer' ? `<div><small>Wallet</small><strong>${P.duration(user.balance_seconds)}</strong></div>` : ''}${user.role === 'employee' ? `<div><small>Employee ID</small><strong>${P.esc(user.employee_code || 'Not set')}</strong></div><div><small>Language</small><strong>${P.esc(user.listener_language || 'Malayalam')}</strong></div><div><small>Availability</small><strong>${P.esc(user.listener_availability || 'offline')}</strong></div><div><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div>` : ''}</div>${user.bio ? `<p class="profile-bio">${P.esc(user.bio)}</p>` : ''}${user.suspension_reason ? `<p class="profile-warning"><b>Restriction:</b> ${P.esc(user.suspension_reason)}${user.suspended_until ? ` until ${P.date(user.suspended_until)}` : ''}</p>` : ''}${employeeMetrics}${listenerFinance}<section class="profile-section"><h3>Recent calls</h3><div class="profile-list">${recentCalls}</div></section>${user.role === 'customer' ? `<section class="profile-section"><h3>Wallet activity</h3><div class="profile-list">${wallet}</div></section>` : ''}<section class="profile-section"><h3>Safety and support</h3><p>${(data.reports || []).length} report(s) • ${(data.support || []).length} support ticket(s)</p></section><section class="profile-section"><h3>Administrator history</h3><div class="profile-list">${audit}</div></section></div>`);
+      modal(`${user.name} — full profile`, `<div class="full-profile"><section class="profile-identity">${user.role === 'employee' ? listenerAvatarMarkup(user, 'profile-avatar') : customerAvatarMarkup(user, 'profile-avatar')}<div><span class="eyebrow">${P.esc(user.role)} PROFILE</span><h2>${P.esc(user.name)}</h2><p>${P.esc(user.email || user.username || 'No login identifier')}</p></div><span class="pill ${P.esc(user.status)}">${P.esc(user.status)}</span></section><div class="profile-facts"><div><small>Phone</small><strong>${user.phone ? `<a href="tel:${P.esc(user.phone)}">${P.esc(user.phone)}</a>` : 'Not provided'}</strong></div><div><small>Joined</small><strong>${P.date(user.created_at)}</strong></div><div><small>Last login</small><strong>${user.last_login_at ? P.date(user.last_login_at) : 'Not recorded'}</strong></div><div><small>Last seen</small><strong>${user.last_seen_at ? P.date(user.last_seen_at) : 'Not recorded'}</strong></div>${user.role === 'customer' ? `<div><small>Wallet</small><strong>${P.duration(user.balance_seconds)}</strong></div>` : ''}${user.role === 'employee' ? `<div><small>Employee ID</small><strong>${P.esc(user.employee_code || 'Not set')}</strong></div><div><small>Language</small><strong>${P.esc(user.listener_language || 'Malayalam')}</strong></div><div><small>Availability</small><strong>${P.esc(user.listener_availability || 'offline')}</strong></div><div><small>Rate / minute</small><strong>${P.moneyExact(user.listener_rate_paise)}</strong></div>` : ''}</div>${user.bio ? `<p class="profile-bio">${P.esc(user.bio)}</p>` : ''}${user.suspension_reason ? `<p class="profile-warning"><b>Restriction:</b> ${P.esc(user.suspension_reason)}${user.suspended_until ? ` until ${P.date(user.suspended_until)}` : ''}</p>` : ''}${employeeMetrics}${listenerFinance}<section class="profile-section"><h3>Recent calls</h3><div class="profile-list">${recentCalls}</div></section>${user.role === 'customer' ? `<section class="profile-section"><h3>Wallet activity</h3><div class="profile-list">${wallet}</div></section>` : ''}<section class="profile-section"><h3>Safety and support</h3><p>${(data.reports || []).length} report(s) • ${(data.support || []).length} support ticket(s)</p></section><section class="profile-section"><h3>Administrator history</h3><div class="profile-list">${audit}</div></section></div>`);
+      hydrateAdminProfilePhotos($('#actionModal'));
     } catch (error) { P.toast(error.message, 'error'); }
   }
 

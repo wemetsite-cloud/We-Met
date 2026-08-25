@@ -155,7 +155,7 @@ function createSocketServer(io) {
     }
 
     const customerResult = await db.query(`
-      SELECT id, name, balance_seconds, status, suspended_until
+      SELECT id, name, profile_image, balance_seconds, status, suspended_until
       FROM users
       WHERE id = $1 AND role = 'customer'
     `, [customerId]);
@@ -271,7 +271,7 @@ function createSocketServer(io) {
       primaryLanguage,
       allowOtherLanguages,
       directEmployeeId,
-      customer: { id: customer.id, name: customer.name },
+      customer: { id: customer.id, name: customer.name, profileImage: customer.profile_image || '' },
       balanceSeconds: Number(customer.balance_seconds),
       signalingReady: new Set(),
       offerStarted: false,

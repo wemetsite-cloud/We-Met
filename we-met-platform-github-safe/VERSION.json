@@ -1,13 +1,20 @@
 {
-  "version": "8.9.6",
-  "name": "porcelain-light-full-cleanup",
+  "version": "8.9.7",
+  "name": "requested-fixes-only",
   "changes": [
-    "Complete artistic light-theme cleanup across customer, listener and admin portals",
-    "Preserves the confirmed working Razorpay Standard Checkout popup implementation",
-    "Fixes mobile header timing, internal back navigation and listener logout recovery",
-    "Improves customer full-screen listener/detail experiences, wallet layout and text contrast",
-    "Simplifies listener workspace while keeping the payout flow focused on balance, rate and withdrawal",
-    "Removes dark legacy operational cards and invisible text from admin pages",
-    "Adds final v8.9.6 service-worker cache isolation and responsive polish"
+    "Tightens customer listener-card avatar and text spacing",
+    "Restores the tilted public call-preview card and staggered three-photo collages",
+    "Refines customer wallet plan spacing and removes the redeem-section outer card",
+    "Improves locked Exclusive styling, profile verified-phone wrapper and profile scroll reset behavior",
+    "Restores the requested simple listener home layout and fixes listener settings/recovery/post-menu spacing and visibility",
+    "Improves the listener call window and shows customer profile photos to listeners when available",
+    "Improves the admin manual-payment balance panel and shows customer/listener profile photos to admins when available",
+    "Merges each portal theme stylesheet into its main stylesheet to reduce frontend file count"
+  ],
+  "notes": [
+    "Applies only the fixes explicitly requested after v8.9.6",
+    "Keeps the uploaded v8.9.6 Razorpay checkout functions unchanged",
+    "Customer profile photos remain private and are exposed only through authenticated admin access or the active listener call payload",
+    "Removes three standalone theme CSS files without changing the backend module structure"
   ]
 }

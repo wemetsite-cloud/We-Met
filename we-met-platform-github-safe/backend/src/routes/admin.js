@@ -3,11 +3,21 @@ const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword } = require('../auth');
 const { authenticate, requireRole, asyncHandler } = require('../middleware');
-const { normalizeProfileImage } = require('../profile-image');
+const { normalizeProfileImage, decodeProfileImage } = require('../profile-image');
 const { normalizePhone, internationalPhone } = require('../phone');
 
 const router = express.Router();
 router.use(authenticate, requireRole('admin'));
+
+router.get('/users/:id/profile-image', asyncHandler(async (req, res) => {
+  const result = await db.query('SELECT profile_image FROM users WHERE id=$1 LIMIT 1', [req.params.id]);
+  const image = decodeProfileImage(result.rows[0]?.profile_image);
+  if (!image) return res.status(404).end();
+  res.setHeader('Content-Type', image.mime);
+  res.setHeader('Content-Length', String(image.buffer.length));
+  res.setHeader('Cache-Control', 'private, no-store');
+  return res.end(image.buffer);
+}));
 
 router.use((req, res, next) => {
   if (!['POST', 'PATCH', 'DELETE'].includes(req.method)) return next();

@@ -151,7 +151,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.6', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.7', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -474,6 +474,10 @@
     if (tab === 'inbox') loadInbox();
     if (tab === 'followers') loadFollowers();
     if (tab === 'desk') { loadStats(); loadActivity(); }
+    if (tab === 'profile') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
+    }
     syncBackButton();
   }
 
@@ -979,6 +983,21 @@
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   }
 
+  function setCustomerCallPhoto(customer, imageSelector, initialsSelector) {
+    const image = $(imageSelector);
+    const initialsNode = $(initialsSelector);
+    const photo = String(customer?.profileImage || customer?.profile_image || customer?.avatar || '');
+    const hasPhoto = /^data:image\/(?:jpeg|png|webp);base64,/i.test(photo);
+    if (image) {
+      if (hasPhoto) { image.src = photo; image.classList.remove('hidden'); }
+      else { image.removeAttribute('src'); image.classList.add('hidden'); }
+    }
+    if (initialsNode) {
+      initialsNode.textContent = initials(customer?.name || 'Customer');
+      initialsNode.classList.toggle('hidden', hasPhoto);
+    }
+  }
+
   function incoming(data) {
     // Never surface a call after the listener has already moved to Break/Offline.
     // The server also protects this, but this client guard closes the final race window.
@@ -990,7 +1009,7 @@
     $('#acceptBtn').disabled = false;
     $('#rejectBtn').disabled = false;
     $('#incomingName').textContent = data.customer.name;
-    $('#incomingInitials').textContent = initials(data.customer.name);
+    setCustomerCallPhoto(data.customer, '#incomingCustomerPhoto', '#incomingCustomerInitialsText');
     $('#activeCallLanguage').textContent = `${me?.listenerLanguage || 'Malayalam'} conversation`;
     openManagedOverlay('#incomingModal', 'incomingModal');
     startRing();
@@ -1002,7 +1021,7 @@
     $('#rejectBtn').disabled = true;
     socket.emit('call:accept', { callId: currentCall.id });
     $('#customerName').textContent = currentCall.customer.name;
-    $('#customerInitials').textContent = initials(currentCall.customer.name);
+    setCustomerCallPhoto(currentCall.customer, '#activeCustomerPhoto', '#activeCustomerInitialsText');
     $('#chatMessages').innerHTML = '<div class="bubble">Private text chat is ready.</div>';
     $('#callTimer').textContent = '0:00';
   }
