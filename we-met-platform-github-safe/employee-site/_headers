@@ -3,7 +3,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), geolocation=(), microphone=(self), payment=()
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https: wss:; worker-src 'self'; manifest-src 'self'
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://verify.msg91.com https://verify.phone91.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net; frame-src https://www.google.com https://recaptcha.google.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.google.com https://www.gstatic.com https://www.recaptcha.net; media-src 'self' blob:; connect-src 'self' https: wss:; worker-src 'self' blob:; manifest-src 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains
 
 /service-worker.js
