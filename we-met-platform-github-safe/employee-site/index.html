@@ -10,8 +10,8 @@
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.16">
-  <link rel="stylesheet" href="style.css?v=8.9.16">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.17">
+  <link rel="stylesheet" href="style.css?v=8.9.17">
   <style data-wm-initial-paint>html,body{margin:0;background:#fff8fb!important;color-scheme:light}</style>
 </head>
 <body>
@@ -206,7 +206,7 @@
   <div id="listenerSupportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="listenerSupportTitle">
     <div class="modal-card support-auth-card"><button id="closeListenerSupport" class="close" type="button" aria-label="Close">×</button><span class="eyebrow">LOGIN SUPPORT</span><h2 id="listenerSupportTitle">Verify your number</h2>
       <form id="listenerSupportPhoneForm" class="stack"><label>Mobile number<div class="listener-phone-field international"><select id="listenerSupportCountry" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+971">🇦🇪 +971</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option><option value="+61">🇦🇺 +61</option><option value="+65">🇸🇬 +65</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+968">🇴🇲 +968</option><option value="+973">🇧🇭 +973</option><option value="+60">🇲🇾 +60</option></select><input id="listenerSupportPhone" inputmode="tel" maxlength="14" required></div></label><button class="button button-primary">Send OTP</button></form>
-      <form id="listenerSupportOtpForm" class="stack hidden"><p>Enter the OTP sent to <b id="listenerSupportPhonePreview">your number</b>.</p><label>OTP<input id="listenerSupportOtp" class="listener-otp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required></label><small id="listenerSupportDevelopmentOtp" class="dev-otp hidden"></small><button class="button button-primary">Verify</button></form>
+      <form id="listenerSupportOtpForm" class="stack hidden"><p>Enter the OTP sent to <b id="listenerSupportPhonePreview">your number</b>.</p><label>OTP<input id="listenerSupportOtp" class="listener-otp" inputmode="numeric" minlength="4" maxlength="6" pattern="[0-9]{4,6}" required></label><small id="listenerSupportDevelopmentOtp" class="dev-otp hidden"></small><button class="button button-primary">Verify</button></form>
       <form id="listenerSupportIssueForm" class="stack hidden"><label>What is stopping you?<textarea id="listenerSupportIssue" minlength="5" maxlength="3000" placeholder="Describe the login problem" required></textarea></label><button class="button button-primary">Submit issue</button></form>
     </div>
   </div>
@@ -239,7 +239,7 @@
   <div id="callView" class="call-view hidden" role="dialog" aria-modal="true" aria-label="Active call"><div class="call-shell customer-theme-call"><div class="call-head"><button id="minimizeListenerCall" class="call-back" type="button" aria-label="Return to listener app"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><span id="callState">Connecting secure audio…</span><strong id="callTimer">0:00</strong></div><div class="person profile-backdrop"><div class="person-avatar" id="customerInitials"><img id="activeCustomerPhoto" class="customer-call-photo hidden" alt="Customer profile photo" draggable="false"><span id="activeCustomerInitialsText">CU</span></div><span id="activeCallLanguage" class="language-chip">Conversation</span><h2 id="customerName">Customer</h2><p>Private browser conversation</p></div><div class="chat"><div id="chatMessages" class="messages" aria-live="polite"></div><form id="chatForm"><label class="sr-only" for="chatInput">Message</label><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Message…"><button type="submit" aria-label="Send"><svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button></form></div><div class="call-actions"><button id="muteBtn" class="call-control" type="button"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg><small>Mute</small></button><button id="reportBtn" class="call-control" type="button"><svg viewBox="0 0 24 24"><path d="M5 22V4M5 5c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></svg><small>Report</small></button><button id="endBtn" class="call-control end" type="button"><svg viewBox="0 0 24 24"><path d="M4 15c4.8-4 11.2-4 16 0l-2.5 4-3.3-2v-3.2a12 12 0 0 0-4.4 0V17l-3.3 2Z"/></svg><small>End</small></button></div></div></div>
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
-  <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.16"></script><script src="/shared/msg91-otp.js?v=8.9.16"></script><script src="/shared/socket-loader.js?v=8.9.16"></script><script src="api.js?v=8.9.16"></script><script src="/shared/webrtc.js?v=8.9.16"></script><script src="app.js?v=8.9.16"></script>
+  <audio id="remoteAudio" autoplay playsinline></audio>
+  <script src="config.js?v=8.9.17"></script><script src="/shared/msg91-otp.js?v=8.9.17"></script><script src="/shared/socket-loader.js?v=8.9.17"></script><script src="api.js?v=8.9.17"></script><script src="/shared/webrtc.js?v=8.9.17"></script><script src="app.js?v=8.9.17"></script>
 </body>
 </html>

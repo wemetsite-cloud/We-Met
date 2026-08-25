@@ -1,34 +1,42 @@
-# SMS OTP and Razorpay setup
+# MSG91 OTP and Razorpay setup — We Met v8.9.17
 
-## 1. Where to paste the SMS API key
+## MSG91 OTP
 
-Do not paste an SMS secret into HTML, JavaScript, `config.js`, or GitHub. The included `render.yaml` already declares secret placeholders.
+The current customer and listener authentication flow uses the **MSG91 OTP Widget**, not Fast2SMS/Twilio.
 
-For Fast2SMS, open **Render Dashboard → we-met-platform → Environment**, then set:
+Use OTP only for:
 
-- `SMS_ENABLED=true`
-- `SMS_PROVIDER=fast2sms`
-- `FAST2SMS_API_KEY=YOUR_FAST2SMS_AUTHORIZATION_KEY`
-- `FAST2SMS_OTP_TEMPLATE_ID=YOUR_APPROVED_OTP_TEMPLATE_ID`
-- `SMS_OTP_EXPIRY_MINUTES=10`
-
-Save the environment and redeploy. The project intentionally sends Fast2SMS messages only to `+91` numbers. Complete Fast2SMS KYC and approve the OTP/DLT template before live testing.
-
-For Twilio instead, set `SMS_ENABLED=true`, `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID` in the same Render Environment screen.
-
-`SMS_TEST_OTP` is for local development only and is ignored when `NODE_ENV=production`.
-
-### SMS flows included
-
-- OTP registration for customers and listeners.
-- Optional SMS OTP sign-in for returning customers and listeners.
-- SMS OTP password reset for customers and listeners.
+- new customer registration;
+- new listener registration;
+- forgot-password recovery;
 - OTP-verified pre-login support.
-- No administrator approval or recovery key is used for password reset.
 
-## 2. Razorpay live credentials
+Returning accounts use the password attached to the same verified phone number. A number that already owns an account is routed back to that account instead of creating another same-role account.
 
-Keep the existing live Razorpay account and values. In Render Environment, confirm these existing secrets are present; do not put them in frontend code:
+### Required Render environment
+
+```text
+MSG91_AUTH_KEY=<private WEMETSERVER Authkey>
+SMS_ENABLED=false
+```
+
+The public OTP Widget configuration/token lives in `shared/msg91-otp.js`. The private MSG91 Authkey must stay on Render only.
+
+### MSG91 dashboard
+
+- OTP Widget subscription: Active
+- Widget: Enabled
+- Web SDK / Mobile Integration: Mobile Integration OFF for this web build
+- SMS channel: enabled
+- Template: MSG91 Default Configuration unless you intentionally move to your own DLT template
+- `WEMETWEB` token: Enabled
+- Country restrictions: match the countries you intend to support
+
+Do not enable the legacy Fast2SMS/Twilio OTP variables for this build unless you intentionally restore the old server-SMS implementation.
+
+## Razorpay wallet and membership
+
+Keep the live Razorpay secrets in Render only:
 
 - `RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
@@ -37,40 +45,29 @@ Keep the existing live Razorpay account and values. In Render Environment, confi
 - `RAZORPAY_SUBSCRIPTION_AMOUNT_PAISE=39900`
 - `LISTENER_SUBSCRIPTION_CREDIT_PAISE=5000`
 
-Wallet plans now use Razorpay Standard Web Checkout directly from the wallet page. The browser creates the order through `/api/create-order`, calls `new Razorpay(options).open()`, and sends the result to `/api/verify-payment`. There is no wallet redirect, payment link, `short_url`, hosted checkout URL, or separate `checkout.html`.
+Wallet plans use Razorpay Standard Checkout directly over the wallet page. Closing checkout stays on the wallet. Talk-time is credited only after backend verification.
 
-Closing Checkout leaves the customer on the wallet page. A successful payment adds talk time only after server-side signature, order, amount, currency, payment-status, and capture verification. Razorpay controls its secure mobile payment-method UI, including the responsive “More Options” view; We Met does not navigate the browser away from the wallet.
+## Calls
 
-### Checkout branding
+Browser audio uses WebRTC + Socket.IO. The package includes multiple STUN endpoints. For production reliability across mobile carriers, CGNAT, office Wi-Fi and restrictive NAT, also configure a real TURN service in Render:
 
-The project sends the We Met name, logo, pink `#E62D7D` action colour, and dark backdrop. Razorpay-hosted card, UPI, bank, and wallet controls cannot be restyled with site CSS.
+```text
+TURN_URL=turn:your-turn-host:3478
+TURN_USERNAME=...
+TURN_CREDENTIAL=...
+```
 
-To adjust provider-owned styling, use **Razorpay Dashboard → Account & Settings → Checkout Styling** in the same live account.
+`TURN_URL` may contain comma-separated TURN URLs. Without TURN, some network pairs can still fail even when both users are online and microphone permission is allowed.
 
-## 3. Signed membership webhook
+## Production smoke test
 
-Create or retain the webhook at:
-
-    https://YOUR-DOMAIN/api/subscriptions/webhook
-
-Paste the identical webhook secret into `RAZORPAY_WEBHOOK_SECRET`. The server validates `X-Razorpay-Signature` against the original raw body, records event IDs idempotently, activates access only after verified payment, and credits the listener once per qualifying payment.
-
-## 4. Production checklist
-
-- Keep Razorpay Test and Live keys, plans, and webhooks in matching modes.
-- Test wallet amounts such as ₹49 and ₹99: open, cancel, retry, successful capture, and browser Back.
-- Confirm the URL stays on the wallet page while Standard Checkout is open and after it closes.
-- Confirm talk time changes only after `/api/verify-payment` succeeds.
-- Test SMS signup, SMS OTP login, and SMS password reset for both customer and listener accounts.
-- Confirm the admin navigation has no password-reset approval queue.
-- Test one membership, renewal, cancellation, failed payment, exclusive post access, and direct messaging.
-- Add a production TURN service for reliable calls across restrictive mobile networks.
-- Keep PostgreSQL backups and rotate any exposed secret immediately.
-
-Official references:
-
-- Razorpay Standard Checkout: https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/
-- Razorpay Checkout Styling: https://razorpay.com/docs/payments/dashboard/account-settings/checkout-styling/
-- Razorpay payment webhooks: https://razorpay.com/docs/webhooks/payments/
-- Twilio Messaging API: https://www.twilio.com/docs/messaging/api
-
+1. New customer → OTP → profile/password → dashboard.
+2. Same customer number again → password screen, not another registration.
+3. Forgot password → OTP → new password.
+4. New listener → OTP → listener details → full-page voice verification.
+5. Submit recording → Admin → Verifications → approve → listener workspace unlocks.
+6. Listener grants microphone permission and goes Online.
+7. Customer has talk-time → calls that online listener → listener receives ring → Accept → two-way audio connects → timer/billing begins only after media connects.
+8. Test Reject, End, Busy/another call, Offline and Break.
+9. Test customer/listener Report and Support submissions.
+10. Test wallet checkout cancellation and successful top-up.

@@ -1,18 +1,27 @@
 {
-  "version": "8.9.16",
-  "name": "stable-otp-registration-responsive-ui",
+  "version": "8.9.17",
+  "name": "full-live-responsive-stability-fix",
   "changes": [
-    "Customer and listener registration are idempotent: a slow/repeated profile submit resumes the account created from the same verified OTP instead of reporting that the phone verification was already used",
-    "Returning numbers continue to open the existing role account with password login until that account is permanently deleted",
-    "New listener accounts remain locked to mandatory voice verification and admin approval before the listener workspace becomes available",
-    "Customer listener profiles use a wider responsive desktop/tablet layout with cleaner banner/avatar/actions/posts and stable navigation",
-    "Customer desktop/tablet navigation is moved out of the floating mobile dock and into a sticky top navigation row",
-    "Listener desktop/tablet login and signed-in views are rebalanced to prevent clipped artwork and oversized empty areas while preserving the <=700px mobile layout",
-    "Dark inherited auth checkboxes/inputs are overridden with accessible light-theme controls across customer and listener authentication",
-    "Decorative background glows are removed from primary app surfaces to reduce visual noise and improve consistency across screen sizes",
-    "Cache/version identifiers are bumped to 8.9.16 so stale 8.9.15 layouts are replaced after deployment"
+    "Customer Home/Exclusive/Messages/Wallet/Profile navigation is fixed to the bottom on desktop, tablet and mobile with page padding so it never cuts through content.",
+    "Customer listener cards use improved margins, padding, avatar/copy hierarchy and responsive desktop/tablet/mobile grids.",
+    "Wallet plans use six cards per normal laptop/desktop row, five on compact laptops, four on tablets and two on phones with compact consistent card sizing.",
+    "Customer Account & Security is re-spaced with a compact verified-phone panel, aligned password form and cleaner delete/logout actions.",
+    "Listener login/start is a true full listener page on desktop/tablet instead of a floating card, while the compact phone layout is preserved.",
+    "Listener voice verification is a separate full-page step after signup/login and displays the exact admin-saved Malayalam prompt.",
+    "Unapproved listeners can access only voice-verification routes until admin approval; normal listener workspace APIs remain locked.",
+    "OTP registration, forgot-password and pre-login support use MSG91; returning same-role phone numbers return to password login instead of creating duplicate accounts.",
+    "Pre-login customer/listener support now verifies with MSG91 and supports 4-6 digit widget OTP lengths.",
+    "Listener online mode now checks microphone permission before advertising availability; customer call requests also preflight microphone permission.",
+    "WebRTC uses multiple STUN servers, pooled ICE candidates and remote-audio resume handling; TURN environment support remains available for restrictive networks.",
+    "Listener inbox, wallet, profile, settings, posts, full-screen post feed and calling surfaces are normalized to the light theme with responsive containment.",
+    "Report, support, verification, availability and calling routes were statically traced end-to-end and cache/version identifiers are bumped to 8.9.17."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
+  ],
+  "recommended_for_call_reliability": [
+    "TURN_URL",
+    "TURN_USERNAME",
+    "TURN_CREDENTIAL"
   ]
 }

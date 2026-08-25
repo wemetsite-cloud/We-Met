@@ -101,7 +101,12 @@
     async ensurePeer() {
       if (this.peer && this.peer.signalingState !== 'closed') return this.peer;
       const stream = await this.ensureMedia();
-      this.peer = new RTCPeerConnection({ iceServers: this.iceServers });
+      this.peer = new RTCPeerConnection({
+        iceServers: this.iceServers,
+        iceCandidatePoolSize: 4,
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require',
+      });
       stream.getTracks().forEach((track) => this.peer.addTrack(track, stream));
 
       this.peer.onicecandidate = ({ candidate }) => {
@@ -112,7 +117,10 @@
       this.peer.ontrack = ({ streams }) => {
         if (!this.remoteAudio || !streams[0]) return;
         this.remoteAudio.srcObject = streams[0];
-        this.remoteAudio.play().catch(() => {});
+        this.remoteAudio.muted = false;
+        this.remoteAudio.volume = 1;
+        this.remoteAudio.setAttribute('playsinline', '');
+        this.resumeRemoteAudio();
       };
       this.peer.onconnectionstatechange = () => {
         const state = this.peer?.connectionState;
@@ -154,6 +162,14 @@
     async start(callId, initiator = false) {
       await this.prepare(callId);
       if (initiator) await this.createOffer();
+    }
+
+    resumeRemoteAudio() {
+      if (!this.remoteAudio?.srcObject) return;
+      this.remoteAudio.play().catch(() => {
+        // A browser may briefly block autoplay. The next call-control gesture
+        // invokes this method again, without treating audio as disconnected.
+      });
     }
 
     toggleMute() {

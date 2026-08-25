@@ -354,7 +354,7 @@ router.post('/phone/login/start', (_req, res) => {
 router.post('/msg91/verify', msg91VerifyLimit, asyncHandler(async (req, res) => {
   const phone = internationalPhone(req.body.phone);
   const role = validRole(String(req.body.role || ''));
-  const purpose = ['registration', 'password_reset'].includes(String(req.body.purpose || '')) ? String(req.body.purpose) : null;
+  const purpose = ['registration', 'password_reset', 'support'].includes(String(req.body.purpose || '')) ? String(req.body.purpose) : null;
   const accessToken = String(req.body.accessToken || '').trim();
   if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
   if (!role || !purpose) return res.status(400).json({ error: 'OTP verification request is invalid.' });
@@ -367,6 +367,8 @@ router.post('/msg91/verify', msg91VerifyLimit, asyncHandler(async (req, res) => 
   if (purpose === 'password_reset' && !found.rows[0]) {
     return res.status(404).json({ error: 'No account was found with this mobile number.' });
   }
+  // Login support may be requested before or after account creation, so it does
+  // not require an existing role account. MSG91 verification is still required.
 
   await verifyMsg91AccessToken(accessToken, phone);
   const verified = await createVerifiedProviderChallenge({ phone, role, purpose, accessToken });
@@ -377,6 +379,7 @@ router.post('/msg91/verify', msg91VerifyLimit, asyncHandler(async (req, res) => 
     tokenExpiresAt: verified.tokenExpiresAt,
   };
   if (purpose === 'password_reset') response.resetToken = verified.oneTimeToken;
+  else if (purpose === 'support') response.supportToken = verified.oneTimeToken;
   else response.registrationToken = verified.oneTimeToken;
   return res.json(response);
 }));
@@ -520,10 +523,11 @@ router.post('/phone/register/listener', registrationLimit, asyncHandler(async (r
 
 router.post('/support/submit', loginSupportLimit, asyncHandler(async (req, res) => {
   const issue = String(req.body.issue || '').trim().slice(0, 3000);
+  const role = validRole(String(req.body.role || 'customer')) || 'customer';
   if (issue.length < 5) return res.status(400).json({ error: 'Briefly describe the login issue.' });
 
   const ticket = await db.transaction(async (client) => {
-    const challenge = await consumeRegistration(client, req.body.registrationToken, 'customer', 'support');
+    const challenge = await consumeRegistration(client, req.body.registrationToken, role, 'support');
     const created = await client.query(`
       INSERT INTO login_support_tickets(phone,issue)
       VALUES($1,$2)

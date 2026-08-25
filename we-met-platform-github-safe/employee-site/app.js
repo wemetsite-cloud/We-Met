@@ -164,7 +164,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.16', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.17', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -356,7 +356,7 @@
     $('#breakBtn').addEventListener('click', () => sendAvailabilityCommand('employee:break', { enabled: status !== 'break' }).catch((error) => P.toast(error.message, 'error')));
     $('#acceptBtn').addEventListener('click', accept);
     $('#rejectBtn').addEventListener('click', () => socket?.emit('call:reject', { callId: currentCall?.id }));
-    $('#endBtn').addEventListener('click', () => socket?.emit('call:end', { callId: currentCall?.id }));
+    $('#endBtn').addEventListener('click', () => { audioCall?.resumeRemoteAudio?.(); socket?.emit('call:end', { callId: currentCall?.id }); });
     $('#muteBtn').addEventListener('click', toggleMute);
     $('#reportBtn').addEventListener('click', reportCurrent);
     $('#chatForm').addEventListener('submit', sendChat);
@@ -599,10 +599,11 @@
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
       const phone = composedPhone('#listenerSupportCountry', '#listenerSupportPhone');
-      const response = await P.api('/api/auth/support/phone/start', { method: 'POST', body: JSON.stringify({ phone }) });
-      listenerSupportState = { phone, challengeId: response.challengeId, verificationToken: '' };
-      $('#listenerSupportPhonePreview').textContent = response.phone;
-      if (response.developmentOtp) { $('#listenerSupportDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#listenerSupportDevelopmentOtp'); }
+      listenerSupportState = { phone, challengeId: '', verificationToken: '' };
+      window.WMMsg91Otp?.reset();
+      await sendMsg91Otp(phone);
+      $('#listenerSupportPhonePreview').textContent = phone;
+      show('#listenerSupportDevelopmentOtp', false);
       show('#listenerSupportPhoneForm', false); show('#listenerSupportOtpForm');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
@@ -611,8 +612,8 @@
   async function verifyListenerSupport(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: listenerSupportState.challengeId, otp: $('#listenerSupportOtp').value }) });
-      listenerSupportState.verificationToken = response.registrationToken;
+      const response = await verifyMsg91ForServer({ phone: listenerSupportState.phone, role: 'employee', purpose: 'support', otp: $('#listenerSupportOtp').value });
+      listenerSupportState.verificationToken = response.supportToken;
       show('#listenerSupportOtpForm', false); show('#listenerSupportIssueForm');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
@@ -621,7 +622,7 @@
   async function submitListenerSupport(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const response = await P.api('/api/auth/support/submit', { method: 'POST', body: JSON.stringify({ registrationToken: listenerSupportState.verificationToken, issue: $('#listenerSupportIssue').value }) });
+      const response = await P.api('/api/auth/support/submit', { method: 'POST', body: JSON.stringify({ registrationToken: listenerSupportState.verificationToken, role: 'employee', issue: $('#listenerSupportIssue').value }) });
       P.toast(response.message || 'Your issue was sent securely.', 'success');
       closeManagedOverlay('listenerSupportModal', 'replace');
       ['listenerSupportPhoneForm','listenerSupportOtpForm','listenerSupportIssueForm'].forEach((id) => document.getElementById(id)?.reset());
@@ -643,9 +644,13 @@
 
   async function goOnline() {
     try {
+      if (!audioCall) throw new Error('Calling is still loading. Try again in a moment.');
+      await audioCall.ensureMedia();
+      audioCall.stop();
       await sendAvailabilityCommand('employee:online');
+      P.toast('You are online and ready for calls.', 'success');
     } catch (error) {
-      P.toast(error.message, 'error');
+      P.toast(error.message || 'Microphone access is required to go online.', 'error');
     }
   }
 
@@ -788,7 +793,8 @@
       return;
     }
     const rejected = verificationState.status === 'rejected';
-    content.innerHTML = `<span class="eyebrow">VOICE VERIFICATION</span><h1>${rejected ? 'Record the line again' : 'One quick voice check'}</h1><p>Read this Malayalam line clearly in a quiet room. The admin uses only this clip to verify the listener account.</p>${rejected && verificationState.note ? `<div class="verification-note"><b>Admin note</b><span>${P.esc(verificationState.note)}</span></div>` : ''}<blockquote lang="ml">${P.esc(verificationState.prompt)}</blockquote><div id="recordingVisualizer" class="recording-visualizer"><i></i><i></i><i></i><i></i><i></i><span id="recordingStatus">Ready to record</span></div><audio id="voicePreview" class="hidden" controls></audio><div class="verification-actions"><button id="startVoiceRecord" class="button button-primary button-large" type="button">● Start recording</button><button id="stopVoiceRecord" class="button button-soft button-large hidden" type="button">Stop recording</button><button id="submitVoiceRecord" class="button button-primary button-large hidden" type="button">Send for verification</button></div><small>Your phone number and original name are never shown publicly.</small>`;
+    const verificationPrompt = String(verificationState.prompt || '').trim() || 'ഞാൻ വി മെറ്റിൽ ആദരവോടെയും ഉത്തരവാദിത്തത്തോടെയും സംസാരിക്കും.';
+    content.innerHTML = `<span class="eyebrow">VOICE VERIFICATION</span><h1>${rejected ? 'Record the line again' : 'One quick voice check'}</h1><p>Read this Malayalam line clearly in a quiet room. The admin uses only this clip to verify the listener account.</p>${rejected && verificationState.note ? `<div class="verification-note"><b>Admin note</b><span>${P.esc(verificationState.note)}</span></div>` : ''}<blockquote lang="ml">${P.esc(verificationPrompt)}</blockquote><div id="recordingVisualizer" class="recording-visualizer"><i></i><i></i><i></i><i></i><i></i><span id="recordingStatus">Ready to record</span></div><audio id="voicePreview" class="hidden" controls></audio><div class="verification-actions"><button id="startVoiceRecord" class="button button-primary button-large" type="button">● Start recording</button><button id="stopVoiceRecord" class="button button-soft button-large hidden" type="button">Stop recording</button><button id="submitVoiceRecord" class="button button-primary button-large hidden" type="button">Send for verification</button></div><small>Your phone number and original name are never shown publicly.</small>`;
     $('#startVoiceRecord').onclick = startVoiceRecording;
     $('#stopVoiceRecord').onclick = stopVoiceRecording;
     $('#submitVoiceRecord').onclick = submitVoiceRecording;
@@ -1048,6 +1054,7 @@
 
   function accept() {
     if (!currentCall || !socket?.connected) return;
+    audioCall?.resumeRemoteAudio?.();
     $('#acceptBtn').disabled = true;
     $('#rejectBtn').disabled = true;
     socket.emit('call:accept', { callId: currentCall.id });

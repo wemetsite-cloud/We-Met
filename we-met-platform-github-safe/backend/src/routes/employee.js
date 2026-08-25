@@ -7,6 +7,11 @@ const { normalizePhone } = require('../phone');
 const router = express.Router();
 router.use(authenticate, requireRole('employee'));
 router.use((req, res, next) => {
+  // Voice verification routes are implemented by employee-social.js, which is
+  // mounted after this router. Let those requests fall through even while the
+  // listener is not yet approved; every other listener-workspace API remains
+  // locked until admin approval.
+  if (req.path === '/verification' || req.path.startsWith('/verification/')) return next();
   if (req.user.listener_verification_status !== 'approved') {
     return res.status(403).json({ error: 'Your listener account activates after voice verification is approved.' });
   }

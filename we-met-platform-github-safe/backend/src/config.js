@@ -33,6 +33,12 @@ const number = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+
+function iceUrls(value, fallback) {
+  const entries = String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+  return entries.length ? entries : fallback;
+}
+
 const nodeEnv = process.env.NODE_ENV || 'development';
 const supportEmail = process.env.SUPPORT_EMAIL || 'wemetsite@gmail.com';
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
@@ -139,10 +145,17 @@ const config = {
   },
 
   iceServers: [
-    { urls: process.env.STUN_URL || 'stun:stun.l.google.com:19302' },
+    {
+      urls: iceUrls(process.env.STUN_URL, [
+        'stun:stun.l.google.com:19302',
+        'stun:stun1.l.google.com:19302',
+        'stun:stun2.l.google.com:19302',
+        'stun:stun3.l.google.com:19302',
+      ]),
+    },
     process.env.TURN_URL
       ? {
-        urls: process.env.TURN_URL,
+        urls: iceUrls(process.env.TURN_URL, []),
         username: process.env.TURN_USERNAME || '',
         credential: process.env.TURN_CREDENTIAL || '',
       }

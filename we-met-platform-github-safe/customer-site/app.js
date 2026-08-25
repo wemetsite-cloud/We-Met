@@ -401,10 +401,11 @@
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
       const phone = composedPhone('#supportCountry', '#supportPhone');
-      const response = await P.api('/api/auth/support/phone/start', { method: 'POST', body: JSON.stringify({ phone }) });
-      supportAuthState.challengeId = response.challengeId;
-      $('#supportPhonePreview').textContent = response.phone;
-      if (response.developmentOtp) { $('#supportDevelopmentOtp').textContent = `Development OTP: ${response.developmentOtp}`; show('#supportDevelopmentOtp'); }
+      supportAuthState = { phone, challengeId: '', registrationToken: '' };
+      window.WMMsg91Otp?.reset();
+      await sendMsg91Otp(phone);
+      $('#supportPhonePreview').textContent = phone;
+      show('#supportDevelopmentOtp', false);
       show('#preloginSupportPhoneForm', false); show('#preloginSupportOtpForm'); $('#supportOtp').focus();
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
@@ -413,8 +414,8 @@
   async function verifyPreloginSupport(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const response = await P.api('/api/auth/phone/verify', { method: 'POST', body: JSON.stringify({ challengeId: supportAuthState.challengeId, otp: $('#supportOtp').value }) });
-      supportAuthState.registrationToken = response.registrationToken;
+      const response = await verifyMsg91ForServer({ phone: supportAuthState.phone, role: 'customer', purpose: 'support', otp: $('#supportOtp').value });
+      supportAuthState.registrationToken = response.supportToken;
       show('#preloginSupportOtpForm', false); show('#preloginSupportIssueForm'); $('#supportIssue').focus();
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
@@ -423,7 +424,7 @@
   async function submitPreloginSupport(event) {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const response = await P.api('/api/auth/support/submit', { method: 'POST', body: JSON.stringify({ registrationToken: supportAuthState.registrationToken, issue: $('#supportIssue').value }) });
+      const response = await P.api('/api/auth/support/submit', { method: 'POST', body: JSON.stringify({ registrationToken: supportAuthState.registrationToken, role: 'customer', issue: $('#supportIssue').value }) });
       closeOverlay('preloginSupportModal', false); P.toast(response.message || 'Login issue submitted.', 'success');
     } catch (error) { P.toast(error.message, 'error'); }
     finally { button.disabled = false; }
@@ -446,7 +447,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.16', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.17', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -1112,19 +1113,31 @@
     socket.on('account:restricted', (data) => { P.toast(data.reason || 'Account restricted.', 'error'); logout(); });
   }
 
-  function requestCall(listenerId) {
+  async function requestCall(listenerId) {
+    audioCall?.resumeRemoteAudio?.();
     const listener = directory.find((item) => item.id === listenerId);
     if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
     if (liveStatus(listener || { id: listenerId }) !== 'available') return P.toast('This listener is not online right now.', 'info');
     if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
     if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
+    try {
+      await audioCall.ensureMedia();
+    } catch (error) {
+      return P.toast(error.message || 'Allow microphone access before calling.', 'error');
+    }
     beginCallRequest({ employeeId: listenerId, allowOtherLanguages: false });
   }
 
-  function requestRandomCall() {
+  async function requestRandomCall() {
+    audioCall?.resumeRemoteAudio?.();
     if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
     if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
     if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
+    try {
+      await audioCall.ensureMedia();
+    } catch (error) {
+      return P.toast(error.message || 'Allow microphone access before calling.', 'error');
+    }
     beginCallRequest({ employeeId: null, allowOtherLanguages: Boolean($('#otherLanguageToggle')?.checked) });
   }
 
@@ -1143,6 +1156,7 @@
   function clearPendingCallRequest() {
     if (pendingCallRequest?.timer) clearTimeout(pendingCallRequest.timer);
     pendingCallRequest = null;
+    if (!currentCall) audioCall?.stop?.();
     syncCallRequestControls();
   }
 
