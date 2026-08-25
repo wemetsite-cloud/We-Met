@@ -1,6 +1,17 @@
 (() => {
   'use strict';
 
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  function resetViewportTop(node = null) {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
+    if (node) {
+      node.scrollTop = 0;
+      node.querySelectorAll?.('.modal-card,.listener-profile-modal,.customer-post-feed-list,.legal-card,.recovery-card,.verification-card,.listener-post-feed-list').forEach((part) => { part.scrollTop = 0; });
+    }
+  }
+
   const P = window.Portal;
   const $ = selector => document.querySelector(selector);
   const $$ = selector => [...document.querySelectorAll(selector)];
@@ -157,13 +168,14 @@
     $('#modalBody').innerHTML = body;
     const opening = $('#actionModal').classList.contains('hidden');
     show('#actionModal');
+    resetViewportTop($('#actionModal'));
     if (opening) history.pushState({ marker: NAVIGATION_MARKER, page: activePage, overlay: 'actionModal' }, document.title);
   }
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.7', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.8', { updateViaCache: 'none' });
     } catch { }
   }
 
@@ -180,7 +192,7 @@
     $('.layout')?.classList.remove('menu-open');
     if ($('#password')) $('#password').value = '';
     activePage = 'overview';
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    resetViewportTop();
     history.replaceState({ marker: NAVIGATION_MARKER, page: 'overview', root: true }, document.title);
     history.pushState({ marker: NAVIGATION_MARKER, page: 'overview', guard: true }, document.title);
     sessionResetPending = false;
@@ -365,7 +377,7 @@
     $$('.page').forEach(page => page.classList.toggle('active', page.id === `page-${name}`));
     $('#pageTitle').textContent = pageMeta[name][0];
     $('#pageDesc').textContent = pageMeta[name][1];
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    resetViewportTop();
 
     const loaders = {
       overview: () => { loadDashboard(); loadLive(); },

@@ -2,14 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#fff8fb">
+  <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="description" content="The private We Met listener app for calls, exclusive posts, messages and earnings.">
   <title>We Met Listener</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.7">
-  <link rel="stylesheet" href="style.css?v=8.9.7">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.8">
+  <link rel="stylesheet" href="style.css?v=8.9.8">
+  <style data-wm-initial-paint>html,body{margin:0;background:#fff8fb!important;color-scheme:light}</style>
 </head>
 <body>
   <div class="listener-glow listener-glow-one" aria-hidden="true"></div>
@@ -76,7 +79,7 @@
     <section class="verification-card">
       <a class="brand"><img src="/shared/logo.svg" alt=""><span><strong>We Met</strong><small>Listener verification</small></span></a>
       <div id="verificationContent"></div>
-      <button id="verificationLogout" class="button button-quiet" type="button">Log out</button>
+      <button id="verificationLogout" class="verification-logout-link" type="button">Log out</button>
     </section>
   </div>
 
@@ -238,6 +241,6 @@
   <button id="restoreListenerCall" class="restore-call hidden" type="button"><span>☎</span><b>Return to call</b><small>Active</small></button>
 
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.7"></script><script src="/shared/socket-loader.js?v=8.9.7"></script><script src="api.js?v=8.9.7"></script><script src="/shared/webrtc.js?v=8.9.7"></script><script src="app.js?v=8.9.7"></script>
+  <script src="config.js?v=8.9.8"></script><script src="/shared/socket-loader.js?v=8.9.8"></script><script src="api.js?v=8.9.8"></script><script src="/shared/webrtc.js?v=8.9.8"></script><script src="app.js?v=8.9.8"></script>
 </body>
 </html>

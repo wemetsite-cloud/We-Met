@@ -1,6 +1,17 @@
 (() => {
   'use strict';
 
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  function resetViewportTop(node = null) {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
+    if (node) {
+      node.scrollTop = 0;
+      node.querySelectorAll?.('.modal-card,.listener-profile-modal,.customer-post-feed-list,.legal-card,.recovery-card,.verification-card,.listener-post-feed-list').forEach((part) => { part.scrollTop = 0; });
+    }
+  }
+
   const P = window.Portal;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -81,6 +92,7 @@
   function openManagedOverlay(selector, overlay, mode = 'push') {
     const opening = $(selector)?.classList.contains('hidden');
     show(selector);
+    resetViewportTop($(selector));
     if (opening) setNavigationState({ overlay }, mode);
     syncBackButton();
   }
@@ -142,6 +154,7 @@
       releasePostEditPreview();
       if (me) selectTab(state.tab, { historyMode: 'none' });
       syncBackButton();
+      resetViewportTop(state.overlay ? document.getElementById(state.overlay) : null);
       if (event.state?.marker === NAVIGATION_MARKER && event.state.root && !currentOverlay() && (!me || activeTab === 'desk')) {
         history.pushState({ ...navigationState('desk', null), guard: true }, document.title);
       }
@@ -151,7 +164,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.7', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.8', { updateViaCache: 'none' });
     } catch {}
   }
 
@@ -191,7 +204,7 @@
     showListenerAuthStep('welcome');
     document.body.classList.remove('signed-in');
     document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    resetViewportTop();
     loadListenerShowcase();
     activeTab = 'desk';
     history.replaceState({ ...navigationState('desk', null), root: true }, document.title);
@@ -465,7 +478,6 @@
     const button = $(`[data-tab="${tab}"]`);
     $$('[data-tab]').forEach((item) => item.classList.toggle('active', item === button));
     $$('.tab').forEach((item) => item.classList.toggle('active', item.id === `tab-${tab}`));
-    button?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
     if (tab === 'history') loadHistory();
     if (tab === 'wallet') loadWallet();
     if (tab === 'notifications' || tab === 'settings') loadNotifications();
@@ -474,8 +486,10 @@
     if (tab === 'inbox') loadInbox();
     if (tab === 'followers') loadFollowers();
     if (tab === 'desk') { loadStats(); loadActivity(); }
+    resetViewportTop();
+    document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
     if (tab === 'profile') {
-      window.scrollTo({ top: 0, behavior: 'auto' });
+      resetViewportTop();
       document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
     }
     syncBackButton();
@@ -709,7 +723,7 @@
     show('#appView');
     document.body.classList.add('signed-in');
     document.querySelector('#appView .topbar')?.classList.remove('topbar-hidden');
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    resetViewportTop();
     $('#profileName').value = me.name || '';
     $('#profileUsername').value = me.username || '';
     $('#profilePhone').value = me.phone || '';

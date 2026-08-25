@@ -1,20 +1,21 @@
 {
-  "version": "8.9.7",
-  "name": "requested-fixes-only",
+  "version": "8.9.8",
+  "name": "final-optimized-requested-fixes",
   "changes": [
-    "Tightens customer listener-card avatar and text spacing",
-    "Restores the tilted public call-preview card and staggered three-photo collages",
-    "Refines customer wallet plan spacing and removes the redeem-section outer card",
-    "Improves locked Exclusive styling, profile verified-phone wrapper and profile scroll reset behavior",
-    "Restores the requested simple listener home layout and fixes listener settings/recovery/post-menu spacing and visibility",
-    "Improves the listener call window and shows customer profile photos to listeners when available",
-    "Improves the admin manual-payment balance panel and shows customer/listener profile photos to admins when available",
-    "Merges each portal theme stylesheet into its main stylesheet to reduce frontend file count"
+    "Forces every portal tab, page and managed overlay to open at the absolute top with manual scroll restoration",
+    "Keeps the confirmed Razorpay Buy and Subscribe checkout functions unchanged",
+    "Applies a light first-paint/loading surface across customer, listener and admin portals and disables page zoom",
+    "Restores the image-first listener desk design and removes the solid settings-list background",
+    "Compacts listener voice-verification and review screens to fit mobile and desktop viewports with a small rose logout link",
+    "Refines customer tilted call-preview card, listener-card spacing, wallet spacing, profile surface and Exclusive lock glow",
+    "Uses the three-portrait overlapping collage style for customer and listener public showcase images",
+    "Improves admin manual-payment balance styling while retaining customer/listener profile-photo support",
+    "Adds expanded Google crawl/index metadata, structured data, robots directives and sitemap metadata",
+    "Retains merged frontend theme stylesheets to keep the project file count reduced"
   ],
   "notes": [
-    "Applies only the fixes explicitly requested after v8.9.6",
-    "Keeps the uploaded v8.9.6 Razorpay checkout functions unchanged",
-    "Customer profile photos remain private and are exposed only through authenticated admin access or the active listener call payload",
-    "Removes three standalone theme CSS files without changing the backend module structure"
+    "Only the requested UI, navigation, SEO and optimization changes were applied",
+    "Backend module structure was left intact to reduce deployment risk",
+    "Search-engine metadata improves crawlability but cannot guarantee Google rankings or indexing time"
   ]
 }

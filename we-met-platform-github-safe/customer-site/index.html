@@ -2,20 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#fff8fb">
-  <meta name="description" content="Private browser voice conversations with clear listener profiles, live availability, transparent connected-second billing and no phone-number sharing.">
-  <meta name="robots" content="index,follow">
+  <meta name="description" content="We Met is an online communication platform for private browser-based voice conversations with verified listener profiles, live availability, clear connected-second billing and privacy-focused communication.">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <meta name="keywords" content="We Met, online communication platform, private voice conversations, browser voice calls, listener platform, online conversation service">
+  <meta name="application-name" content="We Met">
+  <meta name="apple-mobile-web-app-title" content="We Met">
+  <meta property="og:site_name" content="We Met">
+  <meta property="og:image" content="https://wemet.xyz/shared/icon-512.png">
+  <meta property="og:image:alt" content="We Met">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="We Met — Real conversations, when you need one">
+  <meta name="twitter:description" content="Private browser-based voice conversations with verified listener profiles and clear connected-second billing.">
+  <meta name="twitter:image" content="https://wemet.xyz/shared/icon-512.png">
   <meta property="og:title" content="We Met — Real conversations, when you need one">
-  <meta property="og:description" content="Choose an available listener and talk privately from your browser.">
+  <meta property="og:description" content="A privacy-focused online communication platform for browser-based voice conversations with verified listeners.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://wemet.xyz/">
   <link rel="canonical" href="https://wemet.xyz/">
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@graph":[
+      {"@type":"Organization","@id":"https://wemet.xyz/#organization","name":"We Met","url":"https://wemet.xyz/","logo":"https://wemet.xyz/shared/icon-512.png","email":"wemetsite@gmail.com"},
+      {"@type":"WebSite","@id":"https://wemet.xyz/#website","url":"https://wemet.xyz/","name":"We Met","publisher":{"@id":"https://wemet.xyz/#organization"},"inLanguage":"en"},
+      {"@type":"WebApplication","@id":"https://wemet.xyz/#app","name":"We Met","url":"https://wemet.xyz/","applicationCategory":"CommunicationApplication","operatingSystem":"Web","description":"Private browser-based voice conversations with verified listener profiles, live availability and connected-second billing.","publisher":{"@id":"https://wemet.xyz/#organization"}}
+    ]
+  }
+  </script>
   <title>We Met — Real conversations, when you need one</title>
   <link rel="icon" type="image/png" href="/shared/favicon.png">
   <link rel="apple-touch-icon" href="/shared/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest?v=8.9.7">
-  <link rel="stylesheet" href="style.css?v=8.9.7">
+  <link rel="manifest" href="manifest.webmanifest?v=8.9.8">
+  <link rel="stylesheet" href="style.css?v=8.9.8">
+  <style data-wm-initial-paint>html,body{margin:0;background:#fff8fb!important;color-scheme:light}</style>
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -94,7 +116,7 @@
         </div>
       </section>
       <footer class="public-footer shell">
-        <div><a class="brand footer-brand" href="#"><img src="/shared/logo.svg" alt=""><span><strong>We Met</strong><small>Conversation with care</small></span></a><p>A private browser-based voice conversation service with transparent billing and clear safety standards.</p></div>
+        <div><a class="brand footer-brand" href="#"><img src="/shared/logo.svg" alt=""><span><strong>We Met</strong><small>Conversation with care</small></span></a><p>A privacy-focused online communication platform for browser-based voice conversations with transparent billing and clear safety standards.</p></div>
         <nav aria-label="Company and policy links"><a href="about.html">About</a><a href="contact.html">Contact</a><a href="pricing.html">Pricing</a><a href="delivery.html">Service delivery</a><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refund.html">Refunds</a><a href="safety.html">Safety</a><a href="community-guidelines.html">Guidelines</a><a href="child-safety.html">Child safety</a><a href="delete-account.html">Delete account</a></nav>
         <small>© 2026 We Met. Support: <a href="mailto:wemetsite@gmail.com">wemetsite@gmail.com</a></small>
       </footer>
@@ -243,11 +265,11 @@
 
   <div id="legalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="legalTitle"><div class="modal-card legal-card"><button class="modal-back" data-app-back type="button" aria-label="Go back"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="close" data-close="legalModal" type="button" aria-label="Close">×</button><h2 id="legalTitle">Policy</h2><div id="legalBody" class="legal-body"></div></div></div>
   <audio id="remoteAudio" autoplay></audio>
-  <script src="config.js?v=8.9.7"></script>
-  <script src="/shared/socket-loader.js?v=8.9.7"></script>
-  <script src="api.js?v=8.9.7"></script>
-  <script src="/shared/webrtc.js?v=8.9.7"></script>
+  <script src="config.js?v=8.9.8"></script>
+  <script src="/shared/socket-loader.js?v=8.9.8"></script>
+  <script src="api.js?v=8.9.8"></script>
+  <script src="/shared/webrtc.js?v=8.9.8"></script>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="app.js?v=8.9.7"></script>
+  <script src="app.js?v=8.9.8"></script>
 </body>
 </html>

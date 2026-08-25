@@ -1,6 +1,17 @@
 (() => {
   'use strict';
 
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  function resetViewportTop(node = null) {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
+    if (node) {
+      node.scrollTop = 0;
+      node.querySelectorAll?.('.modal-card,.listener-profile-modal,.customer-post-feed-list,.legal-card,.recovery-card,.verification-card,.listener-post-feed-list').forEach((part) => { part.scrollTop = 0; });
+    }
+  }
+
   const P = window.Portal;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -102,6 +113,7 @@
     if (!node) return;
     const opening = node.classList.contains('hidden');
     node.classList.remove('hidden');
+    resetViewportTop(node);
     if (opening) history.pushState({ marker: NAV_MARKER, tab: activeTab, overlay: id }, document.title);
     syncBodyState();
   }
@@ -174,6 +186,7 @@
       if (state.overlay && state.overlay !== 'callModal') document.getElementById(state.overlay)?.classList.remove('hidden');
       if (!['listenerProfileModal', 'customerPostFeed'].includes(state.overlay)) { activeListenerProfileId = null; activeProfileListener = null; releasePostUrls(); }
       syncBodyState();
+      resetViewportTop(state.overlay ? document.getElementById(state.overlay) : null);
       if (event.state?.marker === NAV_MARKER && event.state.root && !currentOverlay() && (!me || activeTab === 'home')) {
         history.pushState({ marker: NAV_MARKER, tab: activeTab || 'home', guard: true }, document.title);
       }
@@ -374,7 +387,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.7', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.8', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -555,7 +568,7 @@
       if (activeConversation) loadDirectMessages();
       else loadConversations(false);
     }, 8000);
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    resetViewportTop();
   }
 
   async function logout(clear = true) {
@@ -574,7 +587,7 @@
     customerPhotoObjectUrl = '';
     document.body.classList.remove('signed-in', 'razorpay-open');
     show('#landing'); show('#dashboard', false); show('#openAuth'); show('#logoutBtn', false); show('#callModal', false); show('#restoreCall', false);
-    activeTab = 'home'; document.querySelector('.topbar')?.classList.remove('topbar-hidden'); window.scrollTo({ top: 0, behavior: 'auto' }); history.replaceState({ marker: NAV_MARKER, tab: 'home', root: true }, document.title); history.pushState({ marker: NAV_MARKER, tab: 'home', guard: true }, document.title); syncBodyState();
+    activeTab = 'home'; document.querySelector('.topbar')?.classList.remove('topbar-hidden'); resetViewportTop(); history.replaceState({ marker: NAV_MARKER, tab: 'home', root: true }, document.title); history.pushState({ marker: NAV_MARKER, tab: 'home', guard: true }, document.title); syncBodyState();
   }
 
   function selectTab(tab, { historyMode = 'push' } = {}) {
@@ -591,7 +604,7 @@
     if (tab === 'following') loadFollowing();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'support') loadSupport();
-    window.scrollTo({ top: Math.max(0, $('#dashboard').offsetTop), behavior: 'auto' }); document.querySelector('.topbar')?.classList.remove('topbar-hidden'); syncBodyState();
+    resetViewportTop(); document.querySelector('.topbar')?.classList.remove('topbar-hidden'); syncBodyState();
   }
 
   function updateBalance(value) {

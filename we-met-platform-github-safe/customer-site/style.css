@@ -926,8 +926,8 @@ body.razorpay-open:before{display:none!important}body.razorpay-open{background:#
 .wallet-checkout-brand b,.wallet-checkout-summary h2,.wallet-checkout-summary>strong,.wallet-checkout-minutes b{color:var(--ink)!important}.wallet-checkout-brand small,.wallet-checkout-provider,.wallet-checkout-summary>div>small,.wallet-checkout-summary p{color:var(--muted)!important}.wallet-checkout-summary,.wallet-checkout-minutes,.wallet-checkout-trust span{background:#fff8fb!important;color:var(--ink)!important;border-color:#e7dae1!important}.wallet-checkout-minutes small{color:#a42e67!important}.wallet-checkout-trust span{color:#7f6c77!important}
 .merchant-detail-card,.premium-qr-card,.proof-preview,.payment-summary div,.upi-actions-card,.payment-qr-card{background:#fff!important;color:var(--ink)!important;border-color:#e6dbe1!important}.merchant-detail-card strong,.premium-qr-card>strong,.payment-summary strong{color:var(--ink)!important}.merchant-copy,.payment-security-line>span,.premium-paid-button{background:#fff0f6!important;color:#a42e67!important;border:1px solid #ead0dd!important}.premium-qr-card .payment-kicker,.premium-qr-card>small{color:var(--muted)!important}.premium-qr-card .qr-save-link{background:#fff7fa!important;color:#a42e67!important;border-color:#e5d8df!important}.payment-summary .exact-amount,.payment-status-icon.approved{background:#eefaf5!important;color:#28765b!important;border-color:#d6ece3!important}.payment-summary .exact-amount small{color:#5e8677!important}
 
-/* ===== merged v8.9.7 theme layer (file-count cleanup) ===== */
-/* We Met v8.9.7 — complete porcelain light system */
+/* ===== merged v8.9.8 theme layer (file-count cleanup) ===== */
+/* We Met v8.9.8 — complete porcelain light system */
 :root{
   --wm-bg:#fffaf8;--wm-bg2:#faf7ff;--wm-card:#fffdfc;--wm-card2:#fff6fa;
   --wm-ink:#30262d;--wm-muted:#82747d;--wm-line:#eadde4;--wm-pink:#d93f82;
@@ -1050,7 +1050,7 @@ input::placeholder,textarea::placeholder{color:#a99aa3!important}.stack label{co
 .payment-card,.simple-upi-mode,.manual-checkout-panel,.wallet-checkout-summary,.payment-summary div{background:linear-gradient(145deg,#fffdfb,#fff5f9)!important;color:var(--wm-ink)!important;border-color:#e5d8df!important}
 .payment-summary .exact-amount,.simple-upi-mode .payment-summary .exact-amount{background:linear-gradient(135deg,#ffeaf3,#f1edff)!important;color:#8f285b!important;border-color:#e2ccda!important}.payment-summary .exact-amount small{color:#806f79!important}.wallet-checkout-minutes{background:linear-gradient(145deg,#fff0f6,#f2efff)!important;border-color:#e6d3df!important}.wallet-checkout-minutes b,.wallet-checkout-summary h2,.wallet-checkout-summary>strong{color:var(--wm-ink)!important}.wallet-checkout-minutes small,.wallet-checkout-summary p,.wallet-checkout-summary>div>small,.wallet-checkout-trust span{color:var(--wm-muted)!important}.wallet-checkout-trust span{background:rgba(255,253,252,.76)!important;border-color:#e5d9e0!important}.premium-paid-button{background:linear-gradient(145deg,#fff0f6,#f1edff)!important;border-color:#e2ccda!important;color:#94295e!important}.exclusive-post{background:linear-gradient(145deg,#fff4f8,#f4f1ff)!important}
 
-/* ===== v8.9.7 requested UI fixes only ===== */
+/* ===== v8.9.8 requested UI fixes only ===== */
 .hero-buttons{display:flex!important;justify-content:center!important;align-items:center!important}
 .hero-start-button{width:auto!important;min-width:164px!important;max-width:220px!important;padding-inline:30px!important;border-radius:18px!important}
 .phone-preview{transform:rotate(-1.15deg)!important;transform-origin:center!important;margin:10px auto 14px!important}
@@ -1066,3 +1066,42 @@ input::placeholder,textarea::placeholder{color:#a99aa3!important}.stack label{co
 .locked-posts{background:radial-gradient(circle at 50% 28%,rgba(255,155,204,.28),transparent 34%),radial-gradient(circle at 72% 66%,rgba(190,167,255,.24),transparent 38%),linear-gradient(145deg,#fff7fb,#f5f1ff)!important;border:1px solid rgba(219,177,199,.75)!important;box-shadow:0 14px 34px rgba(139,73,106,.10),inset 0 0 42px rgba(255,255,255,.55)!important}.locked-posts .lock-art{display:block!important;background:transparent!important;border:0!important;box-shadow:none!important;font-size:40px!important;line-height:1!important;color:#c23172!important;text-shadow:0 0 18px rgba(229,68,142,.28)!important}
 @media(max-width:760px){.hero-buttons{justify-content:center!important}.hero-start-button{min-width:154px!important;min-height:52px!important}.phone-preview{width:calc(100% - 10px)!important;transform:rotate(-1deg)!important;margin:13px auto 18px!important;padding:18px!important}.phone-preview .preview-head,.phone-preview .preview-person,.phone-preview .preview-call,.phone-preview .preview-note{transform:rotate(1deg)!important}.trust-visuals{min-height:220px!important;margin:3px 0 10px!important}.trust-visuals img{width:39%!important;height:auto!important;aspect-ratio:.82!important}.trust-visuals img:nth-child(1){left:5%!important;top:35px!important}.trust-visuals img:nth-child(2){left:31%!important;top:7px!important}.trust-visuals img:nth-child(3){right:5%!important;top:38px!important}.listener-card-open{grid-template-columns:76px minmax(0,1fr)!important}.listener-card-avatar{width:68px!important;height:68px!important;margin-left:3px!important}.listener-card-copy{padding-left:0!important}.wallet-plan-card{padding:23px 12px 14px!important}.wallet-plan-card:before{left:12px!important;right:12px!important;top:14px!important}.wallet-plan-minutes{margin-top:10px!important}.wallet-plan-card>.button{margin-top:auto!important}}
 
+
+
+/* ===== v8.9.8 final requested polish ===== */
+html,body{background:#fff8fb!important;color-scheme:light!important;overscroll-behavior-y:none}
+.hero-start-button{min-width:205px!important;max-width:250px!important;padding-inline:38px!important}
+.phone-preview{transform:rotate(-1.45deg)!important;border-radius:34px!important;background:linear-gradient(145deg,rgba(255,253,252,.97),rgba(255,246,251,.94) 68%,rgba(245,241,255,.94))!important}
+.phone-preview .preview-head,.phone-preview .preview-person,.phone-preview .preview-call,.phone-preview .preview-note{transform:rotate(1.45deg)!important}
+.trust-visuals{min-height:275px!important;background:transparent!important}
+.trust-visuals img{aspect-ratio:.78!important;object-fit:cover!important}
+.trust-visuals img:nth-child(1){width:35%!important;left:4%!important;top:44px!important;transform:rotate(-6deg)!important;z-index:1!important}
+.trust-visuals img:nth-child(2){width:40%!important;left:30%!important;top:5px!important;transform:rotate(.8deg)!important;z-index:4!important}
+.trust-visuals img:nth-child(3){width:35%!important;right:4%!important;top:45px!important;transform:rotate(6deg)!important;z-index:2!important}
+.listener-card-open{grid-template-columns:74px minmax(0,1fr)!important;column-gap:8px!important;align-items:center!important}
+.listener-card-avatar{width:68px!important;height:68px!important;margin:0!important}
+.listener-card-copy{padding:9px 8px 9px 0!important;min-width:0!important}
+.listener-card-copy h3{margin:1px 0 3px!important;line-height:1.05!important}
+.listener-card-copy>p{margin:0 0 6px!important}
+#listenerProfileModal{background:radial-gradient(circle at 10% 8%,rgba(255,215,232,.72),transparent 26%),radial-gradient(circle at 90% 18%,rgba(224,217,255,.65),transparent 26%),linear-gradient(180deg,#fffafc,#fff8fb)!important}
+#listenerProfileModal .listener-profile-modal,#listenerProfileModal .listener-profile-head,#listenerProfileModal .exclusive-posts{background:transparent!important;box-shadow:none!important}
+#listenerProfileModal .listener-profile-head{border:0!important}
+#listenerProfileModal .listener-profile-title{background:transparent!important}
+#listenerProfileModal .call-wallet-note{background:rgba(255,248,251,.68)!important}
+.locked-posts{background:radial-gradient(circle at 50% 34%,rgba(246,123,184,.30),transparent 34%),radial-gradient(circle at 78% 65%,rgba(189,164,255,.24),transparent 43%),linear-gradient(145deg,rgba(255,243,249,.92),rgba(245,239,255,.92))!important}
+.locked-posts .lock-art{background:transparent!important;border:0!important;box-shadow:none!important}
+.coupon-panel{background:transparent!important;border:0!important;box-shadow:none!important}
+.wallet-plan-minutes{padding-top:5px!important}
+.wallet-plan-card{gap:4px!important}
+.wallet-plan-card>.button{margin-bottom:2px!important}
+@media(max-width:760px){
+ .hero-start-button{min-width:190px!important;max-width:230px!important}
+ .phone-preview{transform:rotate(-1.15deg)!important;width:calc(100% - 18px)!important}
+ .phone-preview .preview-head,.phone-preview .preview-person,.phone-preview .preview-call,.phone-preview .preview-note{transform:rotate(1.15deg)!important}
+ .trust-visuals{min-height:220px!important}
+ .trust-visuals img:nth-child(1){width:35%!important;left:2%!important;top:40px!important}
+ .trust-visuals img:nth-child(2){width:41%!important;left:29.5%!important;top:4px!important}
+ .trust-visuals img:nth-child(3){width:35%!important;right:2%!important;top:41px!important}
+ .listener-card-open{grid-template-columns:70px minmax(0,1fr)!important;column-gap:7px!important}
+ .listener-card-avatar{width:64px!important;height:64px!important}
+}

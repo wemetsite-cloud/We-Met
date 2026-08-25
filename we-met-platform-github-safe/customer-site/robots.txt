@@ -1,5 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /admin/
+Disallow: /employee/
+Disallow: /listener/
 
 Sitemap: https://wemet.xyz/sitemap.xml
