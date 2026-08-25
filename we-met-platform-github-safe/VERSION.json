@@ -1,11 +1,12 @@
 {
-  "version": "8.9.11",
+  "version": "8.9.12",
   "name": "msg91-otp-password-login",
   "changes": [
+    "Fixed production CSP so MSG91 OTP provider and reCAPTCHA can load; added provider fallback and corrected server-side MSG91 access-token JSON verification.",
     "Existing customer and listener accounts now sign in with password only; SMS OTP login for existing accounts is disabled",
     "New customer and listener registrations use the MSG91 OTP Widget custom Web SDK with the configured default SMS template",
     "Forgot-password recovery uses MSG91 OTP and server-side access-token verification before allowing a password reset",
-    "MSG91 OTP Widget helper is shared by customer and listener PWAs and cached in the new v8.9.11 service-worker caches",
+    "MSG91 OTP Widget helper is shared by customer and listener PWAs and cached in the new v8.9.12 service-worker caches",
     "Legacy Fast2SMS/Twilio OTP sending is disabled in the Render blueprint for the active authentication flow"
   ],
   "notes": [

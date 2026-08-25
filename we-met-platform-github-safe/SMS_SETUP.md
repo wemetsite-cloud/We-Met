@@ -1,6 +1,6 @@
 # SMS OTP setup — MSG91 OTP Widget
 
-We Met v8.9.11 uses the MSG91 OTP Widget for SMS verification. Returning users **do not have OTP login**: they sign in with their password. OTP is used for new-account phone verification and Forgot password recovery.
+We Met v8.9.12 uses the MSG91 OTP Widget for SMS verification. Returning users **do not have OTP login**: they sign in with their password. OTP is used for new-account phone verification and Forgot password recovery.
 
 ## Required deployment secret
 

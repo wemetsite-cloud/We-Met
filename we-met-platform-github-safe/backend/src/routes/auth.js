@@ -192,8 +192,8 @@ async function verifyMsg91AccessToken(accessToken, expectedPhone) {
   try {
     response = await fetch('https://control.msg91.com/api/v5/widget/verifyAccessToken', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: new URLSearchParams({ authkey: config.msg91.authKey, 'access-token': String(accessToken) }).toString(),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ authkey: config.msg91.authKey, 'access-token': String(accessToken) }),
       signal: AbortSignal.timeout(12_000),
     });
   } catch (error) {

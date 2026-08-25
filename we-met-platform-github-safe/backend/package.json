@@ -1,6 +1,6 @@
 {
   "name": "we-met-backend",
-  "version": "8.9.11",
+  "version": "8.9.12",
   "private": true,
   "description": "We Met backend with password-only returning-user login and MSG91 OTP for registration and password recovery.",
   "main": "server.js",

@@ -1,4 +1,4 @@
-# MSG91 OTP setup for We Met v8.9.11
+# MSG91 OTP setup for We Met v8.9.12
 
 This build uses **password login for every existing customer/listener**. OTP is used for **new account phone verification** and **Forgot password** recovery. The existing login screen no longer offers an OTP-login bypass.
 
@@ -32,3 +32,7 @@ Then redeploy the backend.
 ## OTP length
 
 The current MSG91 widget in the supplied setup is 4 digits. The forms accept 4–6 digits so the site also works if you later change the widget to 6 digits.
+
+## v8.9.12 loader/CSP fix
+
+The production CSP now permits the MSG91 OTP provider plus Google reCAPTCHA resources, and the client loader retries the official `verify.phone91.com` provider if the primary `verify.msg91.com` script fails. Server-side access-token verification now uses the JSON body shown by the MSG91 Server Side Integration panel.

@@ -47,7 +47,7 @@ app.use((req, res, next) => {
   }
   res.setHeader(
     'Content-Security-Policy',
-    `default-src 'self'; script-src 'self' https://checkout.razorpay.com; connect-src 'self' https: wss:${config.isProduction ? '' : ' ws:'}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; object-src 'none'; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'${config.isProduction ? '; upgrade-insecure-requests' : ''}`,
+    `default-src 'self'; script-src 'self' https://checkout.razorpay.com https://verify.msg91.com https://verify.phone91.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net; connect-src 'self' https: wss:${config.isProduction ? '' : ' ws:'}; img-src 'self' data: blob: https://www.google.com https://www.gstatic.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; object-src 'none'; frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://recaptcha.google.com https://www.recaptcha.net; frame-ancestors 'none'; base-uri 'self'; form-action 'self'${config.isProduction ? '; upgrade-insecure-requests' : ''}`,
   );
   next();
 });
