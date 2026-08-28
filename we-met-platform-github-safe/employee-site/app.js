@@ -62,6 +62,7 @@
 
   const NAVIGATION_MARKER = 'we-met-listener-navigation';
   const VALID_TABS = new Set(['desk', 'posts', 'inbox', 'followers', 'wallet', 'history', 'profile', 'settings', 'notifications']);
+  const PRIMARY_NAV_TABS = new Set(['desk', 'inbox', 'posts', 'wallet', 'profile']);
 
   function navigationState(tab = activeTab, overlay = null) {
     return { marker: NAVIGATION_MARKER, tab: VALID_TABS.has(tab) ? tab : 'desk', overlay };
@@ -84,8 +85,17 @@
     return null;
   }
 
+  function syncBottomNavigation() {
+    const nav = $('.listener-bottom-nav');
+    if (!nav) return;
+    const suppressed = Boolean(currentCall) || Boolean(currentOverlay()) || Boolean(me && !PRIMARY_NAV_TABS.has(activeTab));
+    nav.classList.toggle('hidden', suppressed);
+    document.body.classList.toggle('listener-nav-suppressed', suppressed);
+  }
+
   function syncBackButton() {
     $('#listenerBackButton')?.classList.toggle('hidden', !(currentOverlay() || (me && activeTab !== 'desk')));
+    syncBottomNavigation();
   }
 
   function setNavigationState({ tab = activeTab, overlay = null } = {}, mode = 'push') {
@@ -412,6 +422,57 @@
     document.addEventListener('copy', (event) => { if (!event.target.closest('input,textarea,[contenteditable="true"]')) event.preventDefault(); });
   }
 
+  const IMAGE_LOADING_DELAY = 180;
+
+  function isDecorativeBrandImage(image) {
+    return Boolean(image?.closest('.brand,.listener-welcome-art,.verification-wait-art,.empty-state'));
+  }
+
+  function finishImageLoading(image, failed = false) {
+    if (!image) return;
+    if (image._wmLoadingTimer) { clearTimeout(image._wmLoadingTimer); image._wmLoadingTimer = null; }
+    image.classList.remove('wm-image-loading');
+    image.classList.toggle('wm-image-failed', failed);
+  }
+
+  function armImageLoading(image) {
+    if (!(image instanceof HTMLImageElement) || image.dataset.wmLoaderBound === '1' || isDecorativeBrandImage(image)) return;
+    image.dataset.wmLoaderBound = '1';
+    const src = String(image.currentSrc || image.getAttribute('src') || '');
+    if (!src || src.startsWith('data:image/svg+xml')) return;
+    const done = () => finishImageLoading(image, false);
+    const failed = () => finishImageLoading(image, true);
+    image.addEventListener('load', done, { once: true });
+    image.addEventListener('error', failed, { once: true });
+    if (image.complete) {
+      finishImageLoading(image, image.naturalWidth === 0);
+      return;
+    }
+    image._wmLoadingTimer = setTimeout(() => {
+      if (image.complete) return finishImageLoading(image, image.naturalWidth === 0);
+      image.classList.add('wm-image-loading');
+    }, IMAGE_LOADING_DELAY);
+  }
+
+  function initImageLoading() {
+    document.querySelectorAll('img').forEach(armImageLoading);
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach((node) => {
+          if (!(node instanceof Element)) return;
+          if (node.matches('img')) armImageLoading(node);
+          node.querySelectorAll?.('img').forEach(armImageLoading);
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function clearShowcaseLoading() {
+    $('#listenerPublicShowcase')?.querySelectorAll('.wm-image-loading-host').forEach((node) => node.classList.remove('wm-image-loading-host'));
+    $('#listenerHomeShowcase')?.classList.remove('wm-image-loading-host');
+  }
+
   function dailyShuffle(items) {
     const copy = [...items]; const stamp = new Date().toISOString().slice(0,10);
     let seed = [...stamp].reduce((n,char) => ((n*33)^char.charCodeAt(0))>>>0,5381);
@@ -423,12 +484,12 @@
     try {
       const response = await P.api('/api/public/showcase-images', { cache: 'no-store' });
       const images = dailyShuffle(Array.isArray(response.images) ? response.images : []);
-      if (!images.length) return;
+      if (!images.length) { clearShowcaseLoading(); return; }
       const publicFrame = $('#listenerPublicShowcase');
       if (publicFrame) publicFrame.innerHTML = Array.from({length: Math.min(3, images.length)}, (_,i) => `<span><img src="${P.esc(images[i % images.length])}" alt=""></span>`).join('');
       const home = $('#listenerHomeShowcase');
-      if (home) home.innerHTML = `<img src="${P.esc(images[0])}" alt="Listener community preview"><span>${images.length > 1 ? `<img src="${P.esc(images[1])}" alt="">` : ''}</span>`;
-    } catch {}
+      if (home) { home.classList.remove('wm-image-loading-host'); home.innerHTML = `<img src="${P.esc(images[0])}" alt="Listener community preview"><span>${images.length > 1 ? `<img src="${P.esc(images[1])}" alt="">` : ''}</span>`; }
+    } catch { clearShowcaseLoading(); }
   }
 
   function initAutoHideHeader() {
@@ -478,6 +539,7 @@
   async function init() {
     initNavigation();
     bind();
+    initImageLoading();
     registerServiceWorker();
     initAutoHideHeader(); loadListenerShowcase();
     try { publicConfig = await P.api('/api/public/config'); } catch {}
@@ -1003,6 +1065,7 @@
       $('#acceptBtn').disabled = false;
       $('#rejectBtn').disabled = false;
       currentCall = null;
+      syncBottomNavigation();
       if (history.state?.marker === NAVIGATION_MARKER && history.state.overlay) {
         setNavigationState({ overlay: null }, 'replace');
       }
@@ -1116,6 +1179,7 @@
       $('#acceptBtn').disabled = false;
       $('#rejectBtn').disabled = false;
       if (currentCall?.id === acceptingCallId) currentCall = null;
+      syncBottomNavigation();
       P.toast(response?.error || 'Another listener answered this call first.', 'info');
     });
   }
