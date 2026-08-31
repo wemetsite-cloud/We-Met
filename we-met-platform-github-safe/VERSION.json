@@ -1,0 +1,25 @@
+{
+  "version": "8.9.21",
+  "name": "autopay-exclusive-access-reliability",
+  "changes": [
+    "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
+    "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
+    "Cancelling autopay preserves access through the already-paid period and locks it after that period ends.",
+    "Administrator full profiles show customer/listener autopay and exclusive-access history, source, renewal state and current access state.",
+    "Administrators can reset customer/listener passwords and directly grant or revoke listener-specific exclusive access.",
+    "Customer checkout retries short provider delays and clearly distinguishes active autopay from administrator-granted access."
+  ],
+  "required_environment": [
+    "MSG91_AUTH_KEY"
+  ],
+  "recommended_for_call_reliability": [
+    "TURN_URL",
+    "TURN_USERNAME",
+    "TURN_CREDENTIAL"
+  ],
+  "notes": [
+    "Run the normal database initialization during deployment so the safe subscription columns and indexes are added.",
+    "Keep the Razorpay webhook URL configured as /api/subscriptions/webhook for renewal and cancellation updates.",
+    "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md."
+  ]
+}
