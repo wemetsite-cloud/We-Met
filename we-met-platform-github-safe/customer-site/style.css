@@ -1431,6 +1431,114 @@ body.signed-in.call-active #tabs,
 body.signed-in.call-active .dashboard>.tabs{display:none!important}
 body.signed-in.nested-view-open .dashboard,body.signed-in.call-active .dashboard{padding-bottom:28px!important}
 
+/* ===== v8.9.23 message workspace fit + contrast ===== */
+/* Messages own the available app viewport. Only the people list and history scroll. */
+body.signed-in.customer-messages-active{
+  height:100dvh!important;
+  padding-bottom:0!important;
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+body.signed-in.customer-messages-active #mainContent{
+  height:calc(100dvh - 72px)!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body.signed-in.customer-messages-active .dashboard{
+  height:100%!important;
+  min-height:0!important;
+  padding-top:8px!important;
+  padding-bottom:88px!important;
+  overflow:hidden!important;
+}
+#tab-messages.active{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr)!important;
+  height:100%!important;
+  min-height:0!important;
+  padding-bottom:0!important;
+  overflow:hidden!important;
+}
+#tab-messages.active>.section-head{
+  min-height:0!important;
+  margin:0 0 10px!important;
+  flex:0 0 auto!important;
+}
+#tab-messages.active .direct-message-layout{
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:hidden!important;
+}
+#tab-messages.active .direct-message-layout.no-conversations{
+  display:block!important;
+  height:100%!important;
+  min-height:0!important;
+}
+#tab-messages.active .direct-message-layout.no-conversations .conversation-list{
+  height:100%!important;
+}
+#tab-messages.active .conversation-list,
+#tab-messages.active .direct-messages{
+  min-height:0!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  scrollbar-gutter:stable!important;
+}
+#tab-messages.active .direct-chat{
+  min-width:0!important;
+  min-height:0!important;
+  height:100%!important;
+  overflow:hidden!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+}
+#tab-messages.active .direct-chat-head,
+#tab-messages.active .direct-message-form{
+  flex:0 0 auto!important;
+}
+#tab-messages.active .direct-bubble:not(.mine){
+  background:#f6eef2!important;
+  color:#392b35!important;
+}
+#tab-messages.active .direct-bubble:not(.mine) p{
+  color:#392b35!important;
+}
+#tab-messages.active .direct-bubble:not(.mine) small{
+  color:#75616c!important;
+  opacity:1!important;
+}
+#tab-messages.active .direct-bubble.mine{
+  background:#f0448f!important;
+  color:#fff!important;
+}
+#tab-messages.active .direct-bubble.mine p,
+#tab-messages.active .direct-bubble.mine small{
+  color:#fff!important;
+}
+#tab-messages.active .direct-message-form input{
+  background:#fff!important;
+  color:#392b35!important;
+}
+#tab-messages.active .direct-message-form input::placeholder{
+  color:#876f7b!important;
+  opacity:1!important;
+}
+@media(max-width:700px){
+  body.signed-in.customer-messages-active #mainContent{
+    height:calc(100dvh - 56px - env(safe-area-inset-top))!important;
+  }
+  body.signed-in.customer-messages-active .dashboard{
+    padding-top:5px!important;
+    padding-bottom:calc(70px + env(safe-area-inset-bottom))!important;
+  }
+  #tab-messages.active>.section-head{margin:0 0 7px!important}
+  #tab-messages.active .direct-message-layout{border-radius:20px!important}
+  #tab-messages.active .conversation-list{scrollbar-gutter:auto!important}
+}
+
 /* Follow is a compact profile-header action instead of a full-width row. */
 #listenerProfileModal .listener-profile-title{grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important}
 #listenerProfileModal .profile-follow-button{

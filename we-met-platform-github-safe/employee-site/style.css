@@ -1233,3 +1233,101 @@ img.wm-image-loading{
 @media(prefers-reduced-motion:reduce){
   .wm-image-loading-host::after,img.wm-image-loading{animation-duration:2.4s!important}
 }
+
+/* ===== v8.9.23 message workspace fit + contrast ===== */
+/* Inbox owns the available app viewport. Only the people list and history scroll. */
+body.signed-in.listener-messages-active{
+  height:100dvh!important;
+  padding-bottom:0!important;
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+body.signed-in.listener-messages-active #appView{
+  height:100dvh!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body.signed-in.listener-messages-active .listener-main{
+  height:calc(100dvh - 58px)!important;
+  min-height:0!important;
+  padding-top:8px!important;
+  padding-bottom:88px!important;
+  overflow:hidden!important;
+}
+#tab-inbox.active{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr)!important;
+  height:100%!important;
+  min-height:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+#tab-inbox.active>.compact-page-title{
+  min-height:0!important;
+  margin:0 0 10px!important;
+  flex:0 0 auto!important;
+}
+#tab-inbox.active .listener-inbox-layout{
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:hidden!important;
+}
+#tab-inbox.active .listener-inbox-list,
+#tab-inbox.active .listener-direct-messages{
+  min-height:0!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  scrollbar-gutter:stable!important;
+}
+#tab-inbox.active .listener-direct-chat{
+  min-width:0!important;
+  min-height:0!important;
+  height:100%!important;
+  overflow:hidden!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+}
+#tab-inbox.active .listener-chat-head,
+#tab-inbox.active .listener-message-form{
+  flex:0 0 auto!important;
+}
+#tab-inbox.active .listener-direct-bubble:not(.mine){
+  background:#f7eef3!important;
+  color:#392b35!important;
+}
+#tab-inbox.active .listener-direct-bubble:not(.mine) p{
+  color:#392b35!important;
+}
+#tab-inbox.active .listener-direct-bubble:not(.mine) small{
+  color:#75616c!important;
+  opacity:1!important;
+}
+#tab-inbox.active .listener-direct-bubble.mine{
+  background:#f0448f!important;
+  color:#fff!important;
+}
+#tab-inbox.active .listener-direct-bubble.mine p,
+#tab-inbox.active .listener-direct-bubble.mine small{
+  color:#fff!important;
+}
+#tab-inbox.active .listener-message-form input{
+  background:#fff!important;
+  color:#392b35!important;
+}
+#tab-inbox.active .listener-message-form input::placeholder{
+  color:#876f7b!important;
+  opacity:1!important;
+}
+@media(max-width:700px){
+  body.signed-in.listener-messages-active .listener-main{
+    height:calc(100dvh - 56px - env(safe-area-inset-top))!important;
+    padding-top:5px!important;
+    padding-bottom:calc(70px + env(safe-area-inset-bottom))!important;
+  }
+  #tab-inbox.active>.compact-page-title{margin:0 0 7px!important}
+  #tab-inbox.active .listener-inbox-layout{border-radius:20px!important}
+  #tab-inbox.active .listener-inbox-list{scrollbar-gutter:auto!important}
+}

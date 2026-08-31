@@ -132,6 +132,7 @@
     document.body.classList.toggle('modal-open', Boolean(overlay));
     document.body.classList.toggle('nested-view-open', nestedCustomerView);
     document.body.classList.toggle('call-active', Boolean(me && (currentCall || pendingCallRequest)));
+    document.body.classList.toggle('customer-messages-active', Boolean(me && activeTab === 'messages' && !overlay && !currentCall && !pendingCallRequest));
     $('#appBackButton')?.classList.toggle('hidden', !(overlay || (me && activeTab !== 'home')));
   }
 
@@ -465,7 +466,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.21', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.23', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {

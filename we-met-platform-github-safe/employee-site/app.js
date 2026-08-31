@@ -91,6 +91,7 @@
     const suppressed = Boolean(currentCall) || Boolean(currentOverlay()) || Boolean(me && !PRIMARY_NAV_TABS.has(activeTab));
     nav.classList.toggle('hidden', suppressed);
     document.body.classList.toggle('listener-nav-suppressed', suppressed);
+    document.body.classList.toggle('listener-messages-active', Boolean(me && activeTab === 'inbox' && !suppressed));
   }
 
   function syncBackButton() {
@@ -187,7 +188,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.21', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.23', { updateViaCache: 'none' });
     } catch {}
   }
 
