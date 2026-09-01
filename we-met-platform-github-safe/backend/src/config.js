@@ -48,6 +48,9 @@ const razorpayKeySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
 const razorpaySubscriptionPlanId = String(process.env.RAZORPAY_SUBSCRIPTION_PLAN_ID || 'plan_TTIsGpwDtJmgi5').trim();
 const razorpayWebhookSecret = String(process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
 const msg91AuthKey = String(process.env.MSG91_AUTH_KEY || '').trim();
+const msg91OtpTemplateId = String(process.env.MSG91_OTP_TEMPLATE_ID || '').trim();
+const googlePlayPackageName = String(process.env.GOOGLE_PLAY_PACKAGE_NAME || 'xyz.wemet.app').trim();
+const googlePlayServiceAccountJsonBase64 = String(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 || '').trim();
 const smsEnabled = bool(process.env.SMS_ENABLED, false);
 const smsProvider = String(process.env.SMS_PROVIDER || 'fast2sms').trim().toLowerCase();
 const fast2smsApiKey = String(process.env.FAST2SMS_API_KEY || '').trim();
@@ -91,7 +94,14 @@ const config = {
   },
   msg91: {
     authKey: msg91AuthKey,
+    otpTemplateId: msg91OtpTemplateId,
+    otpEnabled: Boolean(msg91AuthKey && msg91OtpTemplateId),
     verifyAccessTokenUrl: 'https://control.msg91.com/api/v5/widget/verifyAccessToken',
+  },
+  googlePlay: {
+    enabled: Boolean(googlePlayPackageName && googlePlayServiceAccountJsonBase64),
+    packageName: googlePlayPackageName,
+    serviceAccountJsonBase64: googlePlayServiceAccountJsonBase64,
   },
   sms: {
     provider: smsProvider,
@@ -192,6 +202,12 @@ function validateConfig() {
   }
   if (Boolean(config.razorpay.keyId) !== Boolean(config.razorpay.keySecret)) {
     problems.push('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be configured together.');
+  }
+  if (config.googlePlay.serviceAccountJsonBase64 && !/^[A-Za-z0-9+/=_-]+$/.test(config.googlePlay.serviceAccountJsonBase64)) {
+    problems.push('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 must be base64-encoded JSON.');
+  }
+  if (config.googlePlay.enabled && !/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){1,9}$/.test(config.googlePlay.packageName)) {
+    problems.push('GOOGLE_PLAY_PACKAGE_NAME must be a valid Android application ID.');
   }
   if (!/^plan_[A-Za-z0-9]{6,64}$/.test(config.razorpay.subscriptionPlanId)) {
     problems.push('RAZORPAY_SUBSCRIPTION_PLAN_ID must be a valid Razorpay plan ID.');

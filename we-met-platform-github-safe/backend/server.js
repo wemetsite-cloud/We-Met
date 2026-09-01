@@ -68,6 +68,7 @@ app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/public', require('./src/routes/public'));
 app.use('/api/push', require('./src/routes/push'));
 app.use('/api', require('./src/routes/razorpay'));
+app.use('/api/play-purchases', require('./src/routes/play-purchases'));
 app.use('/api/subscriptions', subscriptionRoutes.router);
 app.use('/api/customer', require('./src/routes/customer'));
 app.use('/api/customer', require('./src/routes/customer-social'));

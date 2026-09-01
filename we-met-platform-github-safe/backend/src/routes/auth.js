@@ -347,6 +347,25 @@ router.post('/phone/start', otpStartLimit, asyncHandler(async (req, res) => {
   return res.json({ mode: 'otp', phone: maskPhone(phone), role, provider: 'msg91' });
 }));
 
+router.post('/native/otp/start', otpStartLimit, asyncHandler(async (req, res) => {
+  const phone = internationalPhone(req.body.phone);
+  const role = validRole(String(req.body.role || 'customer'));
+  const purpose = ['registration', 'password_reset', 'support'].includes(String(req.body.purpose || ''))
+    ? String(req.body.purpose)
+    : null;
+  if (!phone) return res.status(400).json({ error: 'Enter a valid mobile number with country code.' });
+  if (role !== 'customer' || !purpose) return res.status(400).json({ error: 'This OTP request is invalid.' });
+
+  const existing = await db.query('SELECT id FROM users WHERE role=$1 AND phone=$2 LIMIT 1', [role, phone]);
+  if (purpose === 'registration' && existing.rows[0]) {
+    return res.status(409).json({ error: 'An account already exists with this mobile number. Sign in with your password.' });
+  }
+  if (purpose === 'password_reset' && !existing.rows[0]) {
+    return res.status(404).json({ error: 'No account was found with this mobile number.' });
+  }
+  return res.status(201).json(await createOtpChallenge({ phone, role, purpose, reference: `android-${purpose}` }));
+}));
+
 router.post('/phone/login/start', (_req, res) => {
   res.status(410).json({ error: 'Existing accounts use password login. Use Forgot password if you cannot remember it.' });
 });

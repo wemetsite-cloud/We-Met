@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS plans (
   popular boolean NOT NULL DEFAULT false,
   active boolean NOT NULL DEFAULT true,
   sort_order integer NOT NULL DEFAULT 0,
+  play_product_id text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -353,6 +354,16 @@ CREATE TABLE IF NOT EXISTS listener_follows (
   PRIMARY KEY (customer_id, employee_id)
 );
 
+CREATE TABLE IF NOT EXISTS customer_blocks (
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (customer_id,employee_id),
+  CHECK (customer_id <> employee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_blocks_employee ON customer_blocks(employee_id,created_at DESC);
+
 CREATE TABLE IF NOT EXISTS listener_subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -440,6 +451,22 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version integer NOT NULL DEFAULT
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz;
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS popular boolean NOT NULL DEFAULT false;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS play_product_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_play_product_id ON plans(play_product_id) WHERE play_product_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS play_purchases (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  order_id text UNIQUE,
+  product_id text NOT NULL,
+  quantity integer NOT NULL DEFAULT 1 CHECK (quantity = 1),
+  seconds_granted integer NOT NULL CHECK (seconds_granted > 0),
+  test_purchase boolean NOT NULL DEFAULT false,
+  purchase_completed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_play_purchases_customer ON play_purchases(customer_id,created_at DESC);
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_id uuid REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal';
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS admin_note text;
@@ -647,3 +674,14 @@ ON CONFLICT (name) DO UPDATE SET
   active=true,
   sort_order=EXCLUDED.sort_order,
   updated_at=now();
+
+UPDATE plans SET play_product_id=CASE name
+  WHEN 'Quick Connect' THEN 'talk_time_quick_5m'
+  WHEN 'Easy Talk' THEN 'talk_time_easy_10m'
+  WHEN 'Open Talk' THEN 'talk_time_open_20m'
+  WHEN 'More Time' THEN 'talk_time_more_30m'
+  WHEN 'One Hour' THEN 'talk_time_one_hour'
+  WHEN 'Long Connect' THEN 'talk_time_long_240m'
+  ELSE play_product_id
+END
+WHERE name IN ('Quick Connect','Easy Talk','Open Talk','More Time','One Hour','Long Connect');

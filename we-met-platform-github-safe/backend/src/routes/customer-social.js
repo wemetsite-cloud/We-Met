@@ -49,6 +49,10 @@ async function listenerDirectory(customerId, employeeId = null) {
     FROM users u
     WHERE u.role='employee' AND u.status='active'
       AND u.listener_verification_status='approved'
+      AND NOT EXISTS(
+        SELECT 1 FROM customer_blocks block
+        WHERE block.customer_id=$1 AND block.employee_id=u.id
+      )
       ${whereId}
     ORDER BY CASE u.listener_availability WHEN 'online' THEN 0 WHEN 'break' THEN 1 ELSE 2 END,
              COALESCE(u.username,u.name)
@@ -151,6 +155,58 @@ router.delete('/listeners/:id/follow', asyncHandler(async (req, res) => {
   res.json({ ok: true, following: false });
 }));
 
+router.get('/blocks', asyncHandler(async (req, res) => {
+  const result = await db.query(`
+    SELECT block.employee_id,block.reason,block.created_at,u.name,u.username
+    FROM customer_blocks block JOIN users u ON u.id=block.employee_id
+    WHERE block.customer_id=$1 ORDER BY block.created_at DESC
+  `, [req.user.id]);
+  res.json({ blocks: result.rows });
+}));
+
+router.post('/blocks/:employeeId', asyncHandler(async (req, res) => {
+  const reason = String(req.body.reason || '').trim().slice(0, 250) || null;
+  const listener = await db.query("SELECT id FROM users WHERE id=$1 AND role='employee'", [req.params.employeeId]);
+  if (!listener.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
+  await db.query(`
+    INSERT INTO customer_blocks(customer_id,employee_id,reason)
+    VALUES($1,$2,$3) ON CONFLICT(customer_id,employee_id) DO UPDATE SET reason=EXCLUDED.reason,created_at=now()
+  `, [req.user.id, req.params.employeeId, reason]);
+  await db.query('DELETE FROM listener_follows WHERE customer_id=$1 AND employee_id=$2', [req.user.id, req.params.employeeId]);
+  res.json({ ok: true, blocked: true });
+}));
+
+router.delete('/blocks/:employeeId', asyncHandler(async (req, res) => {
+  await db.query('DELETE FROM customer_blocks WHERE customer_id=$1 AND employee_id=$2', [req.user.id, req.params.employeeId]);
+  res.json({ ok: true, blocked: false });
+}));
+
+router.post('/reports/listener/:employeeId', asyncHandler(async (req, res) => {
+  const reason = String(req.body.reason || '').trim().slice(0, 250);
+  const details = String(req.body.details || '').trim().slice(0, 2000);
+  if (reason.length < 3) return res.status(400).json({ error: 'Describe why you are reporting this listener.' });
+  const listener = await db.query("SELECT id FROM users WHERE id=$1 AND role='employee'", [req.params.employeeId]);
+  if (!listener.rows[0]) return res.status(404).json({ error: 'Listener not found.' });
+  const result = await db.query(`
+    INSERT INTO reports(reporter_id,target_id,reason,details,priority)
+    VALUES($1,$2,$3,$4,'normal') RETURNING id
+  `, [req.user.id, req.params.employeeId, reason, details || null]);
+  res.status(201).json({ report: result.rows[0] });
+}));
+
+router.post('/reports/post/:postId', asyncHandler(async (req, res) => {
+  const reason = String(req.body.reason || '').trim().slice(0, 220);
+  const details = String(req.body.details || '').trim().slice(0, 1800);
+  if (reason.length < 3) return res.status(400).json({ error: 'Describe why you are reporting this post.' });
+  const post = await db.query('SELECT employee_id FROM listener_posts WHERE id=$1', [req.params.postId]);
+  if (!post.rows[0]) return res.status(404).json({ error: 'Post not found.' });
+  const result = await db.query(`
+    INSERT INTO reports(reporter_id,target_id,reason,details,priority)
+    VALUES($1,$2,$3,$4,'normal') RETURNING id
+  `, [req.user.id, post.rows[0].employee_id, `Post ${req.params.postId}: ${reason}`, details || null]);
+  res.status(201).json({ report: result.rows[0] });
+}));
+
 router.get('/subscriptions', asyncHandler(async (req, res) => {
   await reconcileCustomerSubscriptions(req.user.id);
   await db.query(`
@@ -209,6 +265,10 @@ router.get('/conversations', asyncHandler(async (req, res) => {
       SELECT DISTINCT ON (s.employee_id) s.*
       FROM listener_subscriptions s
       WHERE s.customer_id=$1
+        AND NOT EXISTS(
+          SELECT 1 FROM customer_blocks block
+          WHERE block.customer_id=$1 AND block.employee_id=s.employee_id
+        )
         AND (
           s.access_source='admin'
           OR s.paid_count>0
@@ -276,6 +336,8 @@ router.get('/conversations/:employeeId/messages', asyncHandler(async (req, res) 
 router.post('/conversations/:employeeId/messages', asyncHandler(async (req, res) => {
   const content = String(req.body.message || '').trim().slice(0, 2000);
   if (!content) return res.status(400).json({ error: 'Type a message first.' });
+  const blocked = await db.query('SELECT 1 FROM customer_blocks WHERE customer_id=$1 AND employee_id=$2', [req.user.id, req.params.employeeId]);
+  if (blocked.rows[0]) return res.status(403).json({ error: 'Unblock this listener before sending a message.' });
   const subscription = await requireActiveSubscription(db, req.user.id, req.params.employeeId);
   const result = await db.query(`
     INSERT INTO direct_messages(subscription_id,customer_id,employee_id,sender_id,message)

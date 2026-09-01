@@ -51,6 +51,12 @@ services:
         sync: false
       - key: MSG91_AUTH_KEY
         sync: false
+      - key: MSG91_OTP_TEMPLATE_ID
+        sync: false
+      - key: GOOGLE_PLAY_PACKAGE_NAME
+        value: "xyz.wemet.app"
+      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64
+        sync: false
       - key: SMS_ENABLED
         value: "false"
       - key: SMS_PROVIDER

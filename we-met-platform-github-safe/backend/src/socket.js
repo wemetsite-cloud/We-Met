@@ -283,7 +283,12 @@ function createSocketServer(io) {
       if (preferred?.language) primaryLanguage = preferred.language;
     }
 
-    const entries = availableEmployeeEntries(primaryLanguage, allowOtherLanguages, directEmployeeId);
+    let entries = availableEmployeeEntries(primaryLanguage, allowOtherLanguages, directEmployeeId);
+    const blocked = await db.query('SELECT employee_id FROM customer_blocks WHERE customer_id=$1', [customerId]);
+    if (blocked.rows.length) {
+      const blockedIds = new Set(blocked.rows.map((row) => row.employee_id));
+      entries = entries.filter(([employeeId]) => !blockedIds.has(employeeId));
+    }
     if (!entries.length) {
       const otherLanguagesAvailable = [...employees.values()].some((item) => item.state === 'available' && !sameLanguage(item.language, primaryLanguage));
       const outcome = {

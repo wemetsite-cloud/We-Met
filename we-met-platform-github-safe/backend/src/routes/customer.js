@@ -7,12 +7,12 @@ router.use(authenticate, requireRole('customer'));
 
 router.get('/plans', asyncHandler(async (_req, res) => {
   const result = await db.query(`
-    SELECT id,name,price_paise,seconds,popular
+    SELECT id,name,price_paise,seconds,popular,play_product_id
     FROM plans
     WHERE active=true
     ORDER BY sort_order,price_paise
   `);
-  res.json({ plans: result.rows });
+  res.json({ plans: result.rows.map((plan) => ({ ...plan, playProductId: plan.play_product_id || null })) });
 }));
 
 router.get('/history', asyncHandler(async (req, res) => {
