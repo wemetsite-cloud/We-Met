@@ -18,9 +18,9 @@ services:
       - key: SUPPORT_EMAIL
         value: "wemetsite@gmail.com"
       - key: PUBLIC_URL
-        value: "https://wemet.xyz"
+        value: "https://wemetchat.com"
       - key: ALLOWED_ORIGINS
-        value: "https://wemet.xyz,https://www.wemet.xyz,https://admin.wemet.xyz,https://listener.wemet.xyz"
+        value: "https://wemetchat.com,https://www.wemetchat.com,https://admin.wemetchat.com,https://listener.wemetchat.com"
       - key: SERVE_FRONTENDS
         value: "true"
       - key: DATABASE_URL

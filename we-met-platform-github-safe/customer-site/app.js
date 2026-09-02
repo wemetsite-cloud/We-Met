@@ -466,12 +466,12 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.23', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.25', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
     const installed = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
-    $$('[data-install-app],.install-banner,.install-inline').forEach((node) => node.classList.toggle('hidden', installed || !deferredInstallPrompt));
+    $$('[data-install-app]').forEach((node) => node.classList.toggle('hidden', installed || !deferredInstallPrompt));
   }
 
   async function installApp() {
