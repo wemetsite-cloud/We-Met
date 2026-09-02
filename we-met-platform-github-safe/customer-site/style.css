@@ -1550,3 +1550,39 @@ body.signed-in.customer-messages-active .dashboard{
   #listenerProfileModal .listener-profile-title{grid-template-columns:minmax(0,1fr) auto!important;gap:12px!important;align-items:start!important}
   #listenerProfileModal .profile-follow-button{min-width:78px!important;max-width:112px!important;min-height:35px!important;padding:7px 12px!important;font-size:11px!important;margin-top:7px!important}
 }
+
+
+/* ===== v8.9.24 Exclusive navigation light/readability fix ===== */
+#tab-subscriptions{color:var(--wm-ink,#392b35)!important}
+#tab-subscriptions .section-head h2{color:var(--wm-ink,#392b35)!important}
+#tab-subscriptions .section-head p{color:var(--wm-muted,#766570)!important}
+#tab-subscriptions .membership-card{
+  background:linear-gradient(145deg,#fffdfc,#fff7fb)!important;
+  color:var(--wm-ink,#392b35)!important;
+  border-color:#eadbe3!important;
+  box-shadow:0 12px 32px rgba(94,62,80,.07)!important
+}
+#tab-subscriptions .membership-listener img{border-color:#f0dfe7!important}
+#tab-subscriptions .membership-listener span{color:#a62f68!important}
+#tab-subscriptions .membership-listener h3{color:var(--wm-ink,#392b35)!important}
+#tab-subscriptions .membership-listener p{color:var(--wm-muted,#766570)!important}
+#tab-subscriptions .membership-date{
+  background:#fff1f6!important;
+  border:1px solid #ecd9e3!important
+}
+#tab-subscriptions .membership-date small{color:var(--wm-muted,#766570)!important}
+#tab-subscriptions .membership-date strong{color:var(--wm-ink,#392b35)!important}
+#tab-subscriptions .membership-actions .button-soft{
+  background:#fff!important;
+  color:#92295d!important;
+  border-color:#e7d8e0!important
+}
+#tab-subscriptions .membership-actions .text-action{color:#a62f68!important}
+#tab-subscriptions .membership-actions>small{color:var(--wm-muted,#766570)!important}
+#tab-subscriptions .empty-state{
+  background:linear-gradient(145deg,#fffdfc,#fff7fb)!important;
+  color:var(--wm-ink,#392b35)!important;
+  border:1px solid #eadbe3!important
+}
+#tab-subscriptions .empty-state h3{color:var(--wm-ink,#392b35)!important}
+#tab-subscriptions .empty-state p{color:var(--wm-muted,#766570)!important}
