@@ -619,10 +619,9 @@
   }
 
   async function init() {
-    // Keep anonymous landing-page visits completely static so casual traffic does
-    // not wake or consume the Render backend. Backend access begins only after
-    // the visitor actually starts authentication or already has a session.
-    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); initAutoHideHeader();
+    // Keep anonymous landing-page traffic minimal: only the public showcase
+    // image request runs before sign-in; the rest of the backend stays lazy.
+    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); initAutoHideHeader(); loadPublicShowcase();
     if (P.Store.token) await loadMe();
   }
 
