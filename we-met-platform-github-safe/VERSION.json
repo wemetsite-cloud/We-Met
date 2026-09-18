@@ -1,14 +1,15 @@
 {
-  "version": "8.9.23",
-  "name": "autopay-exclusive-access-and-messaging-workspace-reliability",
+  "version": "8.9.26",
+  "name": "render-resource-protection-and-idle-presence-guard",
   "changes": [
-    "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
-    "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
-    "Cancelling autopay preserves access through the already-paid period and locks it after that period ends.",
-    "Administrator full profiles show customer/listener autopay and exclusive-access history, source, renewal state and current access state.",
-    "Administrators can reset customer/listener passwords and directly grant or revoke listener-specific exclusive access.",
-    "Customer checkout retries short provider delays and clearly distinguishes active autopay from administrator-granted access.",
-    "Customer and listener messaging now fit the application viewport while keeping only the people list and message history independently scrollable, with explicit readable message contrast."
+    "Anonymous customer landing-page visits no longer call the backend automatically.",
+    "Customer startup now lazy-loads non-home tabs instead of firing all dashboard API requests at once.",
+    "When no listener browser is online, idle customer Socket.IO connections are closed automatically and Connect now is disabled.",
+    "When the final listener leaves, the server disconnects idle customer realtime sessions while preserving active/reconnecting calls.",
+    "Customer direct-message polling is reduced to 30 seconds and pauses while the page is hidden.",
+    "Global API and realtime reconnection rate limits reduce scripted resource abuse.",
+    "Customer socket connects no longer write last_seen_at on every reconnect.",
+    "Customer service-worker cache version bumped so the protection code replaces stale cached JavaScript."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
@@ -19,8 +20,8 @@
     "TURN_CREDENTIAL"
   ],
   "notes": [
-    "Run the normal database initialization during deployment so the safe subscription columns and indexes are added.",
-    "Keep the Razorpay webhook URL configured as /api/subscriptions/webhook for renewal and cancellation updates.",
-    "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md."
+    "Customers can use Refresh to check availability again after all listeners are offline.",
+    "Normal realtime calling remains active while at least one listener is connected, and active calls are never intentionally dropped by the idle guard.",
+    "For deliberate volumetric attacks outside the application, keep Cloudflare/WAF rate limiting enabled in front of the deployment."
   ]
 }

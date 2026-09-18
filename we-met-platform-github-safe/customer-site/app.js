@@ -504,7 +504,11 @@
     $('#logoutBtn').onclick = () => logout();
     $('#tabs').onclick = (event) => { const button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); };
     $$('[data-jump]').forEach((button) => { button.onclick = () => selectTab(button.dataset.jump); });
-    $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
+    $('#refreshListeners').onclick = async () => {
+      await loadDirectory();
+      if (socket?.connected) socket.emit('listeners:get');
+      else connectSocket();
+    };
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
     $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
@@ -615,20 +619,31 @@
   }
 
   async function init() {
-    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); initAutoHideHeader(); loadPublicShowcase();
-    try { publicConfig = await P.api('/api/public/config'); } catch (error) { P.toast(error.message, 'error'); }
+    // Keep anonymous landing-page visits completely static so casual traffic does
+    // not wake or consume the Render backend. Backend access begins only after
+    // the visitor actually starts authentication or already has a session.
+    initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); initAutoHideHeader();
     if (P.Store.token) await loadMe();
+  }
+
+  async function ensurePublicConfig() {
+    if (publicConfig) return publicConfig;
+    try { publicConfig = await P.api('/api/public/config'); }
+    catch { publicConfig = { minimumStartSeconds: 1, iceServers: [] }; }
+    return publicConfig;
   }
 
   async function loadMe() {
     try {
       const response = await P.api('/api/auth/me');
       if (response.user.role !== 'customer') throw new Error('Wrong portal for this account.');
-      me = response.user; enterApp();
+      me = response.user;
+      await enterApp();
     } catch (error) { if (!P.isAuthError(error)) P.toast('The server is temporarily unavailable. Try again shortly.', 'error'); }
   }
 
   async function enterApp() {
+    await ensurePublicConfig();
     const wasSignedIn = document.body.classList.contains('signed-in');
     document.body.classList.add('signed-in');
     if (!wasSignedIn) sealCustomerAuthenticatedHistory();
@@ -641,15 +656,17 @@
     $('#profilePhone').textContent = me.phone || 'Private mobile';
     updateBalance(me.balanceSeconds);
     const requestedTab = activeTab;
-    await Promise.allSettled([loadSubscriptions(false), loadDirectory(), loadConversations(), loadPlans(), loadHistory(), loadFollowing(), loadNotifications(), loadSupport(), loadCustomerPhoto()]);
+    // Home needs only the listener directory and membership state. Other tabs
+    // load on demand, avoiding a burst of unnecessary database/API work.
+    await Promise.allSettled([loadSubscriptions(false), loadDirectory()]);
     renderSubscriptions(); renderDirectory(); connectSocket();
     if (requestedTab !== 'home') selectTab(requestedTab, { historyMode: 'none' });
     clearInterval(directPollTimer);
     directPollTimer = window.setInterval(() => {
-      if (activeTab !== 'messages') return;
+      if (document.visibilityState !== 'visible' || activeTab !== 'messages') return;
       if (activeConversation) loadDirectMessages();
       else loadConversations(false);
-    }, 8000);
+    }, 30000);
     resetViewportTop();
   }
 
@@ -686,6 +703,7 @@
     if (tab === 'following') loadFollowing();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'support') loadSupport();
+    if (tab === 'profile') loadCustomerPhoto();
     resetViewportTop(); document.querySelector('.topbar')?.classList.remove('topbar-hidden'); syncBodyState();
   }
 
@@ -707,7 +725,9 @@
     const showOtherLanguages = Boolean($('#otherLanguageToggle')?.checked);
     const primaryListeners = randomizedListenerOrder(directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam'));
     const otherListeners = randomizedListenerOrder(directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam'));
-    $('#availabilityText').textContent = 'Listeners available';
+    const anyConnectedListener = liveListeners.length > 0;
+    const anyAvailableListener = liveListeners.some((listener) => listener.status === 'available');
+    $('#availabilityText').textContent = anyAvailableListener ? 'Listeners available' : anyConnectedListener ? 'Listeners are currently busy' : 'No listeners online';
 
     const cards = (listeners) => listeners.map((listener) => {
       const status = liveStatus(listener);
@@ -1146,6 +1166,11 @@
         saved.updatedAt = live.updatedAt || saved.updatedAt;
       }
       renderDirectory();
+      if (!listeners.length && !currentCall && !pendingCallRequest && socket?.connected) {
+        // No listener is connected, so release the realtime connection instead
+        // of keeping Render busy in the background. Refresh reconnects on demand.
+        window.setTimeout(() => { if (!liveListeners.length && !currentCall && socket?.connected) socket.disconnect(); }, 250);
+      }
     });
     socket.on('listener:profile-updated', ({ listener = {} } = {}) => {
       if (!listener.id) return;
@@ -1238,7 +1263,8 @@
   async function requestRandomCall() {
     audioCall?.resumeRemoteAudio?.();
     if ((me?.balanceSeconds || 0) < (publicConfig?.minimumStartSeconds || 1)) { P.toast('Add talk-time before calling.', 'info'); return selectTab('wallet'); }
-    if (!socket?.connected) return P.toast('Calling is reconnecting. Try again shortly.', 'error');
+    if (!liveListeners.some((listener) => listener.status === 'available')) return P.toast('No listener is available right now. Tap Refresh later.', 'info');
+    if (!socket?.connected) return P.toast('Tap Refresh to check listener availability again.', 'info');
     if (currentCall || pendingCallRequest) return P.toast('A call request is already in progress.', 'info');
     try {
       await audioCall.ensureMedia();
@@ -1250,10 +1276,11 @@
 
   function syncCallRequestControls() {
     const locked = Boolean(pendingCallRequest || currentCall);
+    const hasAvailableListener = liveListeners.some((listener) => listener.status === 'available');
     const randomButton = $('#randomConnectButton');
     if (randomButton) {
-      randomButton.disabled = locked;
-      randomButton.textContent = pendingCallRequest ? 'Checking availability…' : currentCall ? 'Call in progress' : 'Connect now';
+      randomButton.disabled = locked || !hasAvailableListener;
+      randomButton.textContent = pendingCallRequest ? 'Checking availability…' : currentCall ? 'Call in progress' : hasAvailableListener ? 'Connect now' : 'No listener online';
     }
     $$('[data-listener-call]').forEach((button) => {
       button.disabled = locked || button.dataset.callAvailable === 'false';
