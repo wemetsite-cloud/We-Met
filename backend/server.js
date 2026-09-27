@@ -6,10 +6,8 @@ const config = require('./src/config');
 const db = require('./src/db');
 const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
-const { verifyToken } = require('./src/auth');
 const { settleCall } = require('./src/call-settlement');
 const subscriptionRoutes = require('./src/routes/subscriptions');
-const createRateLimit = require('./src/request-limit');
 
 const app = express();
 const server = http.createServer(app);
@@ -56,43 +54,6 @@ app.use((req, res, next) => {
 
 app.post('/api/subscriptions/webhook', express.raw({ type: 'application/json', limit: '1mb' }), subscriptionRoutes.webhook);
 app.use(express.json({ limit: '1mb' }));
-
-// Global safety net against scripts hammering API routes and consuming paid
-// Render/Supabase resources. Payment/subscription routes keep their own stricter
-// per-action limits as well.
-const apiSafetyLimit = createRateLimit({
-  windowMs: 60_000,
-  max: 180,
-  message: 'Too many requests. Please wait a minute and try again.',
-});
-const adminApiSafetyLimit = createRateLimit({
-  windowMs: 60_000,
-  max: 900,
-  message: 'Too many administrator requests. Please wait a moment and try again.',
-  key: (req) => {
-    try {
-      const authorization = String(req.headers.authorization || '');
-      const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-      const payload = token ? verifyToken(token) : null;
-      if (payload?.role === 'admin' && payload?.sub) return `admin:${payload.sub}`;
-    } catch {}
-    return `ip:${req.ip}`;
-  },
-});
-app.use('/api', (req, res, next) => {
-  const isAdminRoute = req.path === '/admin' || req.path.startsWith('/admin/');
-  if (!isAdminRoute) return apiSafetyLimit(req, res, next);
-
-  // A valid signed administrator session gets a larger operational allowance.
-  // Invalid/missing tokens stay behind the stricter public per-IP limiter.
-  try {
-    const authorization = String(req.headers.authorization || '');
-    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-    const payload = token ? verifyToken(token) : null;
-    if (payload?.role === 'admin') return adminApiSafetyLimit(req, res, next);
-  } catch {}
-  return apiSafetyLimit(req, res, next);
-});
 
 app.get('/api/health', async (_req, res) => {
   try {

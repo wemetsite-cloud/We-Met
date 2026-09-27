@@ -466,7 +466,7 @@
 
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.29', { updateViaCache: 'none' }); } catch {}
+    try { await navigator.serviceWorker.register('service-worker.js?v=8.9.30', { updateViaCache: 'none' }); } catch {}
   }
 
   function syncInstallControls() {
@@ -504,11 +504,7 @@
     $('#logoutBtn').onclick = () => logout();
     $('#tabs').onclick = (event) => { const button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); };
     $$('[data-jump]').forEach((button) => { button.onclick = () => selectTab(button.dataset.jump); });
-    $('#refreshListeners').onclick = async () => {
-      await loadDirectory();
-      if (socket?.connected) socket.emit('listeners:get');
-      else connectSocket();
-    };
+    $('#refreshListeners').onclick = () => { loadDirectory(); socket?.emit('listeners:get'); };
     $('#randomConnectButton').onclick = requestRandomCall;
     $('#otherLanguageToggle').onchange = renderDirectory;
     $('#membershipCheckoutPay').onclick = beginMembershipCheckout;
@@ -609,7 +605,7 @@
 
   async function loadPublicShowcase() {
     try {
-      const response = await P.api('/api/public/showcase-images', { cache: 'default' });
+      const response = await P.api('/api/public/showcase-images', { cache: 'no-store' });
       const images = dailyShuffle(Array.isArray(response.images) ? response.images : []);
       if (!images.length) return;
       const hero = $('#publicHeroListenerImage'); if (hero) hero.src = images[0];
@@ -619,30 +615,20 @@
   }
 
   async function init() {
-    // Keep anonymous landing-page traffic minimal: only the public showcase
-    // image request runs before sign-in; the rest of the backend stays lazy.
     initNavigation(); bind(); registerServiceWorker(); syncInstallControls(); initAutoHideHeader(); loadPublicShowcase();
+    try { publicConfig = await P.api('/api/public/config'); } catch (error) { P.toast(error.message, 'error'); }
     if (P.Store.token) await loadMe();
-  }
-
-  async function ensurePublicConfig() {
-    if (publicConfig) return publicConfig;
-    try { publicConfig = await P.api('/api/public/config'); }
-    catch { publicConfig = { minimumStartSeconds: 1, iceServers: [] }; }
-    return publicConfig;
   }
 
   async function loadMe() {
     try {
       const response = await P.api('/api/auth/me');
       if (response.user.role !== 'customer') throw new Error('Wrong portal for this account.');
-      me = response.user;
-      await enterApp();
+      me = response.user; enterApp();
     } catch (error) { if (!P.isAuthError(error)) P.toast('The server is temporarily unavailable. Try again shortly.', 'error'); }
   }
 
   async function enterApp() {
-    await ensurePublicConfig();
     const wasSignedIn = document.body.classList.contains('signed-in');
     document.body.classList.add('signed-in');
     if (!wasSignedIn) sealCustomerAuthenticatedHistory();
@@ -655,17 +641,15 @@
     $('#profilePhone').textContent = me.phone || 'Private mobile';
     updateBalance(me.balanceSeconds);
     const requestedTab = activeTab;
-    // Home needs only the listener directory and membership state. Other tabs
-    // load on demand, avoiding a burst of unnecessary database/API work.
-    await Promise.allSettled([loadSubscriptions(false), loadDirectory()]);
+    await Promise.allSettled([loadSubscriptions(false), loadDirectory(), loadConversations(), loadPlans(), loadHistory(), loadFollowing(), loadNotifications(), loadSupport(), loadCustomerPhoto()]);
     renderSubscriptions(); renderDirectory(); connectSocket();
     if (requestedTab !== 'home') selectTab(requestedTab, { historyMode: 'none' });
     clearInterval(directPollTimer);
     directPollTimer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible' || activeTab !== 'messages') return;
+      if (activeTab !== 'messages') return;
       if (activeConversation) loadDirectMessages();
       else loadConversations(false);
-    }, 60000);
+    }, 8000);
     resetViewportTop();
   }
 
@@ -702,7 +686,6 @@
     if (tab === 'following') loadFollowing();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'support') loadSupport();
-    if (tab === 'profile') loadCustomerPhoto();
     resetViewportTop(); document.querySelector('.topbar')?.classList.remove('topbar-hidden'); syncBodyState();
   }
 
@@ -724,20 +707,16 @@
     const showOtherLanguages = Boolean($('#otherLanguageToggle')?.checked);
     const primaryListeners = randomizedListenerOrder(directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() === 'malayalam'));
     const otherListeners = randomizedListenerOrder(directory.filter((listener) => String(listener.language || 'Malayalam').trim().toLowerCase() !== 'malayalam'));
-    const anyConnectedListener = liveListeners.length > 0;
-    const anyAvailableListener = liveListeners.some((listener) => listener.status === 'available');
-    $('#availabilityText').textContent = anyAvailableListener ? 'Listeners available' : anyConnectedListener ? 'Listeners are currently busy' : 'No listeners online';
+    $('#availabilityText').textContent = 'Listeners available';
 
-    const cards = (listeners, startIndex = 0) => listeners.map((listener, index) => {
+    const cards = (listeners) => listeners.map((listener) => {
       const status = liveStatus(listener);
       const subscribed = isActiveMember(listener.id) || listener.subscribed;
-      const imageIndex = startIndex + index;
-      const imageLoad = imageIndex < 10 ? 'loading="eager" fetchpriority="auto"' : 'loading="lazy" fetchpriority="low"';
-      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false" decoding="async" ${imageLoad}><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="verified-listener-label">Verified listener</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>🎧 ${esc(listener.language || 'Malayalam')}</span><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span>${subscribed ? '<span class="exclusive-tag">Exclusive</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">Profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" data-call-available="${status === 'available'}" type="button" ${status !== 'available' || pendingCallRequest || currentCall ? 'disabled' : ''}>Call</button></div></article>`;
+      return `<article class="listener-card listener-card-v8"><button class="listener-card-open" data-listener-profile="${esc(listener.id)}" type="button" aria-label="Open ${esc(listener.name)} profile"><div class="listener-card-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-card-copy"><span class="verified-listener-label">Verified listener</span><h3>${esc(listener.name)}</h3><p>${esc(listener.bio || 'Friendly listener')}</p><div class="listener-tags"><span>🎧 ${esc(listener.language || 'Malayalam')}</span><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span>${subscribed ? '<span class="exclusive-tag">Exclusive</span>' : ''}</div></div></button><div class="listener-card-actions"><button class="button button-soft" data-listener-profile="${esc(listener.id)}" type="button">Profile</button><button class="button button-primary" data-listener-call="${esc(listener.id)}" data-call-available="${status === 'available'}" type="button" ${status !== 'available' || pendingCallRequest || currentCall ? 'disabled' : ''}>Call</button></div></article>`;
     }).join('');
 
-    node.innerHTML = primaryListeners.length ? cards(primaryListeners, 0) : '';
-    $('#otherLanguageGrid').innerHTML = otherListeners.length ? cards(otherListeners, primaryListeners.length) : '';
+    node.innerHTML = primaryListeners.length ? cards(primaryListeners) : '';
+    $('#otherLanguageGrid').innerHTML = otherListeners.length ? cards(otherListeners) : '';
     show('#listenerDiscovery');
     show('#otherLanguageSection', showOtherLanguages);
     syncCallRequestControls();
@@ -1237,15 +1216,7 @@
     socket.on('call:low-balance', () => P.notify('Low talk-time', 'Only one minute remains in your wallet.'));
     socket.on('call:ended', (data) => { clearPendingCallRequest(); if (currentCall) closeCall(); P.toast(data.reason || 'The call ended.', data.needsTopup ? 'error' : 'info'); loadMe(); if (data.needsTopup) selectTab('wallet'); });
     socket.on('chat:message', addCallChat);
-    socket.on('notification:new', (notification) => {
-      P.notify(notification.title, notification.body);
-      const noticeText = `${notification.title || ''} ${notification.body || ''}`;
-      if (/message/i.test(noticeText)) {
-        if (activeTab === 'messages' && activeConversation) loadDirectMessages();
-        else loadConversations(false);
-      }
-      if (/exclusive|subscription|membership|payment/i.test(noticeText)) loadSubscriptions(false);
-    });
+    socket.on('notification:new', (notification) => { P.notify(notification.title, notification.body); loadSubscriptions(false); loadConversations(false); });
     socket.on('account:restricted', (data) => { P.toast(data.reason || 'Account restricted.', 'error'); logout(); });
   }
 

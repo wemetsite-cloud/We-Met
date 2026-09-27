@@ -13,26 +13,6 @@ function createSocketServer(io) {
   const userCall = new Map();
   const listenerDisconnectTimers = new Map();
   let assignmentSequence = 0;
-  const socketConnectBuckets = new Map();
-
-  function socketConnectAllowed(address) {
-    const key = String(address || 'unknown');
-    const now = Date.now();
-    const windowMs = 5 * 60_000;
-    const max = 60;
-    let bucket = socketConnectBuckets.get(key);
-    if (!bucket || bucket.resetAt <= now) {
-      bucket = { count: 0, resetAt: now + windowMs };
-      socketConnectBuckets.set(key, bucket);
-    }
-    bucket.count += 1;
-    if (socketConnectBuckets.size > 5000) {
-      for (const [bucketKey, value] of socketConnectBuckets) {
-        if (value.resetAt <= now) socketConnectBuckets.delete(bucketKey);
-      }
-    }
-    return bucket.count <= max;
-  }
 
   function addUserSocket(userId, socketId) {
     if (!userSockets.has(userId)) userSockets.set(userId, new Set());
@@ -98,10 +78,7 @@ function createSocketServer(io) {
   }
 
   function broadcastListeners() {
-    // Only customer clients consume the live listener directory. Keeping this
-    // role-scoped avoids sending the same presence payload to listener/admin
-    // sockets while preserving continuous customer realtime availability.
-    io.to('role:customer').emit('listeners:update', { listeners: publicListeners() });
+    io.emit('listeners:update', { listeners: publicListeners() });
   }
 
   function hasLiveSocket(userId) {
@@ -142,9 +119,6 @@ function createSocketServer(io) {
 
   io.use(async (socket, next) => {
     try {
-      const forwardedFor = String(socket.handshake.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
-      const address = String(socket.handshake.headers?.['cf-connecting-ip'] || forwardedFor || socket.handshake.address || socket.request?.socket?.remoteAddress || '');
-      if (!socketConnectAllowed(address)) return next(new Error('Too many realtime reconnect attempts. Please wait a few minutes.'));
       const payload = verifyToken(socket.handshake.auth?.token);
       const result = await db.query(`
         SELECT id, role, name, username, email, bio,
@@ -692,12 +666,8 @@ function createSocketServer(io) {
     addUserSocket(user.id, socket.id);
     connectedUsers.set(user.id, { role: user.role, name: user.name });
     socket.join(`user:${user.id}`);
-    socket.join(`role:${user.role}`);
     socket.emit('session:ready', { user });
-    // Listener/admin presence is operationally useful. Customer socket connects
-    // are intentionally not written to the database, preventing reconnect spam
-    // from creating needless write load.
-    if (user.role !== 'customer') db.query('UPDATE users SET last_seen_at=now() WHERE id=$1', [user.id]).catch(console.error);
+    db.query('UPDATE users SET last_seen_at=now() WHERE id=$1', [user.id]).catch(console.error);
 
     if (user.role === 'employee') {
       cancelListenerDisconnect(user.id);
@@ -740,8 +710,7 @@ function createSocketServer(io) {
     }
 
     if (user.role === 'customer') {
-      const listenerSnapshot = publicListeners();
-      socket.emit('listeners:update', { listeners: listenerSnapshot });
+      socket.emit('listeners:update', { listeners: publicListeners() });
       const currentRuntime = calls.get(userCall.get(user.id));
       if (currentRuntime?.status === 'ringing' && currentRuntime.customerId === user.id && (!currentRuntime.customerClientId || currentRuntime.customerClientId === socket.data.clientId)) {
         currentRuntime.customerSocketId = socket.id;
@@ -1076,9 +1045,7 @@ function createSocketServer(io) {
       const remainingSockets = removeUserSocket(user.id, socket.id);
       if (!remainingSockets) {
         connectedUsers.delete(user.id);
-        if (user.role !== 'customer') {
-          db.query('UPDATE users SET last_seen_at=now() WHERE id=$1', [user.id]).catch(console.error);
-        }
+        db.query('UPDATE users SET last_seen_at=now() WHERE id=$1', [user.id]).catch(console.error);
       }
 
       const callId = userCall.get(user.id);
@@ -1161,7 +1128,7 @@ function createSocketServer(io) {
     const row = result.rows[0];
     const current = employees.get(userId);
     if (row?.status === 'active' && row.listener_verification_status === 'approved') {
-      io.to('role:customer').emit('listener:profile-updated', {
+      io.emit('listener:profile-updated', {
         listener: {
           id: row.id,
           name: row.username || row.name,

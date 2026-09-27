@@ -1,12 +1,14 @@
 {
-  "version": "8.9.29",
-  "name": "admin-profile-rate-limit-and-lazy-avatar-fix",
+  "version": "8.9.30",
+  "name": "latest-upload-cache-normalized",
   "changes": [
-    "Fixed administrator Full profile requests being blocked by the global 180 requests/minute safety limiter after avatar loading consumed the allowance.",
-    "Valid signed administrator sessions now use a separate 900 requests/minute operational safety allowance; invalid or missing admin tokens remain behind the stricter public limiter.",
-    "Admin customer profile photos now lazy-load only near the viewport instead of all at once, preventing large request bursts on accounts with many users.",
-    "Duplicate administrator profile-photo fetches are deduplicated in memory and photo responses allow short private browser caching.",
-    "All portal/service-worker cache versions were bumped so the admin fix replaces stale cached files."
+    "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
+    "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
+    "Cancelling autopay preserves access through the already-paid period and locks it after that period ends.",
+    "Administrator full profiles show customer/listener autopay and exclusive-access history, source, renewal state and current access state.",
+    "Administrators can reset customer/listener passwords and directly grant or revoke listener-specific exclusive access.",
+    "Customer checkout retries short provider delays and clearly distinguishes active autopay from administrator-granted access.",
+    "Customer and listener messaging now fit the application viewport while keeping only the people list and message history independently scrollable, with explicit readable message contrast."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
@@ -17,9 +19,9 @@
     "TURN_CREDENTIAL"
   ],
   "notes": [
-    "Normal customer realtime presence remains connected even when no listener is currently online.",
-    "Run the normal database initialization during deployment.",
-    "Public/customer abuse protection remains at 180 API requests per minute; the larger admin allowance applies only when a signed administrator token is valid.",
-    "Administrator profile avatars are loaded on demand to keep Render/Supabase request usage low even with large customer lists."
+    "Run the normal database initialization during deployment so the safe subscription columns and indexes are added.",
+    "Keep the Razorpay webhook URL configured as /api/subscriptions/webhook for renewal and cancellation updates.",
+    "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md.",
+    "Release cache/version identifiers are normalized across customer, listener, admin and root frontends; application behavior is otherwise unchanged from the uploaded master."
   ]
 }

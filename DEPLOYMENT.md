@@ -1,4 +1,4 @@
-# We Met v8.9.18 deployment
+# We Met v8.9.30 deployment
 
 This package contains the customer site, listener workspace, admin portal, Node.js API/Socket.IO server and PostgreSQL schema.
 
