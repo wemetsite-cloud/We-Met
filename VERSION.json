@@ -1,16 +1,12 @@
 {
-  "version": "8.9.28",
-  "name": "unrestricted-realtime-with-render-efficient-loading",
+  "version": "8.9.29",
+  "name": "admin-profile-rate-limit-and-lazy-avatar-fix",
   "changes": [
-    "Removed the no-listener Render guard that disconnected idle customer realtime sessions.",
-    "Connect now stays usable; the server performs the normal live availability check instead of blocking the button to conserve Render usage.",
-    "Removed the two-customer-socket cap while keeping authenticated realtime reconnect protection against scripted abuse.",
-    "Kept lazy dashboard loading and visibility-aware background refreshes so normal functionality stays unrestricted without wasteful API bursts.",
-    "Listener presence and profile broadcasts are now sent only to customer sockets instead of every connected portal.",
-    "Direct-message refresh is notification-driven with a one-minute visible-page fallback instead of frequent polling.",
-    "Listener profile and banner responses use version-safe browser caching, and listener cards load the first 10 images first with later images lazy-loaded.",
-    "Public showcase data now permits short browser/CDN caching instead of being forced to refetch on every landing-page visit.",
-    "All portal/service-worker cache versions were bumped so the optimized files replace stale cached builds."
+    "Fixed administrator Full profile requests being blocked by the global 180 requests/minute safety limiter after avatar loading consumed the allowance.",
+    "Valid signed administrator sessions now use a separate 900 requests/minute operational safety allowance; invalid or missing admin tokens remain behind the stricter public limiter.",
+    "Admin customer profile photos now lazy-load only near the viewport instead of all at once, preventing large request bursts on accounts with many users.",
+    "Duplicate administrator profile-photo fetches are deduplicated in memory and photo responses allow short private browser caching.",
+    "All portal/service-worker cache versions were bumped so the admin fix replaces stale cached files."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
@@ -22,7 +18,8 @@
   ],
   "notes": [
     "Normal customer realtime presence remains connected even when no listener is currently online.",
-    "The global API safety limiter remains as an abuse safeguard; it does not intentionally disable normal calling or wallet usage.",
-    "Run the normal database initialization during deployment."
+    "Run the normal database initialization during deployment.",
+    "Public/customer abuse protection remains at 180 API requests per minute; the larger admin allowance applies only when a signed administrator token is valid.",
+    "Administrator profile avatars are loaded on demand to keep Render/Supabase request usage low even with large customer lists."
   ]
 }

@@ -16,7 +16,7 @@ router.get('/users/:id/profile-image', asyncHandler(async (req, res) => {
   if (!image) return res.status(404).end();
   res.setHeader('Content-Type', image.mime);
   res.setHeader('Content-Length', String(image.buffer.length));
-  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Cache-Control', 'private, max-age=300, must-revalidate');
   return res.end(image.buffer);
 }));
 

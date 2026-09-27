@@ -40,24 +40,62 @@
   let showcaseImages = [];
   let activePage = 'overview';
   const adminProfilePhotoUrls = new Map();
+  const adminProfilePhotoPending = new Map();
 
-  async function hydrateAdminProfilePhotos(scope = document) {
+  async function loadAdminProfilePhoto(node) {
+    const userId = node?.dataset?.adminProfilePhoto;
+    if (!userId || node.dataset.photoLoaded === '1' || node.dataset.photoLoading === '1') return;
+    node.dataset.photoLoading = '1';
+    try {
+      let url = adminProfilePhotoUrls.get(userId);
+      if (!url) {
+        let pending = adminProfilePhotoPending.get(userId);
+        if (!pending) {
+          pending = P.apiBlob(`/api/admin/users/${encodeURIComponent(userId)}/profile-image`, { cache: 'default' })
+            .then((blob) => {
+              const objectUrl = URL.createObjectURL(blob);
+              adminProfilePhotoUrls.set(userId, objectUrl);
+              return objectUrl;
+            })
+            .finally(() => adminProfilePhotoPending.delete(userId));
+          adminProfilePhotoPending.set(userId, pending);
+        }
+        url = await pending;
+      }
+      if (!node.isConnected) return;
+      node.innerHTML = `<img src="${P.esc(url)}" alt="" draggable="false">`;
+      node.classList.add('has-photo');
+      node.dataset.photoLoaded = '1';
+    } catch {} finally {
+      delete node.dataset.photoLoading;
+    }
+  }
+
+  const adminProfilePhotoObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        adminProfilePhotoObserver.unobserve(entry.target);
+        loadAdminProfilePhoto(entry.target);
+      });
+    }, { rootMargin: '360px 0px' })
+    : null;
+
+  function hydrateAdminProfilePhotos(scope = document) {
     const nodes = [...scope.querySelectorAll('[data-admin-profile-photo]')];
-    await Promise.allSettled(nodes.map(async (node) => {
+    nodes.forEach((node) => {
       const userId = node.dataset.adminProfilePhoto;
       if (!userId || node.dataset.photoLoaded === '1') return;
-      try {
-        let url = adminProfilePhotoUrls.get(userId);
-        if (!url) {
-          const blob = await P.apiBlob(`/api/admin/users/${encodeURIComponent(userId)}/profile-image`, { cache: 'no-store' });
-          url = URL.createObjectURL(blob);
-          adminProfilePhotoUrls.set(userId, url);
-        }
-        node.innerHTML = `<img src="${P.esc(url)}" alt="" draggable="false">`;
+      const cachedUrl = adminProfilePhotoUrls.get(userId);
+      if (cachedUrl) {
+        node.innerHTML = `<img src="${P.esc(cachedUrl)}" alt="" draggable="false">`;
         node.classList.add('has-photo');
         node.dataset.photoLoaded = '1';
-      } catch {}
-    }));
+        return;
+      }
+      if (adminProfilePhotoObserver) adminProfilePhotoObserver.observe(node);
+      else loadAdminProfilePhoto(node);
+    });
   }
 
   function customerAvatarMarkup(user, className = '') {
@@ -175,7 +213,7 @@
   async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      return await navigator.serviceWorker.register('service-worker.js?v=8.9.28', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('service-worker.js?v=8.9.29', { updateViaCache: 'none' });
     } catch { }
   }
 
