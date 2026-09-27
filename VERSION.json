@@ -1,14 +1,16 @@
 {
-  "version": "8.9.23",
-  "name": "autopay-exclusive-access-and-messaging-workspace-reliability",
+  "version": "8.9.28",
+  "name": "unrestricted-realtime-with-render-efficient-loading",
   "changes": [
-    "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
-    "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
-    "Cancelling autopay preserves access through the already-paid period and locks it after that period ends.",
-    "Administrator full profiles show customer/listener autopay and exclusive-access history, source, renewal state and current access state.",
-    "Administrators can reset customer/listener passwords and directly grant or revoke listener-specific exclusive access.",
-    "Customer checkout retries short provider delays and clearly distinguishes active autopay from administrator-granted access.",
-    "Customer and listener messaging now fit the application viewport while keeping only the people list and message history independently scrollable, with explicit readable message contrast."
+    "Removed the no-listener Render guard that disconnected idle customer realtime sessions.",
+    "Connect now stays usable; the server performs the normal live availability check instead of blocking the button to conserve Render usage.",
+    "Removed the two-customer-socket cap while keeping authenticated realtime reconnect protection against scripted abuse.",
+    "Kept lazy dashboard loading and visibility-aware background refreshes so normal functionality stays unrestricted without wasteful API bursts.",
+    "Listener presence and profile broadcasts are now sent only to customer sockets instead of every connected portal.",
+    "Direct-message refresh is notification-driven with a one-minute visible-page fallback instead of frequent polling.",
+    "Listener profile and banner responses use version-safe browser caching, and listener cards load the first 10 images first with later images lazy-loaded.",
+    "Public showcase data now permits short browser/CDN caching instead of being forced to refetch on every landing-page visit.",
+    "All portal/service-worker cache versions were bumped so the optimized files replace stale cached builds."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
@@ -19,8 +21,8 @@
     "TURN_CREDENTIAL"
   ],
   "notes": [
-    "Run the normal database initialization during deployment so the safe subscription columns and indexes are added.",
-    "Keep the Razorpay webhook URL configured as /api/subscriptions/webhook for renewal and cancellation updates.",
-    "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md."
+    "Normal customer realtime presence remains connected even when no listener is currently online.",
+    "The global API safety limiter remains as an abuse safeguard; it does not intentionally disable normal calling or wallet usage.",
+    "Run the normal database initialization during deployment."
   ]
 }
