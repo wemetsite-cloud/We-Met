@@ -1,6 +1,6 @@
 {
-  "version": "8.9.31",
-  "name": "latest-master-unrestricted-render-verified",
+  "version": "8.9.23",
+  "name": "autopay-exclusive-access-and-messaging-workspace-reliability",
   "changes": [
     "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
     "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
@@ -21,10 +21,6 @@
   "notes": [
     "Run the normal database initialization during deployment so the safe subscription columns and indexes are added.",
     "Keep the Razorpay webhook URL configured as /api/subscriptions/webhook for renewal and cancellation updates.",
-    "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md.",
-    "No Render-saving customer socket cap or no-listener auto-disconnect is enabled in this release.",
-    "Random Connect remains available while signed in; the backend performs the normal live listener availability check.",
-    "MAX_CALL_SECONDS remains 0, so calls are not ended by a Render-conservation duration limit.",
-    "The /api/health response now exposes version and renderUsageRestriction=false so the active Render deployment can be verified immediately."
+    "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md."
   ]
 }
