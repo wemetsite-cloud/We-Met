@@ -106,3 +106,7 @@ cancelled renewal keeps Exclusive access until the current paid period ends.
 7. Start a ₹399 listener autopay and confirm that listener's Exclusive posts/messages unlock.
 8. Turn off renewal and confirm access remains only through the paid period.
 9. In the admin customer profile, verify autopay history, direct access grant/revoke and password reset.
+
+## Listener profile sharing (8.9.26)
+
+Deploy the updated customer site (app.js, index.html, style.css and service-worker.js). No database or backend changes are required for this feature. Every customer listener card and profile has a Share button. Links use `?listener=<listener-id>` on the customer site and can be forwarded by anyone. Signed-out visitors are shown the existing login flow; after login or registration the selected profile opens automatically. Existing signed-in customers go directly to the profile. Invalid or removed profiles show the existing Profile unavailable message.

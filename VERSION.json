@@ -1,7 +1,10 @@
 {
-  "version": "8.9.23",
-  "name": "autopay-exclusive-access-and-messaging-workspace-reliability",
+  "version": "8.9.26",
+  "name": "shareable-listener-profiles",
   "changes": [
+    "Share buttons on customer listener cards and profiles use native sharing with a copy-link fallback.",
+    "Listener links open the selected profile after existing-session login, password login, or registration.",
+    "Customer asset and service-worker cache version updated to 8.9.26.",
     "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
     "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
     "Cancelling autopay preserves access through the already-paid period and locks it after that period ends.",
