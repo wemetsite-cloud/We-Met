@@ -60,7 +60,7 @@
       }
       return data;
     } catch (error) {
-      if (error.name === 'AbortError') throw new Error('The server is taking too long to respond. Please try again.');
+      if (error.name === 'AbortError') throw Object.assign(new Error('The server is taking too long to respond. Please try again.'), { code: 'REQUEST_TIMEOUT' });
       if (!error.status && (error instanceof TypeError || /failed to fetch|network error/i.test(error.message || ''))) {
         throw Object.assign(new Error('Could not reach the We Met server. Check your connection and try again.'), { code: 'NETWORK_ERROR' });
       }
