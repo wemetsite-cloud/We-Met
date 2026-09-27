@@ -406,9 +406,6 @@ router.post('/verify', authenticate, requireRole('customer'), verifySubscription
       || Number(providerPayment?.amount || 0) < config.razorpay.subscriptionAmountPaise) {
     return res.status(400).json({ error: 'The Razorpay payment does not match this ₹399 listener membership.' });
   }
-  if (['failed', 'refunded'].includes(String(providerPayment.status || '').toLowerCase())) {
-    return res.status(400).json({ error: 'This membership payment failed or was refunded. No exclusive access was added.', code: 'PAYMENT_FAILED' });
-  }
   const outcome = await db.transaction(async (client) => {
     const locked = await client.query('SELECT * FROM listener_subscriptions WHERE id=$1 FOR UPDATE', [local.id]);
     const updated = await updateSubscriptionFromProvider(client, locked.rows[0], providerSubscription);
@@ -443,7 +440,7 @@ router.post('/verify', authenticate, requireRole('customer'), verifySubscription
   }
 
   if (outcome.notify) {
-    await Promise.allSettled([
+    await Promise.all([
       req.app.locals.notifyUser?.(req.user.id, {
         title: 'Exclusive membership active',
         body: `Photos and messages with ${listenerPublicName(local)} are now open.`,

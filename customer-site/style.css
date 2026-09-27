@@ -1581,8 +1581,3 @@ body.signed-in.customer-messages-active .dashboard{
 }
 #tab-subscriptions .empty-state h3{color:var(--wm-ink,#392b35)!important}
 #tab-subscriptions .empty-state p{color:var(--wm-muted,#766570)!important}
-
-/* Profile sharing stays inside the profile; directory actions remain two columns. */
-#loadMoreListeners { display: block; margin: 18px auto; }
-#loadMoreListeners.hidden, #retryPendingPayments.hidden { display: none !important; }
-#retryPendingPayments { margin: 12px 0; }

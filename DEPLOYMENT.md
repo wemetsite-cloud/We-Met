@@ -106,25 +106,3 @@ cancelled renewal keeps Exclusive access until the current paid period ends.
 7. Start a ₹399 listener autopay and confirm that listener's Exclusive posts/messages unlock.
 8. Turn off renewal and confirm access remains only through the paid period.
 9. In the admin customer profile, verify autopay history, direct access grant/revoke and password reset.
-
-## Profile sharing, payments and listener loading (8.9.27)
-
-Deploy this full release, including the backend and all three portal folders. No new database migration or payment credentials are required by these changes. Continue using the existing Razorpay configuration and subscription webhook. The customer, listener, administrator and legacy root service-worker versions and all shipped versioned asset URLs are now 8.9.27.
-
-Share is available inside every listener profile only. Shared customer-site URLs use `?listener=<listener-id>`. Signed-out visitors complete the existing login or registration flow and then open that listener; signed-in customers open it directly. Every card still has Profile and Call actions.
-
-The customer directory renders the first ten listeners, then another ten when Load next 10 listeners is selected. Hidden-language cards are not rendered. Profile images load lazily and image nodes are reused on live updates. Secondary listener thumbnails also use browser lazy loading.
-
-Top-up verification retries capture delays and temporary connection/server failures. Both top-up and Exclusive checkout receipts are retained per customer in the same browser when checkout succeeds, allowing verification after refresh or with Check pending payments in Wallet. Verification remains server-side and credits are idempotent. Recovery requires the same customer account and browser storage; this does not recover a Razorpay callback that never reached the page. Only one checkout or recovery operation runs at a time.
-
-Gateway configuration failures no longer sign customers out. Notification outages no longer cause a committed wallet credit or Exclusive confirmation to be reported as failed. Failed/refunded Exclusive payments are rejected. Profile request sequencing prevents a delayed response for one listener from replacing another listener's profile.
-
-### Validation completed
-
-- JavaScript syntax: all 36 checked files pass.
-- Headless Chromium mobile checks with mocked APIs and checkout: shared-link login, signed-in refresh, profile-only sharing, 10/20/25-card loading, hidden-language exclusion, Exclusive pending-to-active confirmation, top-up capture retry, wallet balance and receipt recovery pass. No browser script errors were observed.
-- Native-share, cancel, clipboard and manual-copy fallback checks pass.
-- Added backend payment integration test with mocked Razorpay and database: capture enforcement, amount/signature rejection, repeated-verification idempotency, Exclusive activation and notification-failure isolation pass.
-- Existing full test suite: 41 of 49 tests pass. Eight legacy source-assertion tests also failed before this work. They include hard-coded old cache versions, a missing original .gitignore, old recovery/admin-reset expectations, old checkout function locations/theme values, and old call-routing source patterns. They have not been deleted or relaxed to make the suite green.
-
-No live Razorpay charges, production database operations or production deployment were performed. After deployment, verify one top-up and one Exclusive purchase using the configured Razorpay environment, and verify the subscription webhook continues receiving provider events. This release fixes the issues verified here; it is not a guarantee that the entire existing platform is bug-free.

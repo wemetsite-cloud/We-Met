@@ -85,7 +85,7 @@ router.post('/create-order', authenticate, requireRole('customer'), createOrderL
     const status = providerStatus(error);
     console.error('Razorpay order creation failed:', error?.error?.code || error?.message || status);
     if (status === 401) {
-      return res.status(503).json({ error: 'Online payments are temporarily unavailable. Please contact support.', code: 'PAYMENT_CONFIGURATION_ERROR' });
+      return res.status(401).json({ error: 'Razorpay authentication failed. Check the server credentials.' });
     }
     return res.status(500).json({ error: 'The payment order could not be created. Please try again.' });
   }
@@ -161,7 +161,7 @@ router.post('/verify-payment', authenticate, requireRole('customer'), verifyPaym
     const status = providerStatus(error);
     console.error('Razorpay payment status check failed:', error?.error?.code || error?.message || status);
     if (status === 401) {
-      return res.status(503).json({ error: 'Online payments are temporarily unavailable. Please contact support.', code: 'PAYMENT_CONFIGURATION_ERROR' });
+      return res.status(401).json({ error: 'Razorpay authentication failed. Check the server credentials.' });
     }
     return res.status(500).json({ error: 'The payment status could not be confirmed. Please try again.' });
   }
@@ -248,11 +248,11 @@ router.post('/verify-payment', authenticate, requireRole('customer'), verifyPaym
   });
 
   if (outcome.notification) {
-    await Promise.resolve().then(() => req.app.locals.notifyUser?.(req.user.id, {
+    await req.app.locals.notifyUser?.(req.user.id, {
       ...outcome.notification,
       url: './',
       tag: `we-met-razorpay-${outcome.order.id}`,
-    })).catch((error) => console.error('Payment notification failed:', error.message));
+    });
   }
 
   return res.json({

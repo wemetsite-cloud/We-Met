@@ -1,13 +1,14 @@
 {
-  "version": "8.9.27",
-  "name": "payments-profile-sharing-and-batched-listeners",
+  "version": "8.9.23",
+  "name": "autopay-exclusive-access-and-messaging-workspace-reliability",
   "changes": [
-    "Share is available only inside each listener profile.",
-    "Listener discovery renders ten cards at a time with Load next 10, lazy image decoding and preserved image elements during live updates.",
-    "Top-up verification retries delayed capture and transient errors; payment receipts can be retried after refresh for the same customer.",
-    "Exclusive confirmation supports timeout retries and refresh recovery; concurrent checkout is prevented.",
-    "All portal service workers and asset query versions updated to 8.9.27.",
-    "Provider credential and notification failures no longer invalidate a customer session or turn committed wallet credits into errors."
+    "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
+    "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
+    "Cancelling autopay preserves access through the already-paid period and locks it after that period ends.",
+    "Administrator full profiles show customer/listener autopay and exclusive-access history, source, renewal state and current access state.",
+    "Administrators can reset customer/listener passwords and directly grant or revoke listener-specific exclusive access.",
+    "Customer checkout retries short provider delays and clearly distinguishes active autopay from administrator-granted access.",
+    "Customer and listener messaging now fit the application viewport while keeping only the people list and message history independently scrollable, with explicit readable message contrast."
   ],
   "required_environment": [
     "MSG91_AUTH_KEY"
