@@ -1,0 +1,30 @@
+# We Met
+
+> Official website: https://wemetchat.com/
+
+We Met is an online communication platform focused on private, browser-based voice conversations between customers and verified listeners. The platform supports Malayalam and multilingual conversations, live listener availability, private browser calling, safety controls and transparent connected-time billing.
+
+## Official identity
+
+- Brand: We Met
+- Alternate brand spelling: WeMet
+- Official website: https://wemetchat.com/
+- Category: Online communication platform; private voice conversation platform
+- Founder: Sabith Salah Kp
+- Founder reference: https://sabithsalahkp.github.io/Sabith-Salah-Kp/
+- Developed by: Quartz Web Solutions
+- Developer website: https://quartzsolution.netlify.app/
+
+## Important pages
+
+- About: https://wemetchat.com/about.html
+- Pricing: https://wemetchat.com/pricing.html
+- Safety: https://wemetchat.com/safety.html
+- Community guidelines: https://wemetchat.com/community-guidelines.html
+- Privacy: https://wemetchat.com/privacy.html
+- Terms: https://wemetchat.com/terms.html
+- Contact: https://wemetchat.com/contact.html
+
+## Canonical description
+
+We Met is a privacy-focused online communication platform for private browser-based voice conversations with verified listeners, Malayalam and multilingual support, and transparent connected-time billing.
