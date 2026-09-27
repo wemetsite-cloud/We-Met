@@ -31,7 +31,7 @@ router.get('/showcase-images', asyncHandler(async (_req, res) => {
     const parsed = JSON.parse(result.rows[0]?.value || '[]');
     if (Array.isArray(parsed)) images = parsed.filter((item) => /^data:image\/(?:jpeg|png|webp);base64,/i.test(String(item || ''))).slice(0, 12);
   } catch {}
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
   res.json({ images, updatedAt: result.rows[0]?.updated_at || null });
 }));
 
@@ -45,7 +45,7 @@ router.get('/listener-profile-image/:id', asyncHandler(async (req, res) => {
   const image = decodeProfileImage(result.rows[0]?.profile_image);
   if (!image) return res.status(404).end();
   res.setHeader('Content-Type', image.mime);
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
   res.setHeader('Content-Length', String(image.buffer.length));
   return res.end(image.buffer);
 }));
@@ -60,7 +60,7 @@ router.get('/listener-banner-image/:id', asyncHandler(async (req, res) => {
   const image = decodeProfileImage(result.rows[0]?.banner_image);
   if (!image) return res.status(404).end();
   res.setHeader('Content-Type', image.mime);
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
   res.setHeader('Content-Length', String(image.buffer.length));
   return res.end(image.buffer);
 }));

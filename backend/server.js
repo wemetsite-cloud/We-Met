@@ -8,6 +8,7 @@ const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
 const { settleCall } = require('./src/call-settlement');
 const subscriptionRoutes = require('./src/routes/subscriptions');
+const createRateLimit = require('./src/request-limit');
 
 const app = express();
 const server = http.createServer(app);
@@ -54,6 +55,16 @@ app.use((req, res, next) => {
 
 app.post('/api/subscriptions/webhook', express.raw({ type: 'application/json', limit: '1mb' }), subscriptionRoutes.webhook);
 app.use(express.json({ limit: '1mb' }));
+
+// Global safety net against scripts hammering API routes and consuming paid
+// Render/Supabase resources. Payment/subscription routes keep their own stricter
+// per-action limits as well.
+const apiSafetyLimit = createRateLimit({
+  windowMs: 60_000,
+  max: 180,
+  message: 'Too many requests. Please wait a minute and try again.',
+});
+app.use('/api', apiSafetyLimit);
 
 app.get('/api/health', async (_req, res) => {
   try {
