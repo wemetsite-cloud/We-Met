@@ -1,6 +1,6 @@
 {
-  "version": "8.9.30",
-  "name": "latest-upload-cache-normalized",
+  "version": "8.9.31",
+  "name": "latest-master-unrestricted-render-verified",
   "changes": [
     "Captured Razorpay subscription payments unlock the selected listener immediately even while provider activation status is catching up.",
     "Pending and near-renewal subscriptions are reconciled with Razorpay so first payments, renewals, cancellation and expiry stay in sync.",
@@ -22,6 +22,9 @@
     "Run the normal database initialization during deployment so the safe subscription columns and indexes are added.",
     "Keep the Razorpay webhook URL configured as /api/subscriptions/webhook for renewal and cancellation updates.",
     "The distribution is consolidated to 94 files: legacy root listener duplicates were removed and setup guides were merged into DEPLOYMENT.md.",
-    "Release cache/version identifiers are normalized across customer, listener, admin and root frontends; application behavior is otherwise unchanged from the uploaded master."
+    "No Render-saving customer socket cap or no-listener auto-disconnect is enabled in this release.",
+    "Random Connect remains available while signed in; the backend performs the normal live listener availability check.",
+    "MAX_CALL_SECONDS remains 0, so calls are not ended by a Render-conservation duration limit.",
+    "The /api/health response now exposes version and renderUsageRestriction=false so the active Render deployment can be verified immediately."
   ]
 }

@@ -8,6 +8,7 @@ const pushService = require('./src/push');
 const { authenticate, requireRole } = require('./src/middleware');
 const { settleCall } = require('./src/call-settlement');
 const subscriptionRoutes = require('./src/routes/subscriptions');
+const backendPackage = require('./package.json');
 
 const app = express();
 const server = http.createServer(app);
@@ -58,7 +59,7 @@ app.use(express.json({ limit: '1mb' }));
 app.get('/api/health', async (_req, res) => {
   try {
     await db.query('SELECT 1');
-    res.json({ ok: true, app: config.appName, time: new Date().toISOString() });
+    res.json({ ok: true, app: config.appName, version: backendPackage.version, renderUsageRestriction: false, maxCallSeconds: config.maxCallSeconds, time: new Date().toISOString() });
   } catch (_error) {
     res.status(503).json({ ok: false, error: 'Database unavailable.' });
   }
@@ -240,7 +241,7 @@ async function reconcileInterruptedListenerActivity() {
   await reconcileInterruptedCalls();
   await reconcileInterruptedListenerActivity();
   server.listen(config.port, () => {
-    console.log(`We Met running at ${config.publicUrl}`);
+    console.log(`We Met v${backendPackage.version} running at ${config.publicUrl} (Render usage restriction: OFF)`);
     if (config.serveFrontends) {
       console.log(`Customer: ${config.publicUrl}/customer/`);
       console.log(`Listener: ${config.publicUrl}/listener/`);

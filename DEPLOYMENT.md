@@ -1,4 +1,4 @@
-# We Met v8.9.30 deployment
+# We Met v8.9.31 deployment
 
 This package contains the customer site, listener workspace, admin portal, Node.js API/Socket.IO server and PostgreSQL schema.
 
@@ -21,7 +21,7 @@ When `SERVE_FRONTENDS=true`, one deployment serves:
 6. Keep the existing Razorpay and database/JWT/admin secrets.
 7. For reliable WebRTC on restrictive networks, configure `TURN_URL`, `TURN_USERNAME`, and `TURN_CREDENTIAL`.
 8. Redeploy and wait for **Live**.
-9. Confirm `/api/health` before testing the portals.
+9. Confirm `/api/health` before testing the portals. For this release it must report `"version":"8.9.31"` and `"renderUsageRestriction":false`. If it reports an older version, Render is still serving an older deployment.
 
 The start command runs the idempotent database initialization before the server starts.
 
