@@ -1,4 +1,4 @@
-const VERSION = '8.9.25';
+const VERSION = '8.9.26';
 const CACHE_PREFIX = 'we-met-customer-';
 const CACHE = `${CACHE_PREFIX}v${VERSION}`;
 const STATIC = [
@@ -14,6 +14,12 @@ const STATIC = [
   'manifest.webmanifest',
   'legal.css',
   'about.html',
+  'malayalam-voice-chat.html',
+  'talk-to-someone-online.html',
+  'browser-voice-calling.html',
+  'make-friends-online.html',
+  'voice-chat-vs-dating-apps.html',
+  'seo-pages.css',
   'contact.html',
   'pricing.html',
   'delivery.html',

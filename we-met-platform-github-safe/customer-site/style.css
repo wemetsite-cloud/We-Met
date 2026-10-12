@@ -1581,3 +1581,24 @@ body.signed-in.customer-messages-active .dashboard{
 }
 #tab-subscriptions .empty-state h3{color:var(--wm-ink,#392b35)!important}
 #tab-subscriptions .empty-state p{color:var(--wm-muted,#766570)!important}
+
+/* Informational search landing section. Content remains HTML-visible for crawlers. */
+.seo-explore{padding-top:clamp(55px,8vw,105px)}
+.seo-explore-heading{max-width:790px}
+.seo-explore-heading h2{font-size:clamp(30px,4vw,52px);line-height:1.08;letter-spacing:-.043em;margin:13px 0 18px}
+.seo-explore-heading p{font-size:15px;line-height:1.8;color:var(--muted);max-width:690px}
+.seo-link-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:28px}
+.seo-link-grid>a{position:relative;display:flex;flex-direction:column;gap:10px;min-height:158px;background:#fff;border:1px solid var(--line);border-radius:22px;padding:25px;box-shadow:0 12px 35px rgba(120,37,77,.05);text-decoration:none;transition:transform .2s,box-shadow .2s}
+.seo-link-grid>a:hover{transform:translateY(-3px);box-shadow:0 15px 38px rgba(120,37,77,.1)}
+.seo-link-grid>a strong{font-size:17px;color:var(--ink);line-height:1.35;padding-right:14px}
+.seo-link-grid>a>span:not(.seo-link-arrow){color:var(--muted);line-height:1.6;font-size:13px}
+.seo-link-arrow{position:absolute;right:20px;top:20px;font-size:19px;color:var(--pink-deep)}
+.seo-faq{max-width:940px;margin-top:50px}
+.seo-faq h2{font-size:clamp(26px,3vw,36px);letter-spacing:-.03em;margin:0 0 20px}
+.seo-faq details{margin-bottom:10px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.86);padding:17px 21px}
+.seo-faq summary{font-size:15px;font-weight:800;color:var(--ink);cursor:pointer;list-style-position:inside}
+.seo-faq details p{color:var(--muted);font-size:14px;line-height:1.75;margin:12px 0 0}
+.seo-faq a{color:var(--pink-deep)}
+@media(max-width:950px){.seo-link-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.seo-link-grid{grid-template-columns:1fr}.seo-link-grid>a{min-height:118px;padding:19px}.seo-explore{padding-top:45px}.seo-faq{margin-top:35px}.seo-faq details{padding:14px 16px}}
+@media(prefers-reduced-motion:reduce){.seo-link-grid>a{transition:none}}
