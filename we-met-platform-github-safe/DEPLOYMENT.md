@@ -116,3 +116,11 @@ On every verified listener profile, tap **♡ Donate**, enter an amount between 
 - Listener wallet history shows **Donation received**, and listener/admin earnings and balances include it. Customer and listener receive notifications on successful verification.
 - Deploy **customer-site**, **employee-site**, **backend**, and **backend/database/schema.sql** together. `npm run start:production` already runs `db:init` and updates the schema. When applying changes manually, run `cd backend && npm run db:init` first.
 - Keep `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` server-side. Confirm that your Razorpay merchant account permits tips/donations for this service before taking live payments.
+
+## Responsive homepage and listener profile polish (v8.9.28)
+
+- Public hero preview: crisp unrotated card and readable text on desktop/tablet/mobile.
+- Profile language and verified status: centered text in compact pills.
+- Donate: stays on the right edge of the profile tags row on mobile.
+- No backend schema/payment changes. Keep the v8.9.27 Razorpay/Render donation release deployed.
+- Upload extracted repository files and commit; Cloudflare Pages customer deployment will refresh PWA cache automatically.
