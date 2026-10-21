@@ -1635,3 +1635,124 @@ body.signed-in.customer-messages-active .dashboard{
 @media(max-width:600px){
   #listenerProfileModal .listener-donate-panel {margin-inline:18px;max-width:none}
 }
+
+
+/* ===== v8.9.28: crisp responsive preview & compact listener identity row ===== */
+/* Rotated, counter-rotated text and backdrop-filtering made the desktop hero
+   preview rasterize softly in Chromium. Keep the design, not the blur. */
+.landing .hero-visual .phone-preview {
+  transform:none!important;
+  -webkit-transform:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  backface-visibility:visible;
+  filter:none!important;
+  isolation:isolate;
+}
+.landing .hero-visual .phone-preview .preview-head,
+.landing .hero-visual .phone-preview .preview-person,
+.landing .hero-visual .phone-preview .preview-call,
+.landing .hero-visual .phone-preview .preview-note {
+  transform:none!important;
+  -webkit-transform:none!important;
+  filter:none!important;
+  text-shadow:none;
+}
+/* The decorative orbit can be soft; the actual card text and buttons cannot. */
+.landing .hero-visual .preview-head,
+.landing .hero-visual .preview-person,
+.landing .hero-visual .preview-call,
+.landing .hero-visual .preview-note {opacity:1!important}
+.landing .hero-visual .phone-preview .preview-person h3 {line-height:1.2}
+
+/* Language and verified profile have text centered *inside* equal-height chips.
+   Donation remains a small, independent button rather than a third badge. */
+#listenerProfileModal .listener-profile-tags {
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  flex-wrap:nowrap!important;
+  gap:12px!important;
+  min-width:0;
+}
+#listenerProfileModal .listener-profile-badges {
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  min-width:0;
+  flex-wrap:wrap;
+}
+#listenerProfileModal .listener-profile-badges>span {
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  vertical-align:middle;
+  min-height:34px;
+  padding:7px 12px!important;
+  border:1px solid #ebd8e2!important;
+  border-radius:999px!important;
+  background:#fff2f8!important;
+  color:#8e365f!important;
+  font-size:11px!important;
+  font-weight:750!important;
+  line-height:1.2!important;
+  letter-spacing:0!important;
+  white-space:nowrap;
+  box-sizing:border-box;
+}
+#listenerProfileModal .listener-profile-badges .listener-verified-badge {
+  background:#f4f7ff!important;
+  color:#635581!important;
+  border-color:#e4e0f3!important;
+}
+#listenerProfileModal .listener-profile-tags .listener-donate-trigger {
+  margin-left:auto!important;
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:7px 13px;
+  text-align:center;
+  white-space:nowrap;
+  line-height:1.2;
+}
+@media (min-width:761px) and (max-width:1040px) {
+  .landing .hero {gap:24px!important}
+  .landing .hero-visual {min-height:470px}
+  .landing .hero-visual .phone-preview {max-width:390px!important}
+}
+@media (max-width:760px) {
+  .landing .hero-visual {width:100%;min-width:0;overflow:visible}
+  .landing .hero-visual .phone-preview {width:min(390px,calc(100% - 20px))!important;max-width:100%!important}
+  #listenerProfileModal .listener-profile-tags {gap:7px!important}
+  #listenerProfileModal .listener-profile-badges {flex-wrap:nowrap;gap:6px;flex:0 1 auto}
+  #listenerProfileModal .listener-profile-badges>span {
+    min-height:33px;
+    padding:6px 9px!important;
+    font-size:10px!important;
+  }
+  #listenerProfileModal .listener-profile-tags .listener-donate-trigger {
+    margin-left:auto!important;
+    min-height:33px;
+    padding:6px 10px;
+    font-size:11px;
+  }
+}
+@media(max-width:370px) {
+  #listenerProfileModal .listener-profile-tags {gap:5px!important}
+  #listenerProfileModal .listener-profile-badges {gap:5px}
+  #listenerProfileModal .listener-profile-badges>span {
+    font-size:9px!important;
+    padding:6px 7px!important;
+  }
+  #listenerProfileModal .listener-profile-tags .listener-donate-trigger {
+    padding:6px 8px;
+    font-size:10px;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .landing .hero-visual .preview-orbit {animation:none!important}
+}
