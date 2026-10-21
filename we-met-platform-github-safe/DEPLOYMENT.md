@@ -106,3 +106,13 @@ cancelled renewal keeps Exclusive access until the current paid period ends.
 7. Start a ₹399 listener autopay and confirm that listener's Exclusive posts/messages unlock.
 8. Turn off renewal and confirm access remains only through the paid period.
 9. In the admin customer profile, verify autopay history, direct access grant/revoke and password reset.
+
+## Minimal listener donations (v8.9.27)
+
+On every verified listener profile, tap **♡ Donate**, enter an amount between **₹10 and ₹10,000**, and tap **Donate** to pay with Razorpay. The form stays hidden until the first tap.
+
+- Donations are a separate **one-time money payment** (never deducted from customer talk-time, and never renew).
+- Only after Razorpay signature + captured status are independently verified does the full amount enter that listener's **existing earnings wallet**. The existing manual listener payout flow remains unchanged; Razorpay/provider charges, if any, remain a platform expense.
+- Listener wallet history shows **Donation received**, and listener/admin earnings and balances include it. Customer and listener receive notifications on successful verification.
+- Deploy **customer-site**, **employee-site**, **backend**, and **backend/database/schema.sql** together. `npm run start:production` already runs `db:init` and updates the schema. When applying changes manually, run `cd backend && npm run db:init` first.
+- Keep `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` server-side. Confirm that your Razorpay merchant account permits tips/donations for this service before taking live payments.
