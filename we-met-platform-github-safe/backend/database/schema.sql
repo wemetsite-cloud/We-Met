@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
 CREATE TABLE IF NOT EXISTS listener_wallet_transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type text NOT NULL CHECK (type IN ('call_credit','subscription_credit','payout','admin_adjustment')),
+  type text NOT NULL CHECK (type IN ('call_credit','subscription_credit','donation_credit','payout','admin_adjustment')),
   amount_paise bigint NOT NULL CHECK (amount_paise <> 0),
   reference_id uuid,
   billed_seconds integer CHECK (billed_seconds IS NULL OR billed_seconds >= 0),
@@ -290,6 +290,22 @@ CREATE TABLE IF NOT EXISTS razorpay_orders (
   paid_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Separate Razorpay donation orders, never mixed with talk-time orders or subscriptions.
+CREATE TABLE IF NOT EXISTS listener_donation_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount_paise integer NOT NULL CHECK (amount_paise BETWEEN 1000 AND 1000000),
+  currency text NOT NULL DEFAULT 'INR' CHECK (currency='INR'),
+  receipt text NOT NULL UNIQUE,
+  razorpay_order_id text NOT NULL UNIQUE,
+  razorpay_payment_id text UNIQUE,
+  razorpay_signature text,
+  status text NOT NULL DEFAULT 'created' CHECK (status IN ('created','paid')),
+  paid_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS otp_challenges (
@@ -557,7 +573,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE listener_wallet_transactions DROP CONSTRAINT IF EXISTS listener_wallet_transactions_type_check;
-  ALTER TABLE listener_wallet_transactions ADD CONSTRAINT listener_wallet_transactions_type_check CHECK (type IN ('call_credit','subscription_credit','payout','admin_adjustment'));
+  ALTER TABLE listener_wallet_transactions ADD CONSTRAINT listener_wallet_transactions_type_check CHECK (type IN ('call_credit','subscription_credit','donation_credit','payout','admin_adjustment'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -608,6 +624,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_open_listener_activity ON listener_activity
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_call_debit ON wallet_transactions(reference_id) WHERE type='call_debit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_payment_credit ON wallet_transactions(reference_id) WHERE type='payment' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_call_credit ON listener_wallet_transactions(reference_id) WHERE type='call_credit' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_donation_credit ON listener_wallet_transactions(reference_id) WHERE type='donation_credit' AND reference_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_listener_donation_orders_employee ON listener_donation_orders(employee_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listener_donation_orders_customer ON listener_donation_orders(customer_id,created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_subscription_credit ON listener_wallet_transactions(reference_id) WHERE type='subscription_credit' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_wallet_payout ON listener_wallet_transactions(reference_id) WHERE type='payout' AND reference_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listener_pending_withdrawal ON listener_withdrawal_requests(employee_id) WHERE status='pending';

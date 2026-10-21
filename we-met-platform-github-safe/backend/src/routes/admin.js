@@ -138,7 +138,7 @@ router.get('/users', asyncHandler(async (req, res) => {
     ) activity_stats ON u.role='employee'
     LEFT JOIN LATERAL (
       SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit','donation_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise
       FROM listener_wallet_transactions t
       WHERE t.employee_id=u.id
@@ -568,13 +568,13 @@ router.get('/users/:id/details', asyncHandler(async (req, res) => {
     `, [req.params.id]),
     db.query(`
       SELECT COALESCE(SUM(amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(amount_paise) FILTER (WHERE type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(amount_paise) FILTER (WHERE type IN ('call_credit','subscription_credit','donation_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-amount_paise) FILTER (WHERE type='payout'),0)::bigint AS lifetime_paid_paise,
              COALESCE(SUM(amount_paise) FILTER (
-               WHERE type IN ('call_credit','subscription_credit') AND created_at>=date_trunc('day',now())
+               WHERE type IN ('call_credit','subscription_credit','donation_credit') AND created_at>=date_trunc('day',now())
              ),0)::bigint AS today_earnings_paise,
              COALESCE(SUM(amount_paise) FILTER (
-               WHERE type IN ('call_credit','subscription_credit') AND created_at>=now()-interval '7 days'
+               WHERE type IN ('call_credit','subscription_credit','donation_credit') AND created_at>=now()-interval '7 days'
              ),0)::bigint AS week_earnings_paise
       FROM listener_wallet_transactions
       WHERE employee_id=$1
@@ -694,13 +694,13 @@ router.get('/listener-wallets', asyncHandler(async (_req, res) => {
     FROM users u
     LEFT JOIN LATERAL (
       SELECT COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit','donation_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=date_trunc('day',now())
+               WHERE t.type IN ('call_credit','subscription_credit','donation_credit') AND t.created_at>=date_trunc('day',now())
              ),0)::bigint AS today_earnings_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=now()-interval '7 days'
+               WHERE t.type IN ('call_credit','subscription_credit','donation_credit') AND t.created_at>=now()-interval '7 days'
              ),0)::bigint AS week_earnings_paise,
              MAX(t.created_at) FILTER (WHERE t.type='payout') AS last_paid_at
       FROM listener_wallet_transactions t

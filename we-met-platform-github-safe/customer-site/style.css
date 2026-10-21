@@ -1602,3 +1602,36 @@ body.signed-in.customer-messages-active .dashboard{
 @media(max-width:950px){.seo-link-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.seo-link-grid{grid-template-columns:1fr}.seo-link-grid>a{min-height:118px;padding:19px}.seo-explore{padding-top:45px}.seo-faq{margin-top:35px}.seo-faq details{padding:14px 16px}}
 @media(prefers-reduced-motion:reduce){.seo-link-grid>a{transition:none}}
+
+/* Compact, on-demand listener donation form. No separate screen. */
+#listenerProfileModal .listener-donate-trigger {
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid #edcbda;border-radius:999px;padding:6px 12px;
+  background:#fff2f7;color:#ad3469;font:inherit;font-size:12px;font-weight:700;
+  cursor:pointer;min-height:32px;box-shadow:none;
+}
+#listenerProfileModal .listener-donate-trigger:hover,
+#listenerProfileModal .listener-donate-trigger[aria-expanded="true"] {
+  border-color:#de8baf;background:#ffe8f2;
+}
+#listenerProfileModal .listener-donate-panel {
+  display:flex;align-items:center;gap:8px;margin:12px 30px 0;
+  padding:8px;border:1px solid #eedce5;border-radius:15px;
+  background:#fff;max-width:410px;
+}
+#listenerProfileModal .listener-donate-panel.hidden {display:none!important}
+#listenerProfileModal .listener-donate-currency {
+  font-weight:800;color:#a12a61;font-size:17px;margin-left:8px;
+}
+#listenerProfileModal .listener-donate-panel input {
+  width:100%;min-width:0;min-height:38px;padding:6px 3px;
+  border:0!important;outline:0!important;box-shadow:none!important;
+  background:transparent!important;color:#27212a;font-size:15px;
+}
+#listenerProfileModal .listener-donate-panel input:focus-visible {outline:0!important}
+#listenerProfileModal .listener-donate-panel .button {
+  flex:none;min-height:39px;padding:9px 18px;border-radius:10px;white-space:nowrap;
+}
+@media(max-width:600px){
+  #listenerProfileModal .listener-donate-panel {margin-inline:18px;max-width:none}
+}

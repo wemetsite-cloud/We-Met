@@ -535,6 +535,12 @@
     $('#preloginSupportIssueForm').onsubmit = submitPreloginSupport;
     $$('.legal-btn').forEach((button) => { button.onclick = () => loadLegal(button.dataset.legal); });
     document.addEventListener('click', handleActionClick);
+    document.addEventListener('submit', (event) => {
+      if (event.target?.id === 'listenerDonationForm') {
+        event.preventDefault();
+        submitListenerDonation(event.target);
+      }
+    });
     document.addEventListener('contextmenu', (event) => { if (event.target.closest('img,.protected-media,.exclusive-post')) event.preventDefault(); });
     document.addEventListener('dragstart', (event) => { if (event.target.closest('img,.protected-media')) event.preventDefault(); });
     document.addEventListener('copy', (event) => { if (me && !event.target.closest('input,textarea')) event.preventDefault(); });
@@ -555,10 +561,11 @@
     if (postLike) return togglePostLike(postLike);
     const openPost = event.target.closest('button[data-open-customer-post]');
     if (openPost) return openCustomerPostFeed(openPost.dataset.openCustomerPost);
-    const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
+    const target = event.target.closest('button[data-listener-profile],button[data-follow],button[data-listener-donate],button[data-subscribe],button[data-listener-call],button[data-listener-message],button[data-buy-plan],button[data-conversation],button[data-cancel-subscription]');
     if (!target) return;
     const d = target.dataset;
     if (d.listenerProfile) return openListenerProfile(d.listenerProfile);
+    if (d.listenerDonate) return toggleListenerDonation(d.listenerDonate);
     if (d.follow) return toggleFollow(d.follow, d.following === 'true');
     if (d.subscribe) return subscribeToListener(d.subscribe, target);
     if (d.listenerCall) return requestCall(d.listenerCall);
@@ -737,8 +744,96 @@
       const callButton = status === 'available'
         ? `<button class="listener-call-fab" data-listener-call="${esc(listener.id)}" data-call-available="true" type="button" aria-label="Call ${esc(listener.name)}" ${pendingCallRequest || currentCall ? 'disabled' : ''}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7.1 3.7 4.8 5.2c-.8.5-1.1 1.5-.8 2.4 2 6.4 6 10.4 12.4 12.4.9.3 1.9 0 2.4-.8l1.5-2.3c.4-.7.3-1.6-.3-2.1l-3-2.3c-.6-.5-1.4-.4-2 .1l-1.4 1.4a12 12 0 0 1-3.6-3.6L11.4 9c.5-.6.6-1.4.1-2l-2.3-3c-.5-.6-1.4-.7-2.1-.3Z"/></svg></button>`
         : '';
-      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
+      $('#listenerProfileContent').innerHTML = `<div class="listener-profile-head"><div class="listener-profile-banner protected-media" style="--profile-banner:url('${esc(listenerImage(listener, 'banner'))}')"></div><div class="listener-profile-avatar"><img class="protected-media" src="${esc(listenerImage(listener))}" alt="${esc(listener.name)}" draggable="false"><i class="${status === 'available' ? 'online' : ''}"></i></div><div class="listener-profile-title"><div><span class="listener-live ${esc(status)}"><i></i>${esc(statusLabel(status))}</span><h2 id="listenerProfileName">${esc(listener.name)}</h2><p>${esc(listener.bio)}</p></div><button class="button button-soft profile-follow-button" data-follow="${esc(listener.id)}" data-following="${listener.following}" type="button">${listener.following ? 'Following' : 'Follow'}</button></div><div class="listener-profile-tags"><span>🎧 ${esc(listener.language)}</span><span>Verified profile</span><button class="listener-donate-trigger" data-listener-donate="${esc(listener.id)}" type="button" aria-expanded="false">♡ Donate</button></div><div class="listener-profile-actions"><button class="button button-soft" data-listener-message="${esc(listener.id)}" type="button">Message</button>${subscribed ? '<span class="member-confirmed">Exclusive active</span>' : `<button class="button button-soft subscribe-button" data-subscribe="${esc(listener.id)}" type="button">Exclusive · ₹399</button>`}</div><form id="listenerDonationForm" class="listener-donate-panel hidden" data-listener-id="${esc(listener.id)}"><label for="listenerDonationAmount" class="sr-only">Donation amount in rupees</label><span class="listener-donate-currency" aria-hidden="true">₹</span><input id="listenerDonationAmount" name="amount" type="number" min="10" max="10000" step="0.01" placeholder="Enter amount" inputmode="decimal" autocomplete="off" required><button class="button button-primary" type="submit">Donate</button></form><p class="call-wallet-note">Calls need only wallet talk-time. Exclusive unlocks posts and messages.</p></div><section class="exclusive-posts"><div class="exclusive-posts-head"><span>POSTS</span><small>${subscribed ? 'Exclusive access active' : 'Exclusive members only'}</small></div><div class="post-grid">${postsMarkup}</div></section>${callButton}`;
     } catch (error) { $('#listenerProfileContent').innerHTML = emptyState('Profile unavailable', error.message); }
+  }
+
+  function toggleListenerDonation(listenerId) {
+    if (!me || activeListenerProfileId !== listenerId) return;
+    const panel = $('#listenerDonationForm');
+    const trigger = $('#listenerProfileContent .listener-donate-trigger');
+    if (!panel || !trigger) return;
+    const open = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !open);
+    trigger.setAttribute('aria-expanded', String(open));
+    if (open) $('#listenerDonationAmount')?.focus();
+  }
+
+  async function submitListenerDonation(form) {
+    const listenerId = form.dataset.listenerId;
+    const amountInput = form.querySelector('[name="amount"]');
+    const rawAmount = String(amountInput?.value || '').trim();
+    if (!/^\d+(?:\.\d{1,2})?$/.test(rawAmount)) {
+      return P.toast('Enter a valid amount in rupees.', 'error');
+    }
+    const amountPaise = Math.round(Number(rawAmount) * 100);
+    if (!Number.isSafeInteger(amountPaise) || amountPaise < 1000 || amountPaise > 1000000) {
+      return P.toast('Enter an amount from ₹10 to ₹10,000.', 'error');
+    }
+    if (!me || !listenerId || activeListenerProfileId !== listenerId) return;
+    if (form.dataset.processing === 'true') return;
+    const button = form.querySelector('button[type="submit"]');
+    form.dataset.processing = 'true';
+    if (button) { button.disabled = true; button.textContent = 'Opening…'; }
+    const restore = () => {
+      form.dataset.processing = 'false';
+      if (button) { button.disabled = false; button.textContent = 'Donate'; }
+    };
+    let handled = false;
+    let failed = false;
+    try {
+      await loadRazorpayCheckout();
+      if (typeof window.Razorpay !== 'function') throw new Error('Secure checkout is unavailable.');
+      const order = await P.api('/api/donations/create', {
+        method: 'POST',
+        body: JSON.stringify({ listenerId, amountPaise }),
+      });
+      if (!order?.order_id || !order?.key_id) throw new Error('Could not create the donation checkout.');
+      const checkout = new window.Razorpay({
+        key: order.key_id,
+        order_id: order.order_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'We Met',
+        description: `Donate to ${order.listener_name || activeProfileListener?.name || 'listener'}`,
+        image: new URL('/shared/icon-192.png', location.href).href,
+        prefill: { name: me.name || '', contact: me.phone || '', email: me.email || '' },
+        theme: { color: '#f0448f' },
+        retry: { enabled: true },
+        modal: {
+          ondismiss: () => {
+            restore();
+            if (!handled && !failed) P.toast('Donation cancelled.', 'info');
+          },
+        },
+        handler: async (payment) => {
+          handled = true;
+          try {
+            const result = await P.api('/api/donations/verify', {
+              method: 'POST', timeout: 30000, body: JSON.stringify(payment),
+            });
+            amountInput.value = '';
+            if (activeListenerProfileId === listenerId) {
+              form.classList.add('hidden');
+              $('#listenerProfileContent .listener-donate-trigger')?.setAttribute('aria-expanded', 'false');
+            }
+            P.toast(result.message || 'Donation sent successfully!', 'success');
+          } catch (error) {
+            P.toast(`${error.message || 'Donation could not be verified.'} Ref: ${payment?.razorpay_payment_id || 'unknown'}`, 'error');
+          } finally { restore(); }
+        },
+      });
+      checkout.on('payment.failed', (response) => {
+        failed = true;
+        restore();
+        P.toast(response?.error?.description || 'Donation payment failed.', 'error');
+      });
+      if (button) button.textContent = 'Processing…';
+      checkout.open();
+    } catch (error) {
+      restore();
+      P.toast(error.message || 'Donation checkout could not start.', 'error');
+    }
   }
 
   async function renderPrivatePosts(posts) {

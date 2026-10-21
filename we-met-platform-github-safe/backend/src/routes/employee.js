@@ -54,13 +54,13 @@ router.get('/wallet', asyncHandler(async (req, res) => {
     db.query(`
       SELECT u.listener_rate_paise,
              COALESCE(SUM(t.amount_paise),0)::bigint AS balance_paise,
-             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit')),0)::bigint AS lifetime_earnings_paise,
+             COALESCE(SUM(t.amount_paise) FILTER (WHERE t.type IN ('call_credit','subscription_credit','donation_credit')),0)::bigint AS lifetime_earnings_paise,
              COALESCE(SUM(-t.amount_paise) FILTER (WHERE t.type='payout'),0)::bigint AS lifetime_paid_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=date_trunc('day',now())
+               WHERE t.type IN ('call_credit','subscription_credit','donation_credit') AND t.created_at>=date_trunc('day',now())
              ),0)::bigint AS today_earnings_paise,
              COALESCE(SUM(t.amount_paise) FILTER (
-               WHERE t.type IN ('call_credit','subscription_credit') AND t.created_at>=now()-interval '7 days'
+               WHERE t.type IN ('call_credit','subscription_credit','donation_credit') AND t.created_at>=now()-interval '7 days'
              ),0)::bigint AS week_earnings_paise
       FROM users u
       LEFT JOIN listener_wallet_transactions t ON t.employee_id=u.id

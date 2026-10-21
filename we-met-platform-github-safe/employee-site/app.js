@@ -1573,12 +1573,13 @@
         : balancePaise > 0
           ? `${P.moneyExact(balancePaise)} is awaiting manual payment by the administrator.`
           : Number(summary.lifetimePaidPaise || 0) > 0
-            ? 'Your recorded earnings are fully settled. New call and subscription earnings will appear here automatically.'
-            : 'Call earnings and ₹50 successful-subscription credits are added automatically.';
+            ? 'Your recorded earnings are fully settled. New call, donation and subscription earnings will appear here automatically.'
+            : 'Call, donation and subscription earnings are added automatically.';
 
       const labels = {
         call_credit: 'Call earnings',
         subscription_credit: 'Exclusive subscription earning',
+        donation_credit: 'Donation received',
         payout: 'Payment recorded',
         admin_adjustment: 'Administrator adjustment',
       };
@@ -1597,7 +1598,7 @@
           const detail = [callDetail || paymentDetail || subscriptionDetail, entry.note].filter(Boolean).join(' · ');
           return `<article class="wallet-entry ${amount < 0 ? 'debit' : 'credit'}"><div><strong>${P.esc(labels[entry.type] || entry.type)}</strong><p>${P.esc(detail || 'Wallet entry')}</p><small>${P.date(entry.created_at)}</small></div><b>${amount >= 0 ? '+' : '−'}${P.moneyExact(Math.abs(amount))}</b></article>`;
         }).join('')
-        : emptyState('No wallet activity', 'Connected-call earnings, ₹50 subscription credits and recorded payments will appear here.');
+        : emptyState('No wallet activity', 'Call earnings, donations, subscriptions and recorded payments will appear here.');
       $('#withdrawalHistory').innerHTML = response.withdrawals?.length
         ? response.withdrawals.map((entry) => `<article class="withdrawal-entry"><div><span class="withdrawal-status ${P.esc(entry.status)}">${P.esc(entry.status)}</span><strong>${P.moneyExact(entry.amount_paise)}</strong><small>${P.date(entry.requested_at)}</small></div><p>${entry.status === 'paid' ? `Paid${entry.payment_reference ? ` · UTR ${P.esc(entry.payment_reference)}` : ''}` : entry.status === 'declined' ? P.esc(entry.admin_note || 'Declined by admin') : 'Admin review · up to 24 hours'}</p></article>`).join('')
         : '<small class="empty-copy">No withdrawal requests yet.</small>';
